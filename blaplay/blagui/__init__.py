@@ -36,14 +36,6 @@ def init():
     from blawindow import BlaWindow
     global bla, tray
 
-    icon_theme = gtk.icon_theme_get_default()
-    icon_theme.append_search_path(blaconst.IMAGES_PATH)
-    icons = []
-    for size in [128, 96, 64, 48, 32, 16]:
-        try: icons.append(icon_theme.load_icon(blaconst.APPNAME, size, 0))
-        except gobject.GError: pass
-    gtk.window_set_default_icon_list(*icons)
-
     bla = BlaWindow()
     tray = BlaTray()
 

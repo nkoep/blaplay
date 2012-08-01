@@ -14,7 +14,9 @@ planned features/enhancements. The BUGS file contains a description of
 currently known issues and proposed possible solutions.
 
 Build dependencies:
+    * python-dev (>= 2.6)
     * Cython (>= 0.15.1)
+    * python-numpy
     * libfftw3-dev (>= 3.2.2)
 
 Runtime dependencies:

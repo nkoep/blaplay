@@ -27,7 +27,7 @@ class BlaAbout(gtk.AboutDialog):
         self.set_name(blaconst.APPNAME)
         self.set_version(blaconst.VERSION)
         self.set_comments(blaconst.COMMENT)
-#        self.set_website(blaconst.WEB)
+        self.set_website(blaconst.WEB)
         self.set_copyright(blaconst.COPYRIGHT)
         self.set_authors(blaconst.AUTHORS)
         self.show_all()

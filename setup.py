@@ -136,14 +136,16 @@ class build_shortcuts(Command):
         basepath = os.path.join(self.build_base, "share", "applications")
         self.mkpath(basepath)
         for shortcut in self.shortcuts:
+            print shortcut, os.path.join(basepath, shortcut)
             self.copy_file(shortcut, os.path.join(basepath, shortcut))
 
-class build_icon_cache(Command):
+class update_icon_cache(Command):
     def initialize_options(self): pass
     def finalize_options(self): pass
 
     def run(self):
-        self.spawn(["gtk-update-icon-cache", "-f", "blaplay/images/hicolor"])
+        self.spawn(["gtk-update-icon-cache", "-f",
+                os.path.join(sys.prefix, "share/icons/hicolor")])
 
 class install_shortcuts(Command):
     description = "install .desktop files"
@@ -178,12 +180,13 @@ class install_shortcuts(Command):
 class build(d_build):
     """Override the default build with new subcommands."""
     sub_commands = d_build.sub_commands
-    sub_commands.extend([("build_shortcuts", lambda *x: True),
-            ("build_icon_cache", lambda *x: True)])
+    sub_commands.extend([("build_shortcuts", lambda *x: True)])
 
 class install(d_install):
     sub_commands = d_install.sub_commands
-    sub_commands.extend([("install_shortcuts", lambda *x: True)])
+    # update the icon cache only after moving icons to the system directories
+    sub_commands.extend([("install_shortcuts", lambda *x: True),
+            ("update_icon_cache", lambda *x: True)])
 
 class BlaDistribution(Distribution):
     shortcuts = []
@@ -191,7 +194,7 @@ class BlaDistribution(Distribution):
     def __init__(self, *args, **kwargs):
         Distribution.__init__(self, *args, **kwargs)
         self.cmdclass.setdefault("build_shortcuts", build_shortcuts)
-        self.cmdclass.setdefault("build_icon_cache", build_icon_cache)
+        self.cmdclass.setdefault("update_icon_cache", update_icon_cache)
         self.cmdclass.setdefault("install_shortcuts", install_shortcuts)
         self.cmdclass.setdefault("build", build)
         self.cmdclass.setdefault("install", install)
@@ -209,11 +212,15 @@ if __name__ == "__main__":
             for f in visualizations
     ]
 
-    base = "blaplay/images"
-    images_comps = []
-    for dirname, dirs, filenames in os.walk(base):
+    base = "/usr/share/icons/hicolor"
+    src_base = "blaplay/images/hicolor"
+    data_files = []
+    for dirname, dirs, filenames in os.walk(src_base):
         for filename in filenames:
-            images_comps.append(os.path.join(dirname, filename)[len(base)+1:])
+            src_leaf = os.path.join(dirname, filename)
+            leaf = os.path.dirname(
+                    os.path.join(base, src_leaf[len(src_base)+1:]))
+            data_files.append((leaf, [src_leaf]))
 
     kwargs = {
         "name": blaconst.APPNAME,
@@ -227,8 +234,9 @@ if __name__ == "__main__":
                 for module in ["blagui", "formats", "visualizations"]],
         "package_data": {
             "": ["ChangeLog", "TODO"],
-            "blaplay": ["images/%s" % comp for comp in images_comps]
+            "blaplay": ["images/*.svg"]
         },
+        "data_files": data_files,
         "scripts": ["blaplay.py"],
         "shortcuts": ["blaplay.desktop"],
         "distclass": BlaDistribution,

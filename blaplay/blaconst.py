@@ -22,7 +22,7 @@ import blautils
 VERSION = "0.1"
 APPNAME = "blaplay"
 COMMENT = "A bla that plays"
-WEB = "http://bla.blub"
+WEB = "https://github.com/nkoep/blaplay"
 AUTHOR = "Niklas Koep"
 AUTHORS = sorted([
     AUTHOR

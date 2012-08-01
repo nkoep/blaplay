@@ -11,14 +11,11 @@
    xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
    xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
    sodipodi:docname="logo.svg"
-   inkscape:version="0.48.2 r9819"
+   inkscape:version="0.48+devel r"
    version="1.1"
    id="svg3016"
    height="150"
-   width="150"
-   inkscape:export-filename="/home/nik/sources/blaplay-git/blaplay/images/hicolor/16x16/apps/blaplay.png"
-   inkscape:export-xdpi="15"
-   inkscape:export-ydpi="15">
+   width="150">
   <defs
      id="defs3018">
     <linearGradient
@@ -260,17 +257,17 @@
      borderopacity="1.0"
      inkscape:pageopacity="0"
      inkscape:pageshadow="2"
-     inkscape:zoom="0.97227182"
-     inkscape:cx="77.375268"
-     inkscape:cy="-1.94324"
+     inkscape:zoom="2.75"
+     inkscape:cx="96.838146"
+     inkscape:cy="62.753102"
      inkscape:current-layer="g4084"
      showgrid="true"
      inkscape:document-units="px"
      inkscape:grid-bbox="true"
      inkscape:window-width="1361"
      inkscape:window-height="859"
-     inkscape:window-x="121"
-     inkscape:window-y="62"
+     inkscape:window-x="198"
+     inkscape:window-y="35"
      inkscape:window-maximized="0" />
   <metadata
      id="metadata3021">
@@ -296,14 +293,14 @@
        d="m 39.530808,-25.666357 52.922963,37.941999 -24.918553,15.393886 0,30.810214 46.823922,-28.632482 0,-33.5663828 -74.828332,-52.8301992 0,30.882965 z"
        style="fill:#ffffff;fill-opacity:0.78431373;stroke:none;display:inline;filter:url(#filter3942)"
        inkscape:connector-curvature="0"
-       transform="matrix(1.1005977,0,0,1.1005977,2.9821676,-15.211403)" />
+       transform="matrix(1.1435158,0,0,1.1435158,2.6823619,-11.635427)" />
     <path
        sodipodi:nodetypes="cccccccc"
        id="path2816-2"
        d="m 11.354127,-6.7613061 32.735329,23.5930111 -16.384828,10.121989 0,20.258861 30.788281,-18.826963 0,-22.071118 -47.138782,-33.140684 0,20.0649039 z"
        style="fill:#ffffff;fill-opacity:0.80784314;stroke:none;display:inline;filter:url(#filter3928)"
        inkscape:connector-curvature="0"
-       transform="matrix(1.1005977,0,0,1.1005977,2.9821676,-15.211403)" />
+       transform="matrix(1.1435158,0,0,1.1435158,2.6823619,-11.635427)" />
   </g>
   <g
      style="display:inline"
@@ -317,13 +314,13 @@
        d="m 39.530808,-25.666357 52.922963,37.941999 -24.918553,15.393886 0,30.810214 46.823922,-28.632482 0,-33.5663828 -74.828332,-52.8301992 0,30.882965 z"
        id="path4086"
        sodipodi:nodetypes="cccccccc"
-       transform="matrix(1.1005977,0,0,1.1005977,2.9821676,-15.211403)" />
+       transform="matrix(1.1435158,0,0,1.1435158,2.6823619,-11.635427)" />
     <path
        inkscape:connector-curvature="0"
        style="fill:url(#linearGradient3814);fill-opacity:1;stroke:none;display:inline;filter:url(#filter3928)"
        d="m 11.354127,-6.7613061 32.735329,23.5930111 -16.384828,10.121989 0,20.258861 30.788281,-18.826963 0,-22.071118 -47.138782,-33.140684 0,20.0649039 z"
        id="path4088"
        sodipodi:nodetypes="cccccccc"
-       transform="matrix(1.1005977,0,0,1.1005977,2.9821676,-15.211403)" />
+       transform="matrix(1.1435158,0,0,1.1435158,2.6823619,-11.635427)" />
   </g>
 </svg>
