@@ -1,9 +1,13 @@
 [Icon Theme]
 Name=blaplay
 Hidden=true
-Directories=scalable/apps
+Directories=64x64/apps,scalable/apps
 
 [scalable/apps]
 Size=48
 Type=Scalable
+
+[64x64/apps]
+Size=64
+Type=Fixed
 
