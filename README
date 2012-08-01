@@ -1,0 +1,48 @@
+blaplay - a bla that plays (or: a working title that stuck)
+
+blaplay is an audio player for GNU/Linux with a minimalistic design focus
+rather than feature richness. As a consequence a plugin system is neither
+implemented nor planned for the future. Instead new features that are decided
+to be added will be implemented into the core application. blaplay is written
+in Python 2.6, and relies on PyGTK, PyGST, and Mutagen to implement its basic
+functionality. Notable features include a monitored audio library, automatic
+cover art, lyrics and biography fetching, and last.fm scrobbling. In the future
+blaplay will also integrate event, artist and release recommendations (powered
+by last.fm, musicbrainz and, songkick), as well as support for internet radio
+stations and portable media devices. Refer to the TODO file for more details on
+planned features/enhancements. The BUGS file contains a description of
+currently known issues and proposed possible solutions.
+
+Build dependencies:
+    * Cython (>= 0.15.1)
+    * libfftw3-dev (>= 3.2.2)
+
+Runtime dependencies:
+    * python (>= 2.6)
+    * python-gtk2 (>= 2.21)
+    * python-gst0.10
+    * python-mutagen (>= 1.19)
+    * python-gobject (>= 2.21)
+    * libfftw3-3 (>= 3.2.2)
+
+Recommended:
+    * gstreamer0.10-plugins-good
+    * gstreamer0.10-plugins-bad
+    * gstreamer0.10-plugins-ugly
+    * python-mmkeys
+    * python-dbus (>= 0.83)
+
+blaplay currently includes a spectrum analyzer element which, for performance
+reasons, is written in Cython, wrapping fftw3 in order to transfer the most
+computationally expensive operations to C-code. Building blaplay therefore
+requires a recent version of the Cython compiler (>= 0.15.1), as well as the
+single-precision library of fftw3 and its development headers. To prepare and
+run blaplay locally, issue
+  $ ./setup.py build_ext --inplace
+  $ ./blaplay.py
+
+after satisfying all build-dependencies. To install blaplay system-wide and run
+it, simply issue
+  $ ./setup.py install
+  $ blaplay
+

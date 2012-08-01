@@ -1,0 +1,56 @@
+BUGS/KNOWN ISSUES
+
+- some formats create jerky animations in the spectrum visualization; this is
+  because the respective decoders sometimes send buffers whose size exceeds our
+  transform length. since we implement a circular buffer to store samples for
+  when we need them to calculate a transform we often skip lots of samples.
+  for example, the mad decoder always sends 1152 samples when forcing a rate of
+  44.1 kHz. we calculate a 4096-point FFT which means we'd get roughly 10~ full
+  FFTs if we didn't use overlap (which we do since we actually want to
+  calculate 35 transforms per second). since the buffer size is always smaller
+  than the size of our ringbuffer we never drop any frames. asfdemux on the
+  other hand sends buffers with 20k+ samples downstream from which we only
+  keep 2 * 4096 (two channels). we get an effective update rate of 2 Hz. to
+  avoid this we need to either a) adjust the size of the ringbuffer or b) make
+  the ringbuffer 2 * 44.1k samples large as we can never receive buffers
+  larger than that since we enforce a rate of 44.1 kHz on the pipeline
+- memory consumption is fairly high; this is due to the fact that we basically
+  read every available tag in a file; the exception being id3 tags where we
+  read a fixed subset of standard tags as well as every included TXXX user tag.
+  in the future we might limit this further
+- the library monitor might miss an event occasionally; additionally, adding
+  many files triggers many events that are processed in python threads which
+  can make things cripplingly slow; try moving the workload to separate
+  processes and add deferred handlers for events on files to avoid updating
+  one and the same file multiple times (we need to make sure to end up with the
+  correct mtime though)
+- memory consumption seems to increase in certain situations where it
+  shouldn't, e.g. sometimes when a playlist is removed (even if it's empty)
+  or when creating a new model for the library. the garbage collector in debug
+  mode doesn't report anything suspicious so it might just be that python
+  allocates memory to create the model and doesn't return it to the OS again in
+  anticipation of needing the memory again at a later point
+- there are occasional segfaults due to invalidated textiters in the textviews
+  displaying lyrics and artist bios; previously the responsible methods were
+  protected by gtk.gdk.threads_enter/leave which avoided these scenarios.
+  however, due to the way new tracks are analyzed (using gtk.main_iteration to
+  drive generator functions in gobject.idle_add calls for performance reasons)
+  this can cause deadlocks; it might be solvable by using textmarks instead of
+  textiters as suggested by gtk's occasional assertion messages
+- switching between library views might cause playback stutters as creating and
+  adding the complete model to the treeview is performance-hungry. the problem
+  might be relaxed by implementing a lazy model where contents of nested nodes
+  are created at row-expansion time as opposed to creating everything
+  beforehand as is the case now
+- occasionally exceptions are raised from threads during interpreter shutdown.
+  all threads are run in daemon mode so they don't prevent blaplay from
+  shutting down. additionally, our thread baseclass keeps references to all
+  threads and on shutdown is supposed to make sure all threads are terminated.
+  this doesn't seem to take however. this seems to be related to threads
+  placing last.fm api calls. also, on interpreter shutdown every variable in a
+  module is set to None. the threading module takes this into account in its
+  __bootstrap method and suppresses exceptions. still these exceptions occur
+  from time to time which means they're probably raised even before the _sys
+  module is set to None. it might be related to killing a thread while we're
+  trying to receive a reply from an httplib.HTTPConnection object. this might
+  be avoidable by catching all exceptions, not just httplib.BadStatusLine

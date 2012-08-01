@@ -1,0 +1,10 @@
+include README
+include LICENSE
+include NEWS
+include BUGS
+include blaplay.desktop
+include visualizations/*.pyx
+recursive-include blaplay/images *.cache *.theme *.svg
+exclude blaplay/images *.cache
+exclude blaplay/visualizations/*.so
+

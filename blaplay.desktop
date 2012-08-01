@@ -1,0 +1,11 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Comment=Listen to and organize your music collection
+Name=blaplay
+Exec=blaplay
+Terminal=false
+Icon=blaplay
+StartupNotify=True
+Categories=GNOME;Audio;Music;Player;GTK;
+
