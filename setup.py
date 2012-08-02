@@ -229,7 +229,11 @@ if __name__ == "__main__":
             images_comps.append(
                     os.path.join(dirname, filename)[len(src_base)+1:])
 
+<<<<<<< HEAD
     base = os.path.join(sys.prefix, "share/icons/hicolor")
+=======
+    base = "/usr/share/icons/hicolor"
+>>>>>>> 86f8b58c02bf88d1cc742aa31720b073e641b277
     src_base = "blaplay/images/hicolor"
     data_files = []
     for dirname, dirs, filenames in os.walk(src_base):

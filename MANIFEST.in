@@ -4,6 +4,6 @@ include NEWS
 include BUGS
 include blaplay.desktop
 include visualizations/*.pyx
-recursive-include blaplay/images *.svg *.png
+recursive-include blaplay/images *.svg *.png *.theme
 exclude blaplay/visualizations/*.so
 
