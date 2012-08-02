@@ -36,6 +36,8 @@ def init():
     from blawindow import BlaWindow
     global bla, tray
 
+    gtk.icon_theme_get_default().append_search_path(blaconst.IMAGES_PATH)
+
     bla = BlaWindow()
     tray = BlaTray()
 
