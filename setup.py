@@ -108,6 +108,15 @@ class check(Command):
                 self.__NAME)
         else: print "found"
 
+        print "Checking for numpy >= 1.3:",
+        try:
+            import numpy.version
+            if numpy.version.version < "1.3": raise ImportError
+        except ImportError:
+            raise SystemExit("not found\n%s requires python-numpy 1.3.\n"
+                % self.__NAME)
+        else: print "found"
+
 class build_scripts(d_build_scripts):
     description = "copy scripts to build directory"
 
@@ -144,8 +153,10 @@ class update_icon_cache(Command):
     def finalize_options(self): pass
 
     def run(self):
-        self.spawn(["gtk-update-icon-cache", "-f",
-                os.path.join(sys.prefix, "share/icons/hicolor")])
+        self.spawn(["gtk-update-icon-cache", "-f", "blaplay/images/hicolor"])
+        icon_dir = os.path.join(sys.prefix, "share/icons/hicolor")
+        if os.access(icon_dir, os.W_OK):
+            self.spawn(["gtk-update-icon-cache", "-f", icon_dir])
 
 class install_shortcuts(Command):
     description = "install .desktop files"
@@ -212,6 +223,13 @@ if __name__ == "__main__":
             for f in visualizations
     ]
 
+    src_base = "blaplay/images"
+    images_comps = []
+    for dirname, dirs, filenames in os.walk(src_base):
+        for filename in filenames:
+            images_comps.append(
+                    os.path.join(dirname, filename)[len(src_base)+1:])
+
     base = "/usr/share/icons/hicolor"
     src_base = "blaplay/images/hicolor"
     data_files = []
@@ -234,7 +252,7 @@ if __name__ == "__main__":
                 for module in ["blagui", "formats", "visualizations"]],
         "package_data": {
             "": ["ChangeLog", "TODO"],
-            "blaplay": ["images/*.svg"]
+            "blaplay": ["images/%s" % comp for comp in images_comps]
         },
         "data_files": data_files,
         "scripts": ["blaplay.py"],
