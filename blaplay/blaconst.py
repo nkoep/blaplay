@@ -136,6 +136,8 @@ MENU_EDIT = map(lambda entry: "/Menu/Edit/%s" % entry,
          "Select/SelectComplement", "Selection/Cut", "Selection/Copy",
          "Selection/Remove"]
 )
+MENU_ORDER = map(lambda entry: "/Menu/PlayOrder/%s" % entry,
+        ["OrderNormal", "OrderRepeat", "OrderShuffle"])
 MENU_VIEWS = map(lambda entry: "/Menu/View/%s" % entry,
         ["Playlists", "Queue", "Radio", "RecommendedEvents", "NewReleases"])
 

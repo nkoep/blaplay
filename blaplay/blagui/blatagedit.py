@@ -302,6 +302,7 @@ class BlaTagedit(blaguiutils.BlaWindow):
             if gtk.events_pending():
                 if gtk.main_iteration(): break
 
+        self.__pb.set_visible(False)
         from blaplay.blagui.blaplaylist import BlaPlaylist
         BlaPlaylist.update_contents()
         if ns["update_library"]: library.update_library()

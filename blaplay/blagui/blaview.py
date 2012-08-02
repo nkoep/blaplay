@@ -290,7 +290,6 @@ class BlaSidePane(gtk.VBox):
             action = blagui.uimanager.get_widget(view)
             action.set_active(states[idx])
 
-    @blautils.gtk_thread
     def __update_track(self, track):
         begin = self.__tb.get_start_iter()
         begin2 = self.__tb2.get_start_iter()
@@ -338,11 +337,11 @@ class BlaSidePane(gtk.VBox):
     def __clear(self):
         # decorating this with blautils.gtk_thread causes a deadlock so we use
         # a regular lock instead
-        with self.__lock:
-            self.__tb.delete(
-                    self.__tb.get_start_iter(), self.__tb.get_end_iter())
-            self.__tb2.delete(
-                    self.__tb2.get_start_iter(), self.__tb2.get_end_iter())
+#        with self.__lock:
+        self.__tb.delete(
+                self.__tb.get_start_iter(), self.__tb.get_end_iter())
+        self.__tb2.delete(
+                self.__tb2.get_start_iter(), self.__tb2.get_end_iter())
 
     def update_view(self, view):
         path = self.__treeview.get_selection().get_selected_rows()[-1][0][0]
@@ -440,6 +439,8 @@ class BlaView(gtk.HPaned):
         if child.get_parent() is not None: child.unparent()
         cls.__container.add(child)
 
+        # not all menu items are available for all views so update them
+        # accordingly
         blagui.update_menu(view)
         cls.__side_pane.update_view(view)
         blacfg.set("general", "view", view)

@@ -60,6 +60,7 @@ class BlaVisualization(gtk.DrawingArea):
             blaguiutils.error_dialog("Failed to initialize the requested "
                     "visualization.")
             disable()
+            blacfg.set("general", "visualization", VISUALIZATION_OFF)
         else:
             self.__module = module()
             self.__module.set_width(self.get_allocation().width)

@@ -493,23 +493,17 @@ class BlaEval(object):
 
     # these methods are static despite absent staticmethod decorators
     def __track_cb(track):
-        value = ""
-        if track[DISC] != "":
-            try: value += "%d." % int(track[DISC].split("/")[0])
-            except ValueError: pass
-        if track[TRACK] != "":
-            try: value += "%02d" % int(track[TRACK].split("/")[0])
-            except ValueError: pass
+        try: value = "%d." % int(track[DISC].split("/")[0])
+        except ValueError: value = ""
+        try: value += "%02d" % int(track[TRACK].split("/")[0])
+        except ValueError: pass
         return value
 
     def __artist_cb(track):
-        value = track[ARTIST]
-        return value if value else "?"
+        return track[ARTIST]
 
     def __title_cb(track):
-        value = track[TITLE]
-        if not value: value = track.basename
-        return value
+        return track[TITLE] or track.basename
 
     def __album_cb(track):
         return track[ALBUM]
@@ -518,11 +512,8 @@ class BlaEval(object):
         return track.duration
 
     def __album_artist_cb(track):
-        if track[ALBUM_ARTIST]: return track[ALBUM_ARTIST]
-        elif track[ARTIST]: return track[ARTIST]
-        elif track[COMPOSER]: return track[COMPOSER]
-        elif track[PERFORMER]: return track[PERFORMER]
-        return ""
+        return (track[ALBUM_ARTIST] or track[ARTIST] or track[COMPOSER] or
+                track[PERFORMER])
 
     def __year_cb(track):
         return track[DATE].split("-")[0]
@@ -1816,9 +1807,12 @@ class BlaPlaylist(gtk.Notebook):
                 data = library.parse_ool_uris(uris)
 
             # FIXME: if data is empty gtk issues an assertion warning
-            if not data: return
-            self.add_tracks(data, drop_info=treeview.get_dest_row_at_pos(x, y),
-                    select_rows=True)
+
+            # if parsing didn't yield any tracks or the playlist was removed
+            # while parsing just return
+            if data and self in BlaPlaylist.pages:
+                self.add_tracks(data, select_rows=True,
+                        drop_info=treeview.get_dest_row_at_pos(x, y))
 
         def __key_press_event(self, treeview, event):
             is_accel = blagui.is_accel

@@ -135,7 +135,6 @@ class BlaTreeView(blaguiutils.BlaTreeViewBase):
         self.__parent = parent
         self.__browser_id = browser_id
 
-        self.set_size_request(-1, 100)
         self.set_fixed_height_mode(True)
         self.set_reorderable(False)
         self.set_rubber_banding(True)
@@ -348,14 +347,14 @@ class BlaLibraryBrowser(gtk.VBox):
         hbox = gtk.HBox()
 
         cb = gtk.combo_box_new_text()
-        for item in ["directory", "artist", "artist/album", "album", "genre",
-                "year"]:
-            cb.append_text("by %s" %item)
+        for label in ["directory", "artist", "artist - album", "album",
+                "genre", "year"]:
+            cb.append_text(label)
         cb.set_active(blacfg.getint("library", "organize.by"))
         cb.connect("changed", self.__organize_by_changed)
 
         alignment = gtk.Alignment()
-        alignment.add(gtk.Label("Organize:"))
+        alignment.add(gtk.Label("Organize by:"))
         table = gtk.Table(rows=2, columns=1, homogeneous=False)
         table.attach(alignment, 0, 1, 0, 1, xpadding=2, ypadding=2)
         table.attach(cb, 0, 1, 1, 2)
