@@ -36,8 +36,7 @@ import pango
 import numpy as np
 
 import blaplay
-from blaplay import blacfg, blaconst, blaplayer
-player = blaplayer.player
+from blaplay import blacfg, blaconst
 
 cdef extern from "math.h":
     float fmaxf(float, float)
@@ -245,7 +244,7 @@ cdef class Spectrum(object):
         # when the main window is hidden the draw method isn't called which
         # means buffers are never flushed. therefore we make sure here that we
         # never store more than 500 ms worth of buffers (two channels, four
-        # bytes per sample, 22100 samples every 500 ms: 44100 * 4 bytes)
+        # bytes per sample, 22050 samples every 500 ms: 44100 * 4 bytes)
         cdef int l = self.__adapter.available() - 44100 * 4
         if l > 0: self.__adapter.flush(l)
 
