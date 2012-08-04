@@ -1,19 +1,5 @@
 BUGS/KNOWN ISSUES
 
-- some formats create jerky animations in the spectrum visualization; this is
-  because the respective decoders sometimes send buffers whose size exceeds our
-  transform length. since we implement a circular buffer to store samples for
-  when we need them to calculate a transform we often skip lots of samples.
-  for example, the mad decoder always sends 1152 samples when forcing a rate of
-  44.1 kHz. we calculate a 4096-point FFT which means we'd get roughly 10~ full
-  FFTs if we didn't use overlap (which we do since we actually want to
-  calculate 35 transforms per second). since the buffer size is always smaller
-  than the size of our ringbuffer we never drop any frames. asfdemux on the
-  other hand sends buffers with 20k+ samples downstream from which we only
-  keep 2 * 4096 (two channels). we get an effective update rate of 2 Hz. to
-  avoid this we need to either a) adjust the size of the ringbuffer or b) make
-  the ringbuffer 2 * 44.1k samples large as we can never receive buffers
-  larger than that since we enforce a rate of 44.1 kHz on the pipeline
 - memory consumption is fairly high; this is due to the fact that we basically
   read every available tag in a file; the exception being id3 tags where we
   read a fixed subset of standard tags as well as every included TXXX user tag.

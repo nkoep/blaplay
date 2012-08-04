@@ -209,9 +209,9 @@ def popup(treeview, event, view_id, catcher):
         menu.append(m)
 
         items = [
-            ("Add to queue", "Q", lambda *x: element.send_to_queue(treeview)),
+            ("Add to queue", "Q", lambda *x: catcher.send_to_queue(treeview)),
             ("Remove from queue", "R",
-                    lambda *x: element.remove_from_queue(treeview)),
+                    lambda *x: catcher.remove_from_queue(treeview)),
         ]
         for label, accel, callback in items:
             m = gtk.MenuItem(label)
@@ -251,8 +251,6 @@ def header_popup(button, event, view_id):
     if not (hasattr(event, "button") and event.button == 3): return False
 
     def column_selected(m, column_id, view_id, view):
-        columns = blacfg.getlistint("general", "columns.%s" % view)
-
         if m.get_active():
             if column_id not in columns: columns.append(column_id)
         else:
@@ -493,23 +491,17 @@ class BlaEval(object):
 
     # these methods are static despite absent staticmethod decorators
     def __track_cb(track):
-        value = ""
-        if track[DISC] != "":
-            try: value += "%d." % int(track[DISC].split("/")[0])
-            except ValueError: pass
-        if track[TRACK] != "":
-            try: value += "%02d" % int(track[TRACK].split("/")[0])
-            except ValueError: pass
+        try: value = "%d." % int(track[DISC].split("/")[0])
+        except ValueError: value = ""
+        try: value += "%02d" % int(track[TRACK].split("/")[0])
+        except ValueError: pass
         return value
 
     def __artist_cb(track):
-        value = track[ARTIST]
-        return value if value else "?"
+        return track[ARTIST]
 
     def __title_cb(track):
-        value = track[TITLE]
-        if not value: value = track.basename
-        return value
+        return track[TITLE] or track.basename
 
     def __album_cb(track):
         return track[ALBUM]
@@ -518,11 +510,8 @@ class BlaEval(object):
         return track.duration
 
     def __album_artist_cb(track):
-        if track[ALBUM_ARTIST]: return track[ALBUM_ARTIST]
-        elif track[ARTIST]: return track[ARTIST]
-        elif track[COMPOSER]: return track[COMPOSER]
-        elif track[PERFORMER]: return track[PERFORMER]
-        return ""
+        return (track[ALBUM_ARTIST] or track[ARTIST] or track[COMPOSER] or
+                track[PERFORMER])
 
     def __year_cb(track):
         return track[DATE].split("-")[0]
@@ -885,7 +874,7 @@ class BlaPlaylist(gtk.Notebook):
     __gsignals__ = {
         "play_track": blaplay.signal(1),
         "count_changed": blaplay.signal(2),
-        "update_playlist_info": blaplay.signal(2)
+        "update_playlist_info": blaplay.signal(3)
     }
 
     pages = []          # list of playlists (needed for the queue)
@@ -1553,14 +1542,21 @@ class BlaPlaylist(gtk.Notebook):
             return track
 
         def update_playlist_info(self):
-            if self.__mode & MODE_FILTERED:
-                length = sum([track[LENGTH] for track in map(
-                        BlaPlaylist.get_track_from_id, self.__tracks)])
-            else: length = self.__length
-
             try: count = self.__treeview.get_model().iter_n_children(None)
             except TypeError: count = 0
-            BlaPlaylist.update_playlist_info(length, count)
+
+            # TODO: keep track of size of a playlist the same way we keep
+            #       track of the length
+            if self.__mode & MODE_FILTERED:
+                tracks = map(BlaPlaylist.get_track_from_id, self.__tracks)
+                size = sum([track[FILESIZE] for track in tracks])
+                length = sum([track[LENGTH] for track in tracks])
+            else:
+                tracks = map(BlaPlaylist.get_track_from_id, self.__all_tracks)
+                size = sum([track[FILESIZE] for track in tracks])
+                length = self.__length
+
+            BlaPlaylist.update_playlist_info(count, size, length)
 
         def update_state(self, state):
             if self.__current is None: return
@@ -1816,9 +1812,12 @@ class BlaPlaylist(gtk.Notebook):
                 data = library.parse_ool_uris(uris)
 
             # FIXME: if data is empty gtk issues an assertion warning
-            if not data: return
-            self.add_tracks(data, drop_info=treeview.get_dest_row_at_pos(x, y),
-                    select_rows=True)
+
+            # if parsing didn't yield any tracks or the playlist was removed
+            # while parsing just return
+            if data and self in BlaPlaylist.pages:
+                self.add_tracks(data, select_rows=True,
+                        drop_info=treeview.get_dest_row_at_pos(x, y))
 
         def __key_press_event(self, treeview, event):
             is_accel = blagui.is_accel
@@ -2267,8 +2266,8 @@ class BlaPlaylist(gtk.Notebook):
         force_view()
 
     @classmethod
-    def update_playlist_info(cls, length, count):
-        cls.__instance.emit("update_playlist_info", length, count)
+    def update_playlist_info(cls, count, size, length):
+        cls.__instance.emit("update_playlist_info", count, size, length)
 
     @classmethod
     def update_uris(cls, uris):

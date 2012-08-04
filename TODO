@@ -2,11 +2,11 @@
 - enhance tag editor (parse tags from filename)
 - add clear button to Queue row in the view selector
 - add "working" animation icon to events/releases row in view selector
-- come on, get a proper logo
+- get a proper logo
 - write up some crude unit/regression tests
 - improve design of radio (duh)/events/releases pages
 - improve lyrics fetcher (more robust search, more search engines)
-- improve memory footprint
+- lower memory footprint
 - improve/speed up "remove duplicates" functionality
 - improve startup speed/reduce import overhead
 - add support for internet radio streams:

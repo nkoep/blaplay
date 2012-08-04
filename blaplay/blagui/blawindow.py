@@ -241,6 +241,7 @@ class BlaWindow(gtk.Window):
         self.__hidden = False
         if not blacfg.getboolean("general", "always.show.tray"):
             blagui.tray.set_visible(False)
+        BlaVisualization.flush_buffers()
 
     def toggle_hide(self, window, event=None):
         blaguiutils.set_visible(self.__hidden)

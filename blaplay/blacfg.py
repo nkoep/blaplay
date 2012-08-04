@@ -58,7 +58,7 @@ def init():
 
         "player":
         {
-            "logarithmic.volume.control": "no",
+            "logarithmic.volume.scale": "no",
             "use.equalizer": "no",
             "equalizer.profile": "",
             "volume": "1.0",

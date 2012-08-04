@@ -18,7 +18,7 @@
 import gtk
 import gobject
 
-from blaplay import blaconst, blacfg, blautils, bladb, blaplayer
+from blaplay import blaconst, blacfg, blautils, bladb, blaplayer, blagui
 player = blaplayer.player
 library = bladb.library
 from blaplay.formats._identifiers import *
@@ -54,8 +54,14 @@ class BlaStatusbar(gtk.Table):
         self.__order = gtk.combo_box_new_text()
         map(self.__order.append_text, blaconst.ORDER_LITERALS)
         self.__order.set_active(blacfg.getint("general", "play.order"))
-        self.__order.connect("changed", lambda cb: blacfg.set(
-                "general", "play.order", cb.get_active()))
+        def order_changed(cb):
+            order = cb.get_active()
+            states = [False] * len(blaconst.ORDER_LITERALS)
+            states[order] = True
+            for idx, order in enumerate(blaconst.MENU_ORDER):
+                action = blagui.uimanager.get_widget(order)
+                action.set_active(states[idx])
+        self.__order.connect("changed", order_changed)
 
         table = gtk.Table(rows=1, columns=2)
         table.attach(gtk.Label("Order:"), 0, 1, 0, 1, xpadding=10)
@@ -100,7 +106,6 @@ class BlaStatusbar(gtk.Table):
 
                 status = "%s | %s |%s %s/%s" % (state, self.__format, "%s",
                         self.__position, self.__duration)
-                # FIXME: if one of these is "" they probably all are
                 x = ""
                 if self.__bitrate: x += " %s avg. |" % self.__bitrate
                 if self.__sampling_rate: x += " %s |" % self.__sampling_rate
@@ -119,10 +124,12 @@ class BlaStatusbar(gtk.Table):
 
     @classmethod
     def set_order(cls, radioaction, current):
-        cls.__instance.__order.set_active(current.get_current_value())
+        order = current.get_current_value()
+        cls.__instance.__order.set_active(order)
+        blacfg.set("general", "play.order", order)
 
     @classmethod
-    def update_playlist_info(cls, playlist, length_seconds, track_count):
+    def update_playlist_info(cls, playlist, track_count, size, length_seconds):
         if track_count == 0:
             cls.__instance.__playlist_info.set_text("")
             return True
@@ -160,8 +167,18 @@ class BlaStatusbar(gtk.Table):
         elif length["seconds"] != 0:
             length = "%d %s" % (length["seconds"], labels[3])
 
-        if track_count == 1: info = "%s track | %s" % (track_count, length)
-        else: info = "%s tracks | %s" % (track_count, length)
+        mb = 1024.0 * 1024.0
+        if size > mb * 1024.0:
+            size /= mb * 1024.0
+            unit = "GB"
+        else:
+            size /= mb
+            unit = "MB"
+        size = "%.1f %s" % (size, unit)
+
+        if track_count == 1:
+            info = "%s track (%s) | %s" % (track_count, size, length)
+        else: info = "%s tracks (%s) | %s" % (track_count, size, length)
 
         cls.__instance.__playlist_info.set_text(info)
 

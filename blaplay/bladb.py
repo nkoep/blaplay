@@ -196,10 +196,13 @@ class BlaLibraryMonitor(gobject.GObject):
                         if uri.startswith(path_from) and uri[l] == "/":
                             library.remove_track(uri)
                 except IndexError:
-                    # IndexError will only be raised for exact matches,
-                    # meaning we removed a directory. therefore we can remove
-                    # every monitored directory under it
+                    # IndexError will only be raised for exact matches meaning
+                    # we removed a file
                     library.remove_track(uri)
+                else:
+                    # if we made it this far we didn't get an exact match so
+                    # we removed a directory. in this case we remove every file
+                    # monitor under the given directory
                     directories = [k for k in self.__monitors.keys()
                             if k.startswith(path_from)]
                     for directory in directories:
@@ -221,8 +224,8 @@ class BlaLibraryMonitor(gobject.GObject):
                 BlaPlaylist.update_uris(uris)
 
             # schedule an update for the library browser, etc. if there are
-            # more items in the queue the timeout will be removed until there
-            # are no more items
+            # more items in the queue the timeout will be removed in the next
+            # loop iteration
             if update: tid = gobject.timeout_add(3000, update_library)
 
     def __get_subdirectories(self, directories):
@@ -362,24 +365,15 @@ class BlaLibraryModel(object):
 
     @classmethod
     def __get_track_label(cls, track):
-        label = ""
-        if track[DISC]:
-            try: label += "%d." % int(track[DISC].split("/")[0])
-            except ValueError: pass
-        if track[TRACK]:
-            try: label += "%02d. " % int(track[TRACK].split("/")[0])
-            except ValueError: pass
-
-        if track[ALBUM_ARTIST]: artist = track[ALBUM_ARTIST]
-        elif track[COMPOSER]: artist = track[COMPOSER]
-        elif track[PERFORMER]: artist = track[PERFORMER]
-        else: artist = ""
-        if artist and artist != track[ARTIST]:
+        try: label = "%d." % int(track[DISC].split("/")[0])
+        except ValueError: label = ""
+        try: label += "%02d. " % int(track[TRACK].split("/")[0])
+        except ValueError: pass
+        artist = (track[ALBUM_ARTIST] or track[ARTIST] or track[COMPOSER] or
+                track[PERFORMER])
+        if track[ARTIST] and artist != track[ARTIST]:
             label += "%s - " % track[ARTIST]
-
-        title = track[TITLE]
-        if not title: title = track.basename
-        return "%s%s" % (label, title)
+        return "%s%s" % (label, track[TITLE] or track.basename)
 
     @classmethod
     def __organize_by_directory(cls, uri, track):
@@ -395,68 +389,28 @@ class BlaLibraryModel(object):
 
     @classmethod
     def __organize_by_artist(cls, uri, track):
-        artist = track[ARTIST]
-        if not artist: artist = "?"
-        album = track[ALBUM]
-        if not album: album = "?"
-
-        return [artist, album], cls.__get_track_label(track)
+        return ([track[ARTIST] or "?", track[ALBUM] or "?"],
+                cls.__get_track_label(track))
 
     @classmethod
     def __organize_by_artist_album(cls, uri, track):
-        if track[ALBUM_ARTIST]: artist = track[ALBUM_ARTIST]
-        elif track[ARTIST]: artist = track[ARTIST]
-        elif track[COMPOSER]: artist = track[COMPOSER]
-        elif track[PERFORMER]: artist = track[PERFORMER]
-        else: artist = ""
-
-        album = track[ALBUM]
-        year = track[DATE].split("-")[0]
-
-        if not year:
-            if artist: label = "%s - %s" % (artist, album)
-            elif album: label = album
-            else: label = "?"
-        else:
-            if artist: label = "%s - [%s] %s" % (artist, year, album)
-            else: label = "[%s] %s" % (year, album)
-
-        return [label], cls.__get_track_label(track)
+        artist = (track[ALBUM_ARTIST] or track[ARTIST] or track[COMPOSER] or
+                track[PERFORMER] or "?")
+        return (["%s - %s" % (artist, track[ALBUM] or "?")],
+                cls.__get_track_label(track))
 
     @classmethod
     def __organize_by_album(cls, uri, track):
-        artist = track[ALBUM_ARTIST]
-        if not artist: artist = track[ARTIST]
-        album = track[ALBUM]
-
-        if not artist and album: label = "%s" % album
-        elif artist and not album: label = "? [%s]" % artist
-        elif not artist and not album: label = "?"
-        else: label = "%s [%s]" % (album, artist)
-
-        return [label], cls.__get_track_label(track)
+        return [track[ALBUM] or "?"], cls.__get_track_label(track)
 
     @classmethod
     def __organize_by_genre_year(cls, uri, track, view):
-        if view == blaconst.ORGANIZE_BY_GENRE:
-            key = GENRE
-            reference = ""
-        else:
-            key = DATE
-            reference = ""
-
-        organizer = track[key].capitalize()
-        if organizer == reference: organizer = "?"
-        elif key == DATE: organizer = organizer.split("-")[0]
-        artist = track[ALBUM_ARTIST]
-        if not artist: artist = track[ARTIST]
-        album = track[ALBUM]
-        if not album: album = "?"
-
-        if not artist and not album: label = "?"
-        elif not artist and album: label = album
-        else: label = "%s - %s" % (artist, album)
-
+        if view == blaconst.ORGANIZE_BY_GENRE: key = GENRE
+        else: key = DATE
+        organizer = track[key].capitalize() or "?"
+        if key == DATE: organizer = organizer.split("-")[0]
+        label = "%s - %s" % (
+                track[ALBUM_ARTIST] or track[ARTIST], track[ALBUM] or "?")
         return [organizer, label], cls.__get_track_label(track)
 
 class BlaLibrary(gobject.GObject):

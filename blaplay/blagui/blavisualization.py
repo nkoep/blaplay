@@ -34,14 +34,16 @@ class BlaVisualization(gtk.DrawingArea):
         super(BlaVisualization, self).__init__()
         type(self).__instance = self
 
+        player.connect("track_changed", self.flush_buffers)
+        player.connect("seek", self.flush_buffers)
         self.connect("expose_event", self.__expose)
-
-        self.__initialize_module(blacfg.getint("general", "visualization"))
         self.connect("realize", lambda *x: self.update_colors())
         def size_allocate(drawingarea, allocation):
             try: self.__module.set_width(allocation.width)
             except AttributeError: pass
         self.connect("size_allocate", size_allocate)
+
+        self.__initialize_module(blacfg.getint("general", "visualization"))
 
         self.show_all()
 
@@ -60,6 +62,7 @@ class BlaVisualization(gtk.DrawingArea):
             blaguiutils.error_dialog("Failed to initialize the requested "
                     "visualization.")
             disable()
+            blacfg.set("general", "visualization", VISUALIZATION_OFF)
         else:
             self.__module = module()
             self.__module.set_width(self.get_allocation().width)
@@ -86,6 +89,11 @@ class BlaVisualization(gtk.DrawingArea):
         # obscured by another one
         self.__module.draw(
                 self.window.cairo_create(), self.get_pango_context())
+
+    @classmethod
+    def flush_buffers(cls, *args):
+        try: cls.__instance.__module.flush_buffers()
+        except AttributeError: pass
 
     @classmethod
     def update_element(cls, radioaction, current):

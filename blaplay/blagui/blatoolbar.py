@@ -202,7 +202,7 @@ class VolumeControl(gtk.HBox):
 
     def __query_tooltip(self, *args):
         volume = self.__scale.get_value()
-        if blacfg.getboolean("player", "logarithmic.volume.control"):
+        if blacfg.getboolean("player", "logarithmic.volume.scale"):
             if volume == 0: tooltip = "-Inf dB"
             else: tooltip = "%d dB" % (50 * (volume / 100 - 1))
         else: tooltip = "%d%%" % volume

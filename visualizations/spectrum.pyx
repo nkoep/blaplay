@@ -30,12 +30,14 @@ import ctypes
 import ctypes.util
 
 import gtk
+import gst
 import cairo
 import pango
 import numpy as np
 
 import blaplay
-from blaplay import blacfg, blaconst, visualizations
+from blaplay import blacfg, blaconst, blaplayer
+player = blaplayer.player
 
 cdef extern from "math.h":
     float fmaxf(float, float)
@@ -124,6 +126,7 @@ cdef class Spectrum(object):
         def __get__(self): return 154
 
     # variables needed to calculate the spectrum
+    cdef object __adapter
     cdef int __bands
     cdef fftwf_plan __plan
     cdef np.ndarray __window
@@ -156,6 +159,11 @@ cdef class Spectrum(object):
         # get window and scale it such that it doesn't change the signal power
         self.__window = gauss_window(NFFT)
         self.__window *= 0.5 * powf(NFFT / np.sum(self.__window ** 2), 0.5)
+
+        cdef int i
+        self.__adapter = gst.Adapter()
+        self.__buf = <float*> fftwf_malloc(NFFT * 2 * sizeof(float))
+        for i in xrange(NFFT * 2): self.__buf[i] = 0.0
 
         # create fftw plan and allocate data. we use FFTW_EXHAUSTIVE to squeeze
         # every last bit of performance out of this module. beware though, on
@@ -213,11 +221,6 @@ cdef class Spectrum(object):
 
         cdef int i
         cdef float *f
-        if self.__buf != NULL: fftwf_free(self.__buf)
-        self.__buf = <float*> fftwf_malloc(NFFT * 2 * sizeof(float))
-        f = self.__buf
-        for i in xrange(NFFT * 2): f[i] = 0.0
-
         if self.__old != NULL: fftwf_free(self.__old)
         self.__old = <float*> fftwf_malloc(self.__bands * sizeof(float))
         f = self.__old
@@ -238,23 +241,17 @@ cdef class Spectrum(object):
 
     @cython.boundscheck(False)
     cpdef new_buffer(self, object buf):
-        # FIXME: most decoders with the exception of mad send more samples
-        #        downstream than we can store in our ringbuffer
+        self.__adapter.push(buf)
+        # when the main window is hidden the draw method isn't called which
+        # means buffers are never flushed. therefore we make sure here that we
+        # never store more than 500 ms worth of buffers (two channels, four
+        # bytes per sample, 22100 samples every 500 ms: 44100 * 4 bytes)
+        cdef int l = self.__adapter.available() - 44100 * 4
+        if l > 0: self.__adapter.flush(l)
 
-        # take as many samples as we need for one transform from the beginning
-        # of the buffer. if it's not enough, take as many as there are and
-        # append them to the last buffer we have, shifting the values in the
-        # old array from right to left
-        cdef np.ndarray[dtype=f32_t, ndim=1] np_buf = np.frombuffer(
-                buf, dtype=f32)
-        cdef int i, l = len(np_buf), samples = NFFT * 2
-        cdef float *__buf = self.__buf, *_buf = <float*> np_buf.data
-
-        l = min(l, samples)
-        for i in xrange(l, samples):
-            __buf[i-l] = __buf[i]
-        for i in xrange(l):
-            __buf[samples-l+i] = _buf[i]
+    @cython.boundscheck(False)
+    cpdef flush_buffers(self):
+        self.__adapter.flush(self.__adapter.available())
 
     @cython.cdivision(True)
     @cython.boundscheck(False)
@@ -262,16 +259,28 @@ cdef class Spectrum(object):
         # attribute look-ups on the instance make the following loops
         # cripplingly slow. therefore we just assign everything to local
         # variables
-        cdef int i, l = NFFT/2 + 1
+        cdef int i, l
         cdef int bands = self.__bands
         cdef float *buf = self.__buf, *in_ = self.__in, *old_ = self.__old
+        cdef float *_buf
         cdef fftwf_complex *out_ = self.__out
         cdef float *window = <float*> self.__window.data
         cdef float *log_freq = self.__log_freq
         cdef float offset = OFFSET
 
-        for i in xrange(NFFT):
-            in_[i] = window[i] * (buf[2*i] + buf[2*i+1])
+        cdef np.ndarray[f32_t, ndim=1] np_buf
+        if self.__adapter.available() > 0:
+            np_buf = np.frombuffer(self.__adapter.take_buffer(
+                    min(self.__adapter.available(), 2 * 4 * 1260)), dtype=f32)
+        else: np_buf = np.zeros(NFFT * 2, f32)
+
+        _buf = <float*> np_buf.data
+        l = min(len(np_buf), NFFT * 2)
+        for i in xrange(l, NFFT * 2): buf[i-l] = buf[i]
+        for i in xrange(l): buf[NFFT * 2-l+i] = _buf[i]
+
+        # take the channel mean and calculate the forward transform
+        for i in xrange(NFFT): in_[i] = window[i] * (buf[2*i] + buf[2*i+1])
         fftwf_execute(self.__plan)
 
         # fftw3 only returns the NFFT/2 + 1 non-redundant frequency
@@ -282,6 +291,7 @@ cdef class Spectrum(object):
         # reuse the input array of the FFT to store the energy coefficients.
         # note that energy gets transformed into power later when we subtract
         # 20 * log10(NFFT) from the log-energy
+        l = NFFT/2 + 1
         in_[0] = out_[0][0] * out_[0][0] + out_[0][1] * out_[0][1]
         in_[l-1] = out_[l-1][0] * out_[l-1][0] + out_[l-1][1] * out_[l-1][1]
         for i in xrange(1, l-1):

@@ -344,12 +344,12 @@ class BlaPreferences(blaguiutils.BlaUniqueWindow):
             super(BlaPreferences.PlayerSettings, self).__init__(spacing=10)
             self.set_border_width(10)
 
-            logarithmic_volume_control = gtk.CheckButton(
-                    "Use logarithmic volume control")
-            logarithmic_volume_control.set_active(
-                    blacfg.getboolean("player", "logarithmic.volume.control"))
-            logarithmic_volume_control.connect(
-                    "toggled", self.__volume_control_changed)
+            logarithmic_volume_scale = gtk.CheckButton(
+                    "Use logarithmic volume scale")
+            logarithmic_volume_scale.set_active(
+                    blacfg.getboolean("player", "logarithmic.volume.scale"))
+            logarithmic_volume_scale.connect(
+                    "toggled", self.__volume_scale_changed)
 
             state = blacfg.getboolean("player", "use.equalizer")
             self.__scales = []
@@ -392,7 +392,7 @@ class BlaPreferences(blaguiutils.BlaUniqueWindow):
 
             table = gtk.Table(rows=2, columns=2, homogeneous=False)
             table.set_row_spacings(2)
-            table.attach(logarithmic_volume_control, 0, 2, 0, 1, xpadding=2)
+            table.attach(logarithmic_volume_scale, 0, 2, 0, 1, xpadding=2)
             table.attach(use_equalizer, 0, 1, 1, 2, xpadding=2)
             table.attach(self.__button_box, 1, 2, 1, 2, xpadding=2)
 
@@ -425,8 +425,8 @@ class BlaPreferences(blaguiutils.BlaUniqueWindow):
 
             self.__use_equalizer_changed(use_equalizer)
 
-        def __volume_control_changed(self, checkbutton):
-            blacfg.setboolean("player", "logarithmic.volume.control",
+        def __volume_scale_changed(self, checkbutton):
+            blacfg.setboolean("player", "logarithmic.volume.scale",
                     checkbutton.get_active())
             player.set_volume(blacfg.getfloat("player", "volume") * 100)
 

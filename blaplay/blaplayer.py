@@ -45,7 +45,8 @@ class BlaPlayer(gobject.GObject):
         "state_changed": blaplay.signal(0),
         "track_changed": blaplay.signal(0),
         "track_stopped": blaplay.signal(0),
-        "new_buffer": blaplay.signal(1)
+        "new_buffer": blaplay.signal(1),
+        "seek": blaplay.signal(0)
     }
 
     __bin = None
@@ -66,16 +67,18 @@ class BlaPlayer(gobject.GObject):
         self.__equalizer = gst.element_factory_make("equalizer-10bands")
         tee = gst.element_factory_make("tee")
         queue_vis = gst.element_factory_make("queue")
-        queue_vis.set_property("max_size_time", 500 * gst.MSECOND)
+        queue_vis.set_property("silent", True)
+        queue_vis.set_property("leaky", True)
 
         def new_buffer(sink): self.emit("new_buffer", sink.emit("pull_buffer"))
         appsink = gst.element_factory_make("appsink")
-        appsink.set_property("drop", False)
+        appsink.set_property("drop", True)
         appsink.set_property("sync", True)
         appsink.set_property("emit_signals", True)
         appsink.connect("new_buffer", new_buffer)
 
         queue_player = gst.element_factory_make("queue")
+        queue_player.set_property("silent", True)
         queue_player.set_property("max_size_time", 500 * gst.MSECOND)
         sink = gst.element_factory_make("autoaudiosink")
 
@@ -99,9 +102,9 @@ class BlaPlayer(gobject.GObject):
         bus.add_signal_watch()
         self.__busid = bus.connect("message", self.__on_message)
 
-        if blacfg.getboolean("player", "muted"): volume = 0.0
-        else: volume = blacfg.getfloat("player", "volume")
-        self.__bin.set_property("volume", volume)
+        if blacfg.getboolean("player", "muted"): volume = 0
+        else: volume = blacfg.getfloat("player", "volume") * 100
+        self.set_volume(volume)
 
         self.enable_equalizer(blacfg.getboolean("player", "use.equalizer"))
 
@@ -140,7 +143,7 @@ class BlaPlayer(gobject.GObject):
         if self.__bin:
             volume /= 100.
 
-            if blacfg.getboolean("player", "logarithmic.volume.control"):
+            if blacfg.getboolean("player", "logarithmic.volume.scale"):
                 volume_db = 50 * (volume - 1.0)
                 if volume_db == -50: volume = 0
                 else: volume = pow(10, volume_db / 20.0)
@@ -152,6 +155,7 @@ class BlaPlayer(gobject.GObject):
 
     def seek(self, pos):
         self.__bin.seek_simple(gst.FORMAT_TIME, gst.SEEK_FLAG_FLUSH, pos)
+        self.emit("seek")
 
     def get_position(self):
         try: pos = self.__bin.query_position(gst.FORMAT_TIME, None)[0]
