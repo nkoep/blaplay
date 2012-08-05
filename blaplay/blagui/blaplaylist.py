@@ -2045,7 +2045,8 @@ class BlaPlaylist(gtk.Notebook):
 
     @classmethod
     def enable_search(cls):
-         cls.__instance.__get_current_page().enable_search()
+        if blacfg.getint("general", "view") == blaconst.VIEW_PLAYLISTS:
+            cls.__instance.__get_current_page().enable_search()
 
     def clear(self):
         self.__get_current_page().clear()
