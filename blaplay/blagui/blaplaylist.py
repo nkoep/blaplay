@@ -510,8 +510,8 @@ class BlaEval(object):
         return track.duration
 
     def __album_artist_cb(track):
-        return (track[ALBUM_ARTIST] or track[ARTIST] or track[COMPOSER] or
-                track[PERFORMER])
+        return (track[ALBUM_ARTIST] or track[ARTIST] or track[PERFORMER] or
+                track[COMPOSER])
 
     def __year_cb(track):
         return track[DATE].split("-")[0]
@@ -1743,8 +1743,8 @@ class BlaPlaylist(gtk.Notebook):
                     return False
                 self.__fid = gobject.timeout_add(500, activate)
 
-        def __filter(self, entry):
-            self.__filter_parameters = entry.get_text().strip().split()
+        def __filter(self, *args):
+            self.__filter_parameters = self.__entry.get_text().strip().split()
             row_align, selected_ids, scroll_identifier = \
                     self.__get_selection_and_row()
 
