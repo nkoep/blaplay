@@ -203,11 +203,7 @@ class BlaLibraryMonitor(gobject.GObject):
                     # if we made it this far we didn't get an exact match so
                     # we removed a directory. in this case we remove every file
                     # monitor under the given directory
-                    directories = [k for k in self.__monitors.keys()
-                            if k.startswith(path_from)]
-                    for directory in directories:
-                        try: self.__monitors.pop(directory).cancel()
-                        except KeyError: pass
+                    self.remove_directories(path_from)
 
             else: # event == EVENT_MOVED
                 uris = []
@@ -221,6 +217,9 @@ class BlaLibraryMonitor(gobject.GObject):
                                     path_to, uri[len(path_from)+1:])
                             library.move_track(uri, new_path)
                             uris.append((uri, new_path))
+
+                    self.remove_directories(path_from)
+                    self.add_directory(path_to)
                 BlaPlaylist.update_uris(uris)
 
             # schedule an update for the library browser, etc. if there are
@@ -247,7 +246,7 @@ class BlaLibraryMonitor(gobject.GObject):
         p.daemon = True
         p.start()
         directories = conn1.recv()
-        # processes must be joined to avoid them turning into zombie
+        # processes must be joined to prevent them from turning into zombie
         # processes on unices
         p.join()
         return directories
@@ -369,8 +368,8 @@ class BlaLibraryModel(object):
         except ValueError: label = ""
         try: label += "%02d. " % int(track[TRACK].split("/")[0])
         except ValueError: pass
-        artist = (track[ALBUM_ARTIST] or track[ARTIST] or track[COMPOSER] or
-                track[PERFORMER])
+        artist = (track[ALBUM_ARTIST] or track[ARTIST] or track[PERFORMER] or
+                track[COMPOSER])
         if track[ARTIST] and artist != track[ARTIST]:
             label += "%s - " % track[ARTIST]
         return "%s%s" % (label, track[TITLE] or track.basename)
@@ -394,8 +393,8 @@ class BlaLibraryModel(object):
 
     @classmethod
     def __organize_by_artist_album(cls, uri, track):
-        artist = (track[ALBUM_ARTIST] or track[ARTIST] or track[COMPOSER] or
-                track[PERFORMER] or "?")
+        artist = (track[ALBUM_ARTIST] or track[PERFORMER] or track[ARTIST] or
+                "?")
         return (["%s - %s" % (artist, track[ALBUM] or "?")],
                 cls.__get_track_label(track))
 
@@ -506,14 +505,18 @@ class BlaLibrary(gobject.GObject):
 
         files = set()
         add = files.add
+        discover = blautils.discover
         new_files = 0
-        for idx, f in enumerate(set(directories)):
-            if f not in self: add(f)
-            if len(files) == yield_interval:
-                new_files += self.add_tracks(files)
-                files.clear()
-            if idx % yield_interval == 0: yield True
-        if files: new_files += self.add_tracks(files)
+        idx = 0
+        for directory in set(directories):
+            for f in discover(directory):
+                if f not in self: add(f)
+                if len(files) == yield_interval:
+                    new_files += self.add_tracks(files)
+                    files.clear()
+                if idx % yield_interval == 0: yield True
+                idx += 1
+            if files: new_files += self.add_tracks(files)
 
         # check for missing tracks and remove them (they're actually moved to
         # __tracks_ool so playlists referencing a URI will have the last known
@@ -538,9 +541,6 @@ class BlaLibrary(gobject.GObject):
         # already imported module that resides in the globals dict
         import blagui
         while blagui.bla is None: yield True
-        from blagui import blaplaylist
-        global BlaPlaylist
-        BlaPlaylist = blaplaylist.BlaPlaylist
         if missing or new_files or updated: update_library()
         yield False
 
@@ -658,6 +658,13 @@ class BlaLibrary(gobject.GObject):
         return 0
 
     def get_playlists(self):
+        # we need BlaPlaylist throughout this module, but we can't import it on
+        # module initialization as the class object isn't created at that time.
+        # when this method is called we can be sure the class exists
+        from blagui import blaplaylist
+        global BlaPlaylist
+        BlaPlaylist = blaplaylist.BlaPlaylist
+
         return self.__playlists, self.__queue
 
     def save_playlists(self, playlists, queue):
