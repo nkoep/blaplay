@@ -48,6 +48,15 @@ def gtk_thread(f):
         gtk.gdk.threads_leave()
     return wrapper
 
+# there's nothing complicated about this decorator at all...
+def lock(lock_):
+    def func(f):
+        @functools.wraps(f)
+        def wrapper(*args, **kwargs):
+            with lock_: f(*args, **kwargs)
+        return wrapper
+    return func
+
 def toss_extension(filepath):
     return os.path.splitext(filepath)[0]
 

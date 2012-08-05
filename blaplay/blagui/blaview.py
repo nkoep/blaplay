@@ -17,7 +17,6 @@
 
 import os
 
-import glib
 import gobject
 import gtk
 import cairo
@@ -131,7 +130,7 @@ class BlaSidePane(gtk.VBox):
 
         def __prepare_cover(self, cover):
             try: pb = gtk.gdk.pixbuf_new_from_file(cover)
-            except glib.GError:
+            except gobject.GError:
                 try:
                     if cover != blaconst.COVER: os.unlink(cover)
                 except OSError: pass
@@ -290,6 +289,7 @@ class BlaSidePane(gtk.VBox):
             action = blagui.uimanager.get_widget(view)
             action.set_active(states[idx])
 
+    @blautils.lock(__lock)
     def __update_track(self, track):
         begin = self.__tb.get_start_iter()
         begin2 = self.__tb2.get_start_iter()
@@ -307,17 +307,19 @@ class BlaSidePane(gtk.VBox):
             self.__tb2.insert_with_tags_by_name(
                     begin2, "\n%s" % artist, "bold", "large", "color")
 
+    @blautils.lock(__lock)
     def __update_lyrics(self, lyrics):
         if lyrics:
             self.__tb.insert_with_tags_by_name(self.__tb.get_end_iter(),
                     "\n\n%s\n" % lyrics, "color")
 
+    @blautils.lock(__lock)
     def __update_biography(self, image, biography):
         iterator = self.__tb2.get_end_iter()
 
         if image:
             try: image = gtk.gdk.pixbuf_new_from_file(image)
-            except glib.GError:
+            except gobject.GError:
                 try: os.unlink(image)
                 except OSError: pass
             else:
@@ -334,10 +336,8 @@ class BlaSidePane(gtk.VBox):
             self.__tb2.insert_with_tags_by_name(iterator,
                     "\n\n%s\n" % biography, "color")
 
+    @blautils.lock( __lock)
     def __clear(self):
-        # decorating this with blautils.gtk_thread causes a deadlock so we use
-        # a regular lock instead
-#        with self.__lock:
         self.__tb.delete(
                 self.__tb.get_start_iter(), self.__tb.get_end_iter())
         self.__tb2.delete(
@@ -373,10 +373,11 @@ class BlaSidePane(gtk.VBox):
 
     def update_track(self):
         def worker(track):
-            with self.__lock:
-                self.__update_track(track)
-                self.fetcher.start(track)
-                return False
+            # the track title and artist names need to be set first. only after
+            # that is done do we spawn threads to fetch lyrics and biography
+            self.__update_track(track)
+            self.fetcher.start(track)
+            return False
 
         gobject.source_remove(self.__tid)
 
