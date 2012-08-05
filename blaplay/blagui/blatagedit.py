@@ -139,12 +139,15 @@ class BlaTreeView(gtk.TreeView):
         return False
 
     def edited(self, renderer, path, text, tageditor):
+        if self.__old_path is None: return False
         if text == self.__old_value: return False
         model = self.get_model()
         row = model[self.__old_path]
         identifier = row[0]
         row[1] = text
         self.emit("set_value", identifier, text)
+        self.__old_value = ""
+        self.__old_path = None
 
 class BlaTagedit(blaguiutils.BlaWindow):
     def __init__(self, uris):
