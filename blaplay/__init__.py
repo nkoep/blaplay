@@ -61,10 +61,12 @@ def print_e(msg):
     sys.exit()
 
 def manage_pidfile(filepath):
-    if (not os.path.isdir(blaconst.USERDIR) or
-            not os.path.isdir(blaconst.CACHE)):
+    directories = [blaconst.USERDIR, blaconst.COVERS, blaconst.ARTISTS,
+                blaconst.RELEASES, blaconst.EVENTS]
+    if not all(map(os.path.isdir, directories)):
         print_i("Setting up user directories")
-        for directory in [blaconst.USERDIR, blaconst.CACHE]:
+        for directory in [blaconst.USERDIR, blaconst.COVERS, blaconst.ARTISTS,
+                blaconst.RELEASES, blaconst.EVENTS]:
             try: os.makedirs(directory)
             except OSError as (errno, strerror):
                 # file exists

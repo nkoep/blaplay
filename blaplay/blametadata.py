@@ -57,7 +57,7 @@ class BlaFetcher(gobject.GObject):
 
         # FIXME: this is recently raised by wikia replies :EE
         try: doc = f(buf, len(buf), None, "utf-8", flags)
-        except libxml2.treeError: return lyrics
+        except (libxml2.treeError, TypeError): return lyrics
 
         ctx = doc.xpathNewContext()
         if not ctx: return lyrics
@@ -198,7 +198,7 @@ class BlaFetcher(gobject.GObject):
         image, biography = None, None
         if track[ARTIST]:
             # look for cached artist image
-            image_base = os.path.join(blaconst.CACHE,
+            image_base = os.path.join(blaconst.ARTISTS,
                     track[ARTIST].replace(" ", "_").replace("/", "_"))
             if os.path.isfile("%s.jpg" % image_base):
                 image = "%s.jpg" % image_base
@@ -244,8 +244,8 @@ class BlaFetcher(gobject.GObject):
         if path != blaconst.COVER:
             image_base = track.get_cover_basepath()
             name = os.path.basename(image_base)
-            images = [os.path.join(blaconst.CACHE, f) for f in
-                    os.listdir(blaconst.CACHE) if f.startswith(name)]
+            images = [os.path.join(blaconst.COVERS, f) for f in
+                    os.listdir(blaconst.COVERS) if f.startswith(name)]
             map(os.unlink, images)
 
         if path:

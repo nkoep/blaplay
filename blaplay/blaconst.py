@@ -30,14 +30,13 @@ AUTHORS = sorted([
 EMAIL = "niklas.koep@gmail.com"
 COPYRIGHT = "Copyright © 2012 %s\n<%s>" % (AUTHOR, EMAIL)
 
-LASTFM_APIKEY = "38fcb93ce36693485715ea4197de49de"
-LASTFM_SECRET = "18503e42d49e15bcd709bbdecdcf8682"
-LASTFM_BASEURL = ("http://ws.audioscrobbler.com/2.0/?api_key=%s&format=json"
-        % LASTFM_APIKEY)
-
 USERDIR = os.path.join(os.path.expanduser("~"), ".%s" % APPNAME)
-CACHE = os.path.join(USERDIR, "cache")
+COVERS = os.path.join(USERDIR, "covers")
+ARTISTS = os.path.join(USERDIR, "artists")
+RELEASES = os.path.join(USERDIR, "releases")
+EVENTS = os.path.join(USERDIR, "events")
 BASEDIR = os.path.dirname(os.path.realpath(__file__))
+IMAGES_PATH = os.path.join(BASEDIR, "images")
 
 CFG_PATH = os.path.join(USERDIR, "config")
 PIDFILE = os.path.join(USERDIR, "pid")
@@ -46,11 +45,18 @@ PLAYLISTS_PATH = os.path.join(USERDIR, "playlists")
 METADATA_PATH = os.path.join(USERDIR, "metadata")
 SCROBBLES_PATH = os.path.join(USERDIR, "scrobbles")
 WISDOM_PATH = os.path.join(USERDIR, "fftw3_wisdom")
-IMAGES_PATH = os.path.join(BASEDIR, "images")
+
 LOGO = os.path.join(IMAGES_PATH, "logo.svg")
 COVER = os.path.join(IMAGES_PATH, "cover.svg")
 MINSIZE = [-1, 400]
 STYLE_NAME = blautils.md5(APPNAME)
+
+# last.fm
+LASTFM_APIKEY = "38fcb93ce36693485715ea4197de49de"
+LASTFM_SECRET = "18503e42d49e15bcd709bbdecdcf8682"
+LASTFM_BASEURL = ("http://ws.audioscrobbler.com/2.0/?api_key=%s&format=json"
+        % LASTFM_APIKEY)
+LASTFM_LOGO = os.path.join(IMAGES_PATH, "lastfm.gif")
 
 # player constants
 STATE_PLAYING, STATE_PAUSED, STATE_STOPPED = xrange(3)

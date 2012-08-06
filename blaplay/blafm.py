@@ -170,8 +170,8 @@ def get_cover(track, image_base):
                 break
     if path:
         name = os.path.basename(image_base)
-        images = [os.path.join(blaconst.CACHE, f) for f in
-                os.listdir(blaconst.CACHE) if f.startswith(name)]
+        images = [os.path.join(blaconst.COVERS, f) for f in
+                os.listdir(blaconst.COVERS) if f.startswith(name)]
         map(os.unlink, images)
         cover = "%s.%s" % (image_base, blautils.get_extension(path))
         shutil.copy(path, cover)

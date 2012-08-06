@@ -112,7 +112,7 @@ class BlaTrack(dict):
         base = "%s-%s" % (self[ARTIST].replace(" ", "_"),
                 self[ALBUM].replace(" ", "_"))
         base = base.replace("/", "_")
-        return os.path.join(blaconst.CACHE, base)
+        return os.path.join(blaconst.COVERS, base)
 
     def get_lyrics_key(self):
         if "" in [self[ARTIST], self[TITLE]]: return ""

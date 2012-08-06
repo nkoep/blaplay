@@ -16,7 +16,10 @@
 # Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
 import os
+import shutil
 import math
+import threading
+import Queue
 
 import gobject
 import gtk
@@ -61,8 +64,6 @@ class BlaCellRendererPixbuf(blaguiutils.BlaCellRendererBase):
     def on_render(self, window, widget, background_area, cell_area,
             expose_area, flags):
         cr = window.cairo_create()
-
-        # check if a state icon should be rendered
         content = self.get_property("content")
         if isinstance(content, str):
             # render active resp. inactive rows
@@ -105,12 +106,6 @@ class BlaCellRendererPixbuf(blaguiutils.BlaCellRendererBase):
 gobject.type_register(BlaCellRendererPixbuf)
 
 class BlaReleaseBrowser(blaguiutils.BlaScrolledWindow):
-    # TODO: - design the page a little closer to the original:
-    #         http://www.last.fm/home/newreleases
-    #       - cache images
-    #       - add timer to check for new releases every x hours
-    #       - ignore entries
-
     __gsignals__ = {
         "update_models": blaplay.signal(1),
         "count_changed": blaplay.signal(2)
@@ -122,7 +117,7 @@ class BlaReleaseBrowser(blaguiutils.BlaScrolledWindow):
         def __init__(self, raw):
             self.__raw = raw
             self.release_name = raw["name"]
-            self.release_url=  raw["url"]
+            self.release_url = raw["url"]
             self.artist_name = raw["artist"]["name"]
             self.artist_url = raw["artist"]["url"]
             self.date = parse_rfc_time(raw["@attr"]["releasedate"])
@@ -138,21 +133,31 @@ class BlaReleaseBrowser(blaguiutils.BlaScrolledWindow):
         def calender_week(self):
             return datetime.date(*self.date[:3]).isocalendar()[:2]
 
-        # FIXME: rather do this with one thread and emit a signal when a cover
-        #        was updated
-        @blautils.thread
-        def get_cover(self, model, iterator):
-            pixbuf = None
-            url = blafm.get_image_url(self.__raw["image"])
-            try:
-                image, message = urllib.urlretrieve(url)
-                pixbuf = gtk.gdk.pixbuf_new_from_file(image).scale_simple(
-                        COVER_SIZE, COVER_SIZE,
-                        gtk.gdk.INTERP_HYPER
-                )
-                self.cover = pixbuf
-                model.row_changed(model.get_path(iterator), iterator)
-            except (IOError, gobject.GError): pass
+        def get_cover(self, image_base, model, iterator):
+            pixbuf = path = None
+            for ext in ["jpg", "png"]:
+                try:
+                    path = "%s.%s" % (image_base, ext)
+                    pixbuf = gtk.gdk.pixbuf_new_from_file(path)
+                except gobject.GError: pass
+                else:
+                    pixbuf = pixbuf.scale_simple(COVER_SIZE, COVER_SIZE,
+                            gtk.gdk.INTERP_HYPER)
+                    break
+            else:
+                url = blafm.get_image_url(self.__raw["image"])
+                try:
+                    image, message = urllib.urlretrieve(url)
+                    path = "%s.%s" % (
+                            image_base, blautils.get_extension(image))
+                    shutil.move(image, path)
+                    pixbuf = gtk.gdk.pixbuf_new_from_file(path).scale_simple(
+                            COVER_SIZE, COVER_SIZE, gtk.gdk.INTERP_HYPER)
+                except (IOError, gobject.GError): pass
+
+            self.cover = pixbuf
+            model.row_changed(model.get_path(iterator), iterator)
+            return path
 
     def __init__(self):
         super(BlaReleaseBrowser, self).__init__()
@@ -176,10 +181,7 @@ class BlaReleaseBrowser(blaguiutils.BlaScrolledWindow):
             alignment.add(label)
             hbox.pack_start(alignment, expand=True, fill=True, padding=padding)
 
-        # TODO: pick either the black or white version of the logo, depending
-        #       on the background color
-        image = gtk.image_new_from_file(
-                os.path.join(blaconst.IMAGES_PATH, "lastfm.png"))
+        image = gtk.image_new_from_file(blaconst.LASTFM_LOGO)
         alignment = gtk.Alignment(1.0, 0.5)
         alignment.add(image)
         hbox.pack_start(alignment, expand=False)
@@ -255,6 +257,28 @@ class BlaReleaseBrowser(blaguiutils.BlaScrolledWindow):
         self.show_all()
 
     def __update_models(self, releases):
+        def worker():
+            while True:
+                release, model, iterator = queue.get()
+                image_base = os.path.join(blaconst.RELEASES, ("%s-%s" % (
+                        release.artist_name, release.release_name)).replace(
+                        " ", "_")
+                )
+                path = release.get_cover(image_base, model, iterator)
+                if path: images.add(path)
+                queue.task_done()
+        images = set()
+        queue = Queue.Queue()
+
+        blaplay.print_d("Starting worker threads to fetch covers for new "
+                "releases")
+        threads = []
+        for x in xrange(3):
+            t = threading.Thread(target=worker)
+            t.daemon = True
+            threads.append(t)
+            t.start()
+
         type_ = blacfg.getint("general", "new.releases")
         releases_library, releases_recommended = releases
         self.__count_library = len(releases_library)
@@ -286,10 +310,16 @@ class BlaReleaseBrowser(blaguiutils.BlaScrolledWindow):
                     if week == current_week:
                         datestring %= "This week</b></span> (%s)" % date
                     else: datestring %= "Week of %s</b></span>" % date
-
                     model.append([datestring])
                 iterator = model.append([release])
-                release.get_cover(model, iterator)
+                queue.put((release, model, iterator))
+        queue.join()
+        map(threading.Thread._Thread__stop, threads)
+
+        # get rid of covers for releases that don't show up in the list anymore
+        for f in set(blautils.discover(blaconst.RELEASES)).difference(images):
+            try: os.unlink(f)
+            except OSError: pass
 
     def __type_changed(self, radiobutton, type_):
         # the signal of the new active radiobutton arrives last so only change
@@ -345,6 +375,6 @@ class BlaReleaseBrowser(blaguiutils.BlaScrolledWindow):
 
     def __cw_to_start_end_day(self, year, week):
         date = datetime.date(year, 1, 1)
-        timedelta = datetime.timedelta(days=(week-1)*7)
+        timedelta = datetime.timedelta(days=(week-1)*7+1)
         return date + timedelta, date + timedelta + datetime.timedelta(days=6)
 

@@ -291,8 +291,7 @@ class BlaSidePane(gtk.VBox):
 
     @blautils.lock(__lock)
     def __update_track(self, track):
-        begin = self.__tb.get_start_iter()
-        begin2 = self.__tb2.get_start_iter()
+        iterator = self.__tb.get_iter_at_mark(self.__tb.get_insert())
 
         # set track name and artist
         title = track[TITLE]
@@ -300,22 +299,24 @@ class BlaSidePane(gtk.VBox):
         artist = track[ARTIST]
 
         self.__tb.insert_with_tags_by_name(
-                begin, "\n%s" % title, "bold", "large", "color")
+                iterator, "\n%s" % title, "bold", "large", "color")
         if artist:
             self.__tb.insert_with_tags_by_name(
-                    begin, "\n%s" % artist, "italic", "color")
+                    iterator, "\n%s" % artist, "italic", "color")
+
+            iterator = self.__tb2.get_iter_at_mark(self.__tb2.get_insert())
             self.__tb2.insert_with_tags_by_name(
-                    begin2, "\n%s" % artist, "bold", "large", "color")
+                    iterator, "\n%s" % artist, "bold", "large", "color")
 
     @blautils.lock(__lock)
     def __update_lyrics(self, lyrics):
         if lyrics:
-            self.__tb.insert_with_tags_by_name(self.__tb.get_end_iter(),
-                    "\n\n%s\n" % lyrics, "color")
+            self.__tb.insert_with_tags_by_name(self.__tb.get_iter_at_mark(
+                    self.__tb.get_insert()), "\n\n%s\n" % lyrics, "color")
 
     @blautils.lock(__lock)
     def __update_biography(self, image, biography):
-        iterator = self.__tb2.get_end_iter()
+        iterator = self.__tb2.get_iter_at_mark(self.__tb2.get_insert())
 
         if image:
             try: image = gtk.gdk.pixbuf_new_from_file(image)
