@@ -54,7 +54,11 @@ def init():
             "queue.remove.when.activated": "yes",
             "search.after.timeout": "no",
             "visualization": blaconst.VISUALIZATION_SPECTRUM,
-            "new.releases": blaconst.NEW_RELEASES_FROM_LIBRARY
+            "releases.filter": blaconst.NEW_RELEASES_FROM_LIBRARY,
+            "events.country": "",
+            "events.city": "",
+            "events.source": blaconst.EVENTS_LASTFM,
+            "events.filter": blaconst.EVENTS_RECOMMENDED
         },
 
         "player":

@@ -1,10 +1,8 @@
 - enhance command-line interface
 - enhance tag editor (parse tags from filename)
-- add clear button to Queue row in the view selector
-- add "working" animation icon to events/releases row in view selector
 - get a proper logo
 - write up some crude unit/regression tests
-- improve design of radio (duh)/events/releases pages
+- improve design of radio (duh)/events pages
 - improve lyrics fetcher (more robust search, more search engines)
 - lower memory footprint
 - improve/speed up "remove duplicates" functionality
@@ -19,12 +17,14 @@
 - iPod support, possibly other players, too
 - support for CUE sheets
 - gapless playback
+
+- songkick integration for upcoming artist events
+- get covers from covertartarchive/musicbrainz
+- add spectrogram (+ 3D spectrogram) visualization(s) if feasible
+
+- QTableView clone in GTK to allow cells to span across multiple columns
+  (required for grouping in playlists)
 - port to GI once stability/performance is satisfying
 - py3k port once all required modules are ported (the main requirement
   being mutagen as gtk and gst won't be a problem once we ported to GI)
-- songkick integration for upcoming artist events
-- get covers and upcoming releases from musicbrainz
-- add spectrogram (+ 3D spectrogram) visualization(s) if feasible
-- QTableView clone in GTK to allow cells to span across multiple columns
-  (required for grouping in playlists)
 

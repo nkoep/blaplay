@@ -207,25 +207,39 @@ def get_biography(track, image_base):
 
     return image, biography
 
-def get_recommended_events(festivalsonly=False, country=""):
+def get_events(recommended=True, country="", city="", festivalsonly=False):
+    # TODO: check return value if there are more events than the given limit
+
     events = None
-    session_key = BlaScrobbler.get_session_key()
-    if not session_key: events
 
-    method = "user.getRecommendedEvents"
-    params = [
-        ("method", method), ("api_key", blaconst.LASTFM_APIKEY),
-        ("sk", session_key), ("festivalsonly", str(int(festivalsonly)))
-    ]
-    if country: params.append(("country", country))
+    if recommended:
+        session_key = BlaScrobbler.get_session_key()
+        if not session_key: events
 
-    api_signature = sign_api_call(params)
-    params.append(("api_sig", api_signature))
-    error, response = post_message(params)
+        method = "user.getRecommendedEvents"
+        params = [
+            ("method", method), ("api_key", blaconst.LASTFM_APIKEY),
+            ("sk", session_key), ("festivalsonly", str(int(festivalsonly))),
+            ("limit", "25")
+        ]
+        if country: params.append(("country", country))
+
+        api_signature = sign_api_call(params)
+        params.append(("api_sig", api_signature))
+        error, response = post_message(params)
+        if not error: response = response["events"]
+
+    else:
+        location = ", ".join([city, country] if country else [city])
+        url = "%s&method=geo.getEvents&location=%s&festivalsonly=%s" % (
+                blaconst.LASTFM_BASEURL, location, str(int(festivalsonly)))
+        url = quote_url(url)
+        error, response = get_response(url, "events")
+
     if error:
         blaplay.print_d("Failed to retrieve recommended events: %s (error %d)"
                 % (response, error))
-    else: events = response["events"]
+    else: events = response["event"]
     return events
 
 def get_new_releases(recommended=False):

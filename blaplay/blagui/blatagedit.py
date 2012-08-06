@@ -16,6 +16,7 @@
 # Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
 import os
+import re
 from time import ctime
 from copy import deepcopy
 
@@ -481,6 +482,32 @@ class BlaTagedit(blaguiutils.BlaWindow):
         paths = [r.path for r in model if r[0] in identifiers]
         map(selection.select_path, paths)
 
+    def __capitalize(self, identifiers):
+        def capitalize(s):
+            return re.sub(r"(^|\s)(\S)",
+                    lambda m: m.group(1) + m.group(2).upper(), s)
+
+        model, paths = self.__file_list.get_selection().get_selected_rows()
+        for path in paths:
+            uri = model[path][0]
+            try: track = self.__tracks[uri]
+            except KeyError: track = library[uri]
+            for identifier in identifiers:
+                value = track[identifier]
+                value = capitalize(value)
+
+                if value != track[identifier]:
+                    if not self.__tracks.has_key(uri):
+                        # copy-on-write
+                        self.__tracks[uri] = deepcopy(track)
+                    self.__tracks[uri][identifier] = value
+
+        self.__update_selection()
+        selection = self.__treeview_metadata.get_selection()
+        model = self.__treeview_metadata.get_model()
+        paths = [r.path for r in model if r[0] in identifiers]
+        map(selection.select_path, paths)
+
     def __setup_page(self, is_editable):
         sw = blaguiutils.BlaScrolledWindow()
 
@@ -527,14 +554,21 @@ class BlaTagedit(blaguiutils.BlaWindow):
                     *map(int, [event.x, event.y]))
         except TypeError: pass
         else:
-            m = gtk.MenuItem("Delete tag")
-            mod, key = gtk.accelerator_parse("Delete")
-            m.add_accelerator(
-                    "activate", blagui.accelgroup, mod, key, gtk.ACCEL_VISIBLE)
             model, paths = treeview.get_selection().get_selected_rows()
             identifiers = [model[path][0] for path in paths]
-            m.connect("activate", lambda *x: self.__delete_tags(identifiers))
-            menu.append(m)
+            items = [
+                ("Delete tag", "Delete",
+                        lambda *x: self.__delete_tags(identifiers)),
+                ("Capitalize", None, lambda *x: self.__capitalize(identifiers))
+            ]
+            for label, accel, callback in items:
+                m = gtk.MenuItem(label)
+                if accel:
+                    mod, key = gtk.accelerator_parse(accel)
+                    m.add_accelerator("activate", blagui.accelgroup, mod, key,
+                            gtk.ACCEL_VISIBLE)
+                m.connect("activate", callback)
+                menu.append(m)
 
         menu.show_all()
         menu.popup(None, None, None, event.button, event.time)
