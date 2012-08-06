@@ -204,6 +204,8 @@ class BlaTreeViewBase(gtk.TreeView):
         self.__renderer = kwargs.pop("renderer", None)
         self.__text_column = kwargs.pop("text_column", None)
         self.__allow_no_selection = kwargs.pop("allow_no_selection", True)
+        set_button_event_handlers = kwargs.pop(
+                "set_button_event_handlers", True)
 
         super(BlaTreeViewBase, self).__init__(*args, **kwargs)
         if blacfg.getboolean("colors", "overwrite") and self.__multicol:
@@ -212,12 +214,13 @@ class BlaTreeViewBase(gtk.TreeView):
         self.set_name(name)
         type(self).instances.append(self)
         self.set_enable_search(False)
-        self.connect_object("button_press_event",
-                BlaTreeViewBase.__button_press_event, self)
-        self.connect_object("button_release_event",
-                BlaTreeViewBase.__button_release_event, self)
-        self.connect_object(
-                "row_activated", BlaTreeViewBase.__row_activated, self)
+        if set_button_event_handlers:
+            self.connect_object("button_press_event",
+                    BlaTreeViewBase.__button_press_event, self)
+            self.connect_object("button_release_event",
+                    BlaTreeViewBase.__button_release_event, self)
+            self.connect_object(
+                    "row_activated", BlaTreeViewBase.__row_activated, self)
         self.connect_after("drag_begin", self.__drag_begin)
         self.connect_object("drag_failed", BlaTreeViewBase.__drag_failed, self)
         self.get_selection().set_mode(gtk.SELECTION_MULTIPLE)
@@ -236,8 +239,9 @@ class BlaTreeViewBase(gtk.TreeView):
         model = self.get_model()
         iterator = model.get_iter(path)
 
-        width = renderer.get_text_width(
-                self, model.get_value(iterator, self.__text_column))[1]
+        layout = renderer.get_layout(
+                self, model.get_value(iterator, self.__text_column))
+        width = layout.get_pixel_size()[0]
         cell_area = self.get_cell_area(path, column)
         expander_size = self.style_get_property("expander_size")
 

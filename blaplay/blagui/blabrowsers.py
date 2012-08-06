@@ -40,19 +40,13 @@ from blaplay.formats._identifiers import *
 
 class BlaCellRenderer(blaguiutils.BlaCellRendererBase):
     __gproperties__ = {
-        "text": (
-            gobject.TYPE_STRING,
-            "text",
-            "text to display",
-            "",
-            gobject.PARAM_READWRITE
-        )
+        "text": (gobject.TYPE_STRING, "text", "", "", gobject.PARAM_READWRITE)
     }
 
     def __init__(self):
         super(BlaCellRenderer, self).__init__()
 
-    def get_text_width(self, *args):
+    def get_layout(self, *args):
         if len(args) == 1: tv, text = args[0], ""
         else: tv, text = args
 
@@ -66,15 +60,14 @@ class BlaCellRenderer(blaguiutils.BlaCellRendererBase):
             try: text = self.get_property("text")
             except AttributeError: text = ""
         layout.set_text(text)
-
-        width, height = layout.get_pixel_size()[0:2]
-        return (layout, width, height)
+        return layout
 
     def on_get_size(self, widget, cell_area):
         surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, 0, 0)
         cr = cairo.Context(surface)
         pc_context = pangocairo.CairoContext(cr)
-        layout, width, height = self.get_text_width(widget)
+        layout = self.get_layout(widget)
+        width, height = layout.get_pixel_size()
         return (0, 0, width, height)
 
     def on_render(self, window, widget, background_area, cell_area,
@@ -101,7 +94,8 @@ class BlaCellRenderer(blaguiutils.BlaCellRendererBase):
         pc_context.fill()
 
         # render active resp. inactive rows
-        layout, width, height = self.get_text_width(widget)
+        layout = self.get_layout(widget)
+        width, height = layout.get_pixel_size()
 
         if (flags == (gtk.CELL_RENDERER_SELECTED|gtk.CELL_RENDERER_PRELIT) or
                 flags == gtk.CELL_RENDERER_SELECTED):

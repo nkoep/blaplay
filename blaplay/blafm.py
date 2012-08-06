@@ -228,12 +228,12 @@ def get_recommended_events(festivalsonly=False, country=""):
     else: events = response["events"]
     return events
 
-def get_new_releases():
+def get_new_releases(recommended=False):
     releases = []
     user = blacfg.getstring("lastfm", "user")
     if user:
-        url = "%s&method=user.getNewReleases&user=%s" % (
-                blaconst.LASTFM_BASEURL, user)
+        url = "%s&method=user.getNewReleases&user=%s&userecs=%d" % (
+                blaconst.LASTFM_BASEURL, user, int(recommended))
         url = quote_url(url)
         error, response = get_response(url, "albums")
         if error:

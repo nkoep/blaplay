@@ -52,6 +52,11 @@ COVER = os.path.join(IMAGES_PATH, "cover.svg")
 MINSIZE = [-1, 400]
 STYLE_NAME = blautils.md5(APPNAME)
 
+# player constants
+STATE_PLAYING, STATE_PAUSED, STATE_STOPPED = xrange(3)
+TRACK_PLAY, TRACK_NEXT, TRACK_PREVIOUS, TRACK_RANDOM = xrange(4)
+EQUALIZER_BANDS = 10
+
 # menu
 MENU = """
     <ui>
@@ -167,8 +172,6 @@ ORDER_LITERALS = ["Normal", "Repeat", "Shuffle"]
 
 METADATA_LYRICS, METADATA_BIOGRAPHY = xrange(2)
 
-# player constants
-STATE_PLAYING, STATE_PAUSED, STATE_STOPPED = xrange(3)
-TRACK_PLAY, TRACK_NEXT, TRACK_PREVIOUS, TRACK_RANDOM = xrange(4)
-EQUALIZER_BANDS = 10
+# releases browser
+NEW_RELEASES_FROM_LIBRARY, NEW_RELEASES_RECOMMENDED = xrange(2)
 

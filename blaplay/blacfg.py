@@ -53,7 +53,8 @@ def init():
             "cursor.follows.playback": "yes",
             "queue.remove.when.activated": "yes",
             "search.after.timeout": "no",
-            "visualization": blaconst.VISUALIZATION_SPECTRUM
+            "visualization": blaconst.VISUALIZATION_SPECTRUM,
+            "new.releases": blaconst.NEW_RELEASES_FROM_LIBRARY
         },
 
         "player":

@@ -16,99 +16,335 @@
 # Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
 import os
+import math
 
-import glib
 import gobject
 import gtk
 import pango
+import pangocairo
 import urllib
+import datetime
 from email.utils import parsedate_tz as parse_rfc_time
 import time
 
 import blaplay
-from blaplay import blautils, blaconst, blafm
+from blaplay import blacfg, blaconst, blautils, blafm
 from blaplay.blagui import blaguiutils
 
+COVER_SIZE = 65
+
+
+class BlaCellRendererPixbuf(blaguiutils.BlaCellRendererBase):
+    __gproperties__ = {
+        "content": (gobject.TYPE_PYOBJECT, "", "", gobject.PARAM_READWRITE)
+    }
+
+    def __init__(self):
+        super(BlaCellRendererPixbuf, self).__init__()
+
+    def __get_layout(self, widget):
+        context = widget.get_pango_context()
+        layout = pango.Layout(context)
+        fdesc = gtk.widget_get_default_style().font_desc
+        layout.set_font_description(fdesc)
+        layout.set_markup(self.get_property("content"))
+        return layout
+
+    def on_get_size(self, widget, cell_area):
+        content = self.get_property("content")
+        if isinstance(content, str):
+            layout = self.__get_layout(widget)
+            height = layout.get_pixel_size()[-1]
+        else: height = COVER_SIZE
+        return (0, 0, COVER_SIZE, height)
+
+    def on_render(self, window, widget, background_area, cell_area,
+            expose_area, flags):
+        cr = window.cairo_create()
+
+        # check if a state icon should be rendered
+        content = self.get_property("content")
+        if isinstance(content, str):
+            # render active resp. inactive rows
+            layout = self.__get_layout(widget)
+            layout.set_width((expose_area.width + expose_area.x) * pango.SCALE)
+            layout.set_ellipsize(pango.ELLIPSIZE_END)
+
+            if blacfg.getboolean("colors", "overwrite"):
+                if (flags == (gtk.CELL_RENDERER_SELECTED |
+                        gtk.CELL_RENDERER_PRELIT) or
+                        flags == gtk.CELL_RENDERER_SELECTED):
+                    color = gtk.gdk.color_parse(self._active_text_color)
+                else: color = gtk.gdk.color_parse(self._text_color)
+            else:
+                style = widget.get_style()
+                if (flags == (gtk.CELL_RENDERER_SELECTED |
+                        gtk.CELL_RENDERER_PRELIT) or
+                        flags == gtk.CELL_RENDERER_SELECTED):
+                    color = style.text[gtk.STATE_SELECTED]
+                else: color = style.text[gtk.STATE_NORMAL]
+            cr.set_source_color(color)
+
+            pc_context = pangocairo.CairoContext(cr)
+            pc_context.move_to(expose_area.x + 10, expose_area.y)
+            pc_context.show_layout(layout)
+
+            cr.set_line_width(1.0)
+            size = layout.get_pixel_size()
+            cr.move_to(size[0] + 20,
+                    math.ceil(expose_area.y + size[1] / 2) + 0.5)
+            cr.line_to(expose_area.x+expose_area.width - 10,
+                    math.ceil(expose_area.y + size[1] / 2) + 0.5)
+            cr.stroke()
+        else:
+            if not content: return
+            cr.set_source_pixbuf(content, expose_area.x, expose_area.y)
+            cr.rectangle(*expose_area)
+            cr.fill()
+
+gobject.type_register(BlaCellRendererPixbuf)
 
 class BlaReleaseBrowser(blaguiutils.BlaScrolledWindow):
     # TODO: - design the page a little closer to the original:
     #         http://www.last.fm/home/newreleases
     #       - cache images
     #       - add timer to check for new releases every x hours
+    #       - ignore entries
 
     __gsignals__ = {
+        "update_models": blaplay.signal(1),
         "count_changed": blaplay.signal(2)
     }
+    __count_library = 0
+    __count_recommended = 0
 
     class Release(object):
-        __COVER_SIZE = 65
-
         def __init__(self, raw):
+            self.__raw = raw
             self.release_name = raw["name"]
             self.release_url=  raw["url"]
             self.artist_name = raw["artist"]["name"]
             self.artist_url = raw["artist"]["url"]
-            release_date = parse_rfc_time(raw["@attr"]["releasedate"])
-            self.release_date = time.strftime("%A %d %B %Y", release_date[:-1])
-            self.cover = self.__get_cover(raw["image"])
+            self.date = parse_rfc_time(raw["@attr"]["releasedate"])
+            self.cover = gtk.gdk.Pixbuf(gtk.gdk.COLORSPACE_RGB, True, 8,
+                    COVER_SIZE, COVER_SIZE)
+            self.cover.fill(0)
 
-        def __get_cover(self, images):
+        @property
+        def release_date(self):
+            return time.strftime("%A %d %B %Y", self.date[:-1])
+
+        @property
+        def calender_week(self):
+            return datetime.date(*self.date[:3]).isocalendar()[:2]
+
+        # FIXME: rather do this with one thread and emit a signal when a cover
+        #        was updated
+        @blautils.thread
+        def get_cover(self, model, iterator):
             pixbuf = None
-            url = blafm.get_image_url(images)
+            url = blafm.get_image_url(self.__raw["image"])
             try:
                 image, message = urllib.urlretrieve(url)
                 pixbuf = gtk.gdk.pixbuf_new_from_file(image).scale_simple(
-                        self.__COVER_SIZE, self.__COVER_SIZE,
+                        COVER_SIZE, COVER_SIZE,
                         gtk.gdk.INTERP_HYPER
                 )
-            except (IOError, glib.GError): pass
-            else:
-                # FIXME: shouldn't this happen automatically considering
-                #        urlretrieve works on tempfiles?
-                os.unlink(image)
-            return pixbuf
+                self.cover = pixbuf
+                model.row_changed(model.get_path(iterator), iterator)
+            except (IOError, gobject.GError): pass
 
     def __init__(self):
         super(BlaReleaseBrowser, self).__init__()
-        self.set_shadow_type(gtk.SHADOW_IN)
+        self.set_shadow_type(gtk.SHADOW_NONE)
 
+        vbox = gtk.VBox()
+        vbox.set_border_width(10)
+
+        # heading
+        hbox = gtk.HBox()
+        items = [
+            ("<b><span size=\"xx-large\">New releases</span></b>",
+             0.0, 0.5, 0),
+            ("<b><span size=\"x-small\">powered by</span></b>",
+             1.0, 1.0, 5)
+        ]
+        for markup, xalign, yalign, padding in items:
+            label = gtk.Label()
+            label.set_markup(markup)
+            alignment = gtk.Alignment(xalign, yalign)
+            alignment.add(label)
+            hbox.pack_start(alignment, expand=True, fill=True, padding=padding)
+
+        # TODO: pick either the black or white version of the logo, depending
+        #       on the background color
+        image = gtk.image_new_from_file(
+                os.path.join(blaconst.IMAGES_PATH, "lastfm.png"))
+        alignment = gtk.Alignment(1.0, 0.5)
+        alignment.add(image)
+        hbox.pack_start(alignment, expand=False)
+
+        vbox.pack_start(hbox, expand=False)
+
+        # type selector
+        hbox = gtk.HBox(spacing=5)
+        hbox.set_border_width(10)
+        items = [
+            ("From artists in your library",
+             blaconst.NEW_RELEASES_FROM_LIBRARY),
+            ("Recommended by Last.fm", blaconst.NEW_RELEASES_RECOMMENDED)
+        ]
+        active = blacfg.getint("general", "new.releases")
+        radiobutton = None
+        for label, type_ in items:
+            radiobutton = gtk.RadioButton(radiobutton, label)
+            if type_ == active: radiobutton.set_active(True)
+            radiobutton.connect("toggled", self.__type_changed, type_)
+            hbox.pack_start(radiobutton, expand=False)
+
+        vbox.pack_start(hbox, expand=False)
+
+        # releases list
         def cell_data_func_pixbuf(column, renderer, model, iterator):
-            pb = model[iterator][0].cover
-            if pb: renderer.set_property("pixbuf", pb)
+            release = model[iterator][0]
+            try: renderer.set_property("content", release.cover)
+            except AttributeError: renderer.set_property("content", release)
 
         def cell_data_func_text(column, renderer, model, iterator):
             release = model[iterator][0]
-            markup = "<b>%s</b>\n%s\nReleased: %s" % (release.release_name,
-                    release.artist_name, release.release_date)
+            try:
+                markup = "<b>%s</b>\n%s\nReleased: %s" % (release.release_name,
+                        release.artist_name, release.release_date)
+            except AttributeError: markup = ""
             renderer.set_property("markup", markup)
 
-        treeview = blaguiutils.BlaTreeViewBase()
-        treeview.set_headers_visible(False)
-        treeview.set_rules_hint(True)
-        r = gtk.CellRendererPixbuf()
-        column = gtk.TreeViewColumn("covers", r)
+        self.__treeview = blaguiutils.BlaTreeViewBase(
+                set_button_event_handlers=False)
+        self.__treeview.set_rules_hint(True)
+        self.__treeview.get_selection().set_mode(gtk.SELECTION_SINGLE)
+        self.__treeview.set_headers_visible(False)
+        r = BlaCellRendererPixbuf()
+        column = gtk.TreeViewColumn("covers")
+        column.pack_start(r, expand=False)
         column.set_cell_data_func(r, cell_data_func_pixbuf)
-        treeview.append_column(column)
         r = gtk.CellRendererText()
         r.set_property("ellipsize", pango.ELLIPSIZE_END)
-        column = gtk.TreeViewColumn("text", r)
+        column.pack_start(r)
         column.set_cell_data_func(r, cell_data_func_text)
-        treeview.append_column(column)
-        treeview.connect("row_activated", self.__row_activated)
+        self.__treeview.append_column(column)
+        self.__treeview.connect("row_activated", self.__row_activated)
+        self.__treeview.connect(
+                "button_press_event", self.__button_press_event)
+        self.__models = [gtk.ListStore(gobject.TYPE_PYOBJECT)
+                for x in xrange(2)]
+        self.__treeview.set_model(self.__models[active])
+        self.connect_object(
+                "update_models", BlaReleaseBrowser.__update_models, self)
+        vbox.pack_start(self.__treeview, expand=True, padding=10)
 
         @blautils.thread
-        def populate():
-            model = gtk.ListStore(gobject.TYPE_PYOBJECT)
-            releases = blafm.get_new_releases()
-            for release in releases:
-                model.append([BlaReleaseBrowser.Release(release)])
-            self.emit("count_changed", blaconst.VIEW_RELEASES, len(releases))
-            treeview.set_model(model)
+        def check_releases():
+            self.emit("update_models", (blafm.get_new_releases(),
+                    blafm.get_new_releases(recommended=True)))
+            return True
+        # check for new releases now and every two hours
+        gobject.timeout_add(2 * 3600 * 1000, check_releases)
+        check_releases()
 
-        populate()
-        self.add(treeview)
+        self.add_with_viewport(vbox)
         self.show_all()
+
+    def __update_models(self, releases):
+        type_ = blacfg.getint("general", "new.releases")
+        releases_library, releases_recommended = releases
+        self.__count_library = len(releases_library)
+        self.__count_recommended = len(releases_recommended)
+
+        if type_ == blaconst.NEW_RELEASES_FROM_LIBRARY:
+            count = self.__count_library
+        else: count = self.__count_recommended
+        self.emit("count_changed", blaconst.VIEW_RELEASES, count)
+
+        items = [
+            (self.__models[blaconst.NEW_RELEASES_FROM_LIBRARY],
+             releases_library),
+            (self.__models[blaconst.NEW_RELEASES_RECOMMENDED],
+             releases_recommended)
+        ]
+        current_week = datetime.date.today().isocalendar()[:2]
+        for model, releases in items:
+            previous_week = None
+            for release in releases:
+                release = BlaReleaseBrowser.Release(release)
+                week = release.calender_week
+                if previous_week != week:
+                    previous_week = week
+                    date = self.__cw_to_start_end_day(*week)
+                    date = "%s - %s" % (date[0].strftime("%a %d %b"),
+                            date[1].strftime("%a %d %b"))
+                    datestring = "\n<span size=\"larger\"><b>%s\n"
+                    if week == current_week:
+                        datestring %= "This week</b></span> (%s)" % date
+                    else: datestring %= "Week of %s</b></span>" % date
+
+                    model.append([datestring])
+                iterator = model.append([release])
+                release.get_cover(model, iterator)
+
+    def __type_changed(self, radiobutton, type_):
+        # the signal of the new active radiobutton arrives last so only change
+        # the config then
+        if radiobutton.get_active():
+            blacfg.set("general", "new.releases", type_)
+            self.__treeview.set_model(self.__models[type_])
+            if type_ == blaconst.NEW_RELEASES_FROM_LIBRARY:
+                count = self.__count_library
+            else: count = self.__count_recommended
+            self.emit("count_changed", blaconst.VIEW_RELEASES, count)
 
     def __row_activated(self, treeview, path, column):
         blautils.open_url(treeview.get_model()[path][0].release_url)
+
+    def __button_press_event(self, treeview, event):
+        try: path = treeview.get_path_at_pos(*map(int, [event.x, event.y]))[0]
+        except TypeError: return False
+
+        model = treeview.get_model()
+        release = model[path][0]
+        if not isinstance(release, BlaReleaseBrowser.Release): return True
+        if event.button in [1, 2]:
+            if event.type in [gtk.gdk._2BUTTON_PRESS, gtk.gdk._3BUTTON_PRESS]:
+                return True
+            return False
+
+        release_url = release.release_url
+        artist_url = release.artist_url
+
+        items = [
+            ("View release page", lambda *x: blautils.open_url(release_url)),
+            ("View artist profile", lambda *x: blautils.open_url(artist_url))
+        ]
+
+        user = blacfg.getstring("lastfm", "user")
+        if user:
+            artist_history_url = os.path.basename(release.artist_url)
+            artist_history_url = ("http://www.last.fm/user/%s/library/music/%s"
+                    % (user, artist_history_url))
+            items.append(("View artist history",
+                    lambda *x: blautils.open_url(artist_history_url)))
+
+        menu = gtk.Menu()
+        for label, callback in items:
+            m = gtk.MenuItem(label)
+            m.connect("activate", callback)
+            menu.append(m)
+
+        menu.show_all()
+        menu.popup(None, None, None, event.button, event.time)
+        return False
+
+    def __cw_to_start_end_day(self, year, week):
+        date = datetime.date(year, 1, 1)
+        timedelta = datetime.timedelta(days=(week-1)*7)
+        return date + timedelta, date + timedelta + datetime.timedelta(days=6)
 

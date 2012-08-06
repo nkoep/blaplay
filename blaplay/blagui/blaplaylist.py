@@ -343,33 +343,21 @@ class BlaCellRenderer(blaguiutils.BlaCellRendererBase):
     """
 
     __gproperties__ = {
-        "text": (
-            gobject.TYPE_STRING,
-            "text",
-            "text to display",
-            "",
-            gobject.PARAM_READWRITE
-        ),
-        "stock-id": (
-            gobject.TYPE_STRING,
-            "text",
-            "text to display",
-            "",
-            gobject.PARAM_READWRITE
-        )
+        "text": (gobject.TYPE_STRING, "text", "", "", gobject.PARAM_READWRITE),
+        "stock-id": (gobject.TYPE_STRING, "text", "", "",
+                gobject.PARAM_READWRITE)
     }
 
     def __init__(self):
         super(BlaCellRenderer, self).__init__()
 
-    def __get_text_width(self, widget):
+    def __get_layout(self, widget):
         context = widget.get_pango_context()
         layout = pango.Layout(context)
         fdesc = gtk.widget_get_default_style().font_desc
         layout.set_font_description(fdesc)
         layout.set_text(self.get_property("text"))
-        size = layout.get_pixel_size()
-        return (layout, size)
+        return layout
 
     def on_get_size(self, widget, cell_area):
         return (0, 0, -1, -1)
@@ -382,22 +370,22 @@ class BlaCellRenderer(blaguiutils.BlaCellRendererBase):
         stock = self.get_property("stock-id")
         if stock:
             pixbuf = widget.render_icon(stock, gtk.ICON_SIZE_SMALL_TOOLBAR)
-            size = (pixbuf.get_width(), pixbuf.get_height())
+            width, height = pixbuf.get_width(), pixbuf.get_height()
             cr.set_source_pixbuf(pixbuf,
                     expose_area.x +
-                    round((expose_area.width - size[0] + 0.5) / 2),
+                    round((expose_area.width - width + 0.5) / 2),
                     expose_area.y +
-                    round((expose_area.height - size[1] + 0.5) / 2)
+                    round((expose_area.height - height + 0.5) / 2)
             )
             cr.rectangle(*expose_area)
             cr.fill()
         else:
             # render active resp. inactive rows
-            layout, size = self.__get_text_width(widget)
+            layout = self.__get_layout(widget)
+            width, height = layout.get_pixel_size()
             layout.set_width((expose_area.width + expose_area.x) * pango.SCALE)
             layout.set_ellipsize(pango.ELLIPSIZE_END)
 
-            # set font, font color and the text to render
             if blacfg.getboolean("colors", "overwrite"):
                 if (flags == (gtk.CELL_RENDERER_SELECTED |
                         gtk.CELL_RENDERER_PRELIT) or
@@ -414,12 +402,12 @@ class BlaCellRenderer(blaguiutils.BlaCellRendererBase):
             cr.set_source_color(color)
 
             pc_context = pangocairo.CairoContext(cr)
-            if size[0] < expose_area.width:
+            if width < expose_area.width:
                 x = expose_area.x + round(
-                        (expose_area.width - size[0] + 0.5) / 2)
+                        (expose_area.width - width + 0.5) / 2)
             else: x = expose_area.x
             pc_context.move_to(x, expose_area.y +
-                    round((expose_area.height - size[1] + 0.5) / 2))
+                    round((expose_area.height - height + 0.5) / 2))
             pc_context.show_layout(layout)
 
 gobject.type_register(BlaCellRenderer)
@@ -2389,5 +2377,7 @@ class BlaPlaylist(gtk.Notebook):
         if blagui.is_accel(event, "<Ctrl>T"): self.add_playlist(focus=True)
         elif blagui.is_accel(event, "<Ctrl>W"):
             BlaPlaylist.remove_playlist(self.__get_current_page())
+        elif blagui.is_accel(event, "Escape"):
+            self.__get_current_page().disable_search()
         return False
 
