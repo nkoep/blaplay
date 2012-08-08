@@ -303,8 +303,7 @@ class BlaTagedit(blaguiutils.BlaWindow):
         gobject.idle_add(p.next)
 
         while ns["wait"]:
-            if gtk.events_pending():
-                if gtk.main_iteration(): break
+            if gtk.events_pending() and gtk.main_iteration(): break
 
         self.__pb.set_visible(False)
         from blaplay.blagui.blaplaylist import BlaPlaylist
