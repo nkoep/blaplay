@@ -128,11 +128,9 @@ def update_colors():
     )
 
     from blabrowsers import BlaBrowsers
-    from blavisualization import BlaVisualization
     from blaview import BlaView
 
     BlaBrowsers.update_colors()
-    BlaVisualization.update_colors()
     BlaView.update_colors()
 
 def is_accel(event, accel):

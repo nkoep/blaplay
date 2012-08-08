@@ -37,7 +37,6 @@ class BlaVisualization(gtk.DrawingArea):
         player.connect("track_changed", self.flush_buffers)
         player.connect("seek", self.flush_buffers)
         self.connect("expose_event", self.__expose)
-        self.connect("realize", lambda *x: self.update_colors())
         def size_allocate(drawingarea, allocation):
             try: self.__module.set_width(allocation.width)
             except AttributeError: pass
@@ -66,7 +65,6 @@ class BlaVisualization(gtk.DrawingArea):
         else:
             self.__module = module()
             self.__module.set_width(self.get_allocation().width)
-            self.update_colors()
             self.set_size_request(-1, self.__module.height)
             try: player.disconnect(self.__cid)
             except AttributeError: pass
@@ -88,7 +86,7 @@ class BlaVisualization(gtk.DrawingArea):
         # saves some CPU time. this is not the case if the window is just
         # obscured by another one
         self.__module.draw(
-                self.window.cairo_create(), self.get_pango_context())
+                self.window.cairo_create(), self.get_pango_context(), self.get_style())
 
     @classmethod
     def flush_buffers(cls, *args):
@@ -100,18 +98,4 @@ class BlaVisualization(gtk.DrawingArea):
         element = current.get_current_value()
         blacfg.set("general", "visualization", element)
         cls.__instance.__initialize_module(element)
-
-    @classmethod
-    def update_colors(cls):
-        if blacfg.getboolean("colors", "overwrite"):
-            f = lambda c: gtk.gdk.color_parse(blacfg.getstring("colors", c))
-            text, highlight, bg = map(f, ["text", "highlight", "background"])
-        else:
-            style = cls.__instance.get_style()
-            text = style.text[gtk.STATE_NORMAL]
-            highlight = style.base[gtk.STATE_ACTIVE]
-            bg = style.bg[gtk.STATE_NORMAL]
-
-        try: cls.__instance.__module.set_colors(text, highlight, bg)
-        except AttributeError: pass
 

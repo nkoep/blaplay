@@ -188,22 +188,36 @@ cdef class Spectrum(object):
         self.__log_freq = NULL
         self.__plan = NULL
 
-    def set_colors(self, *args):
-        self.__color_text, self.__color_highlight, self.__color_bg = args
-        self.__gradient = cairo.LinearGradient(
-                0, 0, 0, self.height - self.__padding)
-        self.__gradient.add_color_stop_rgb(
-                0.5,
-                self.__color_highlight.red / 65535.,
-                self.__color_highlight.green / 65535.,
-                self.__color_highlight.blue / 65535.
-        )
-        self.__gradient.add_color_stop_rgb(
-                1.0,
-                self.__color_text.red / 65535.,
-                self.__color_text.green / 65535.,
-                self.__color_text.blue / 65535.
-        )
+    def __update_colors(self, style):
+        if blacfg.getboolean("colors", "overwrite"):
+            f = lambda c: gtk.gdk.color_parse(blacfg.getstring("colors", c))
+            color_text, color_highlight, color_bg = map(
+                    f, ["text", "highlight", "background"])
+        else:
+            color_text = style.text[gtk.STATE_NORMAL]
+            color_highlight = style.base[gtk.STATE_ACTIVE]
+            color_bg = style.bg[gtk.STATE_NORMAL]
+
+        if (color_text != self.__color_text or
+                color_highlight != self.__color_highlight or
+                color_bg != self.__color_bg):
+            self.__gradient = cairo.LinearGradient(
+                    0, 0, 0, self.height - self.__padding)
+            self.__gradient.add_color_stop_rgb(
+                    0.5,
+                    color_highlight.red / 65535.,
+                    color_highlight.green / 65535.,
+                    color_highlight.blue / 65535.
+            )
+            self.__gradient.add_color_stop_rgb(
+                    1.0,
+                    color_text.red / 65535.,
+                    color_text.green / 65535.,
+                    color_text.blue / 65535.
+            )
+            self.__color_text = color_text
+            self.__color_highlight = color_highlight
+            self.__color_bg = color_bg
 
     @cython.cdivision(True)
     @cython.boundscheck(False)
@@ -254,7 +268,7 @@ cdef class Spectrum(object):
 
     @cython.cdivision(True)
     @cython.boundscheck(False)
-    cpdef draw(self, object cr, object pc):
+    cpdef draw(self, object cr, object pc, object style):
         # attribute look-ups on the instance make the following loops
         # cripplingly slow. therefore we just assign everything to local
         # variables
@@ -330,6 +344,9 @@ cdef class Spectrum(object):
             value = fminf(fmaxf(10 * (log10f(value + eps) - offset), -65.0), 0)
             out_[i][0] = (value + old_[i]) / 2.0
             old_[i] = value
+
+        # update colors if necessary
+        self.__update_colors(style)
 
         # draw the background
         cr.set_source_color(self.__color_bg)
