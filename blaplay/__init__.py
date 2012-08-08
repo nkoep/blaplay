@@ -169,7 +169,7 @@ def init():
     import ctypes
     import gtk
     import signal
-    from blaplay import blafm
+    from blaplay import blacfg, blafm
     global metadata
 
     def main_quit(*args): gtk.main_quit()
@@ -190,6 +190,8 @@ def init():
     if _metadata: metadata = _metadata
 
     gtk.quit_add(0, clean_up)
+    # write config to disk every 10 minutes
+    gobject.timeout_add(10 * 60 * 1000, blacfg.save, False)
     gtk.main()
 
 def add_metadata(section, key, value):

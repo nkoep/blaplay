@@ -20,6 +20,8 @@ cfg = RawConfigParser()
 
 import blaconst
 
+last_save = None
+
 
 def init():
     import blaplay
@@ -54,7 +56,11 @@ def init():
             "queue.remove.when.activated": "yes",
             "search.after.timeout": "no",
             "visualization": blaconst.VISUALIZATION_SPECTRUM,
-            "new.releases": blaconst.NEW_RELEASES_FROM_LIBRARY
+            "releases.filter": blaconst.NEW_RELEASES_FROM_LIBRARY,
+            "events.country": "",
+            "events.city": "",
+            "events.filter": blaconst.EVENTS_RECOMMENDED,
+            "events.limit": 25
         },
 
         "player":
@@ -116,7 +122,7 @@ def getstring(section, key):
     except (ValueError, NoSectionError, NoOptionError): return None
 
 def getint(section, key):
-    try: return int(cfg.get(section, key))
+    try: return int(float(cfg.get(section, key)))
     except (ValueError, NoSectionError, NoOptionError): return None
 
 def getfloat(section, key):
@@ -154,10 +160,18 @@ def setboolean(section, key, value):
     if value: cfg.set(section, key, "yes")
     else: cfg.set(section, key, "no")
 
-def save():
+def save(force=True):
     import os
     import shutil
     import tempfile
+    import time
+    global last_save
+
+    t = time.time()
+    if not force and last_save and (t-last_save) < 10 * 60: return
+    last_save = t
+    import blaplay
+    blaplay.print_d("Saving config")
 
     # write data to tempfile
     fd, tmp_path = tempfile.mkstemp()

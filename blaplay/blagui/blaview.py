@@ -289,6 +289,7 @@ class BlaSidePane(gtk.VBox):
             action = blagui.uimanager.get_widget(view)
             action.set_active(states[idx])
 
+    @blautils.gtk_thread
     @blautils.lock(__lock)
     def __update_track(self, track):
         iterator = self.__tb.get_iter_at_mark(self.__tb.get_insert())
@@ -308,12 +309,14 @@ class BlaSidePane(gtk.VBox):
             self.__tb2.insert_with_tags_by_name(
                     iterator, "\n%s" % artist, "bold", "large", "color")
 
+    @blautils.gtk_thread
     @blautils.lock(__lock)
     def __update_lyrics(self, lyrics):
         if lyrics:
             self.__tb.insert_with_tags_by_name(self.__tb.get_iter_at_mark(
                     self.__tb.get_insert()), "\n\n%s\n" % lyrics, "color")
 
+    @blautils.gtk_thread
     @blautils.lock(__lock)
     def __update_biography(self, image, biography):
         iterator = self.__tb2.get_iter_at_mark(self.__tb2.get_insert())
@@ -337,7 +340,8 @@ class BlaSidePane(gtk.VBox):
             self.__tb2.insert_with_tags_by_name(iterator,
                     "\n\n%s\n" % biography, "color")
 
-    @blautils.lock( __lock)
+    @blautils.gtk_thread
+    @blautils.lock(__lock)
     def __clear(self):
         self.__tb.delete(
                 self.__tb.get_start_iter(), self.__tb.get_end_iter())

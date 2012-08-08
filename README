@@ -6,12 +6,14 @@ implemented nor planned for the future. Instead new features that are decided
 to be added will be implemented into the core application. blaplay is written
 in Python 2.6, and relies on PyGTK, PyGST, and Mutagen to implement its basic
 functionality. Notable features include a monitored audio library, automatic
-cover art, lyrics and biography fetching, and last.fm scrobbling. In the future
-blaplay will also integrate event, artist and release recommendations (powered
-by last.fm, musicbrainz and, songkick), as well as support for internet radio
-stations and portable media devices. Refer to the TODO file for more details on
+cover art, lyrics and biography fetching, as well as last.fm scrobbling. In
+addition to that it offers event and release recommendations based on the
+user's last.fm library.
+
+In the future blaplay will also integrate support for internet radio stations
+and portable media devices. Refer to the TODO file for more details on
 planned features/enhancements. The BUGS file contains a description of
-currently known issues and proposed possible solutions.
+currently known issues and proposed solutions.
 
 Build dependencies:
     * python-dev (>= 2.6)

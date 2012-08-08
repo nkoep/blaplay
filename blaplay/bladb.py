@@ -740,9 +740,13 @@ class BlaLibrary(gobject.GObject):
 
         # this guarantees that we don't return before all URIs have been
         # checked, but normal event-processing still commences
+        gtk.gdk.threads_init()
         while ns["wait"]:
-            if gtk.events_pending():
-                if gtk.main_iteration(): return
+            gtk.gdk.threads_enter()
+            if gtk.main_iteration():
+                gtk.gdk.threads_leave()
+                return
+            gtk.gdk.threads_leave()
         return ns["uris"] if ns["done"] else None
 
     def scan_directory(self, directory):
@@ -805,6 +809,7 @@ class BlaLibrary(gobject.GObject):
 
         self.__scan_queue.append(directory)
         if not self.__currently_scanning:
+            gtk.gdk.threads_init()
             while True:
                 try: directory = self.__scan_queue.pop(0)
                 except IndexError: break
@@ -815,8 +820,11 @@ class BlaLibrary(gobject.GObject):
                 p = scan(directory)
                 gobject.idle_add(p.next)
                 while ns["wait"]:
-                    if gtk.events_pending():
-                        if gtk.main_iteration(): return
+                    gtk.gdk.threads_enter()
+                    if gtk.main_iteration():
+                        gtk.gdk.threads_leave()
+                        return
+                    gtk.gdk.threads_leave()
 
     @blautils.thread
     def remove_directory(self, directory):

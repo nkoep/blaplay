@@ -158,6 +158,8 @@ def get_cover(track, image_base):
         if not url: raise IOError
         path, message = urllib.urlretrieve(url)
     except IOError:
+        # TODO: move this to blametadata.py so we can ignore covers on disk
+        #       if the `fetch cover' method was invoked
         base = os.path.dirname(track.path)
         images = [f for f in os.listdir(base)
                 if blautils.get_extension(f) in ["jpg", "png"]]
@@ -207,25 +209,38 @@ def get_biography(track, image_base):
 
     return image, biography
 
-def get_recommended_events(festivalsonly=False, country=""):
+def get_events(limit, recommended, city="", country=""):
     events = None
-    session_key = BlaScrobbler.get_session_key()
-    if not session_key: events
 
-    method = "user.getRecommendedEvents"
-    params = [
-        ("method", method), ("api_key", blaconst.LASTFM_APIKEY),
-        ("sk", session_key), ("festivalsonly", str(int(festivalsonly)))
-    ]
-    if country: params.append(("country", country))
+    if recommended:
+        session_key = BlaScrobbler.get_session_key()
+        if not session_key: events
 
-    api_signature = sign_api_call(params)
-    params.append(("api_sig", api_signature))
-    error, response = post_message(params)
+        # since this is an authorized service the location information from the
+        # associated last.fm user account is used. passing the country kwarg ,
+        # doesn't allow specifying the city, so we just ignore it here
+        method = "user.getRecommendedEvents"
+        params = [
+            ("method", method), ("api_key", blaconst.LASTFM_APIKEY),
+            ("sk", session_key), ("limit", str(limit))
+        ]
+
+        api_signature = sign_api_call(params)
+        params.append(("api_sig", api_signature))
+        error, response = post_message(params)
+        if not error: response = response["events"]
+
+    else:
+        location = ", ".join([city, country] if country else [city])
+        url = "%s&method=geo.getEvents&location=%s&limit=%d" % (
+                blaconst.LASTFM_BASEURL, location, limit)
+        url = quote_url(url)
+        error, response = get_response(url, "events")
+
     if error:
         blaplay.print_d("Failed to retrieve recommended events: %s (error %d)"
                 % (response, error))
-    else: events = response["events"]
+    else: events = response["event"]
     return events
 
 def get_new_releases(recommended=False):

@@ -30,6 +30,10 @@ from threading import Thread, ThreadError, Lock
 
 import gtk
 
+def get_thread_id():
+    import ctypes
+    lib = ctypes.CDLL("libc.so.6")
+    return lib.syscall(186) # SYS_gettid
 
 def thread(f):
     @functools.wraps(f)
@@ -43,6 +47,7 @@ def thread(f):
 def gtk_thread(f):
     @functools.wraps(f)
     def wrapper(*args, **kwargs):
+        gtk.gdk.threads_init()
         gtk.gdk.threads_enter()
         f(*args, **kwargs)
         gtk.gdk.threads_leave()
