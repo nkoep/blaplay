@@ -51,9 +51,9 @@ class BlaWindow(gtk.Window):
         self.connect("configure_event", self.__save_geometry)
 
         # mainmenu
-        uimanager = gtk.UIManager()
-        accelgroup = uimanager.get_accel_group()
-        self.add_accel_group(accelgroup)
+        blagui.uimanager = uimanager = gtk.UIManager()
+        blagui.accelgroup = uimanager.get_accel_group()
+        self.add_accel_group(blagui.accelgroup)
         actiongroup = gtk.ActionGroup("blagui-actions")
 
         actions = [
@@ -78,7 +78,7 @@ class BlaWindow(gtk.Window):
             ("SavePlaylist", None, "_Save playlist...", None, "",
                     self.__save_playlist),
             ("Quit", gtk.STOCK_QUIT, "_Quit", "<Ctrl>Q", "", self.quit),
-            ("Paste", None, "Paste", "<Ctrl>V", "", BlaView.paste),
+            ("Paste", None, "Paste", None, "", BlaView.paste),
             ("Clear", None, "_Clear", None, "", BlaView.clear),
             ("SelectAll", None, "All", None, "",
              lambda *x: BlaView.select(blaconst.SELECT_ALL)),
@@ -92,8 +92,8 @@ class BlaWindow(gtk.Window):
              lambda *x: BlaView.select(blaconst.SELECT_BY_ALBUM_ARTISTS)),
             ("SelectByGenre", None, "By genre", None, "",
              lambda *x: BlaView.select(blaconst.SELECT_BY_GENRES)),
-            ("Cut", None, "Cut", "<Ctrl>X", "", BlaView.cut),
-            ("Copy", None, "Copy", "<Ctrl>C", "", BlaView.copy),
+            ("Cut", None, "Cut", None, "", BlaView.cut),
+            ("Copy", None, "Copy", None, "", BlaView.copy),
             ("Remove", None, "Remove", None, "", BlaView.remove),
             ("PlaylistFromSelection", None, "Selection", None, "",
                     lambda *x: BlaPlaylist.new_playlist(
@@ -179,8 +179,6 @@ class BlaWindow(gtk.Window):
         )
         uimanager.insert_action_group(actiongroup, 0)
         uimanager.add_ui_from_string(blaconst.MENU)
-        blagui.uimanager = uimanager
-        blagui.accelgroup = accelgroup
 
         # this is the topmost box that holds all the other objects
         self.add(gtk.VBox())
@@ -325,13 +323,15 @@ class BlaWindow(gtk.Window):
             tooltip = "Stopped"
 
         else:
-            artist = track[ARTIST]
-            if not artist: artist = "?"
+            if player.radio:
+                title = track[TITLE] or "%s - %s" % (
+                        blaconst.APPNAME, track["organization"])
+            else:
+                artist = track[ARTIST]
+                title = track[TITLE] or "?"
+                if artist and title: title = "%s - %s" % (artist, title)
+                else: title = track.basename
 
-            title = track[TITLE]
-            if not title: title = track.basename
-
-            title = "%s - %s" % (artist, title)
             tooltip = title
 
         self.set_title(title)

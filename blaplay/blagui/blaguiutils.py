@@ -93,17 +93,6 @@ class BlaCellRendererBase(gtk.GenericCellRenderer):
     def do_get_property(self, prop):
         return getattr(self, prop.name)
 
-class BlaEntry(gtk.Entry):
-    """ A simple entry wrapper that deselects its text when losing focus. """
-
-    def __init__(self):
-        super(BlaEntry, self).__init__()
-        self.connect("focus_out_event", self.__deselect_text)
-
-    def __deselect_text(self, entry, event):
-        entry.select_region(0, 0)
-        return False
-
 # the following classes are modified versions of implementations from quodlibet
 
 class BlaWindow(gtk.Window):
@@ -266,6 +255,8 @@ class BlaTreeViewBase(gtk.TreeView):
         return False
 
     def __button_press_event(self, event):
+        self.grab_focus()
+
         def unselect_all(selection):
             selection.set_select_function(lambda *x: True)
             selection.unselect_all()

@@ -358,17 +358,7 @@ class BlaLibraryBrowser(gtk.VBox):
         entry.set_icon_from_stock(
                 gtk.ENTRY_ICON_SECONDARY, gtk.STOCK_CLEAR)
         entry.connect("icon_release", lambda *x: x[0].delete_text(0, -1))
-        def update_filter_parameters(entry):
-            self.__filter_parameters = entry.get_text().strip().split()
-            if (blacfg.getboolean("playlist", "search.after.timeout") or
-                    not self.__filter_parameters):
-                try: gobject.source_remove(self.__fid)
-                except AttributeError: pass
-                def activate():
-                    entry.activate()
-                    return False
-                self.__fid = gobject.timeout_add(500, activate)
-        entry.connect("changed", update_filter_parameters)
+        entry.connect("changed", self.__update_filter_parameters)
         entry.connect("activate", self.__update_treeview)
 
         button = gtk.Button()
@@ -398,21 +388,16 @@ class BlaLibraryBrowser(gtk.VBox):
 
         gtk.quit_add(0, library.save_library)
 
-    def update_colors(self):
-        column = self.__treeview.get_column(0)
-        column.clear()
-
-        if blacfg.getboolean("library", "custom.browser"):
-            renderer = BlaCellRenderer()
-            renderer.update_colors()
-        else: renderer = gtk.CellRendererText()
-
-        column.pack_start(renderer, expand=True)
-        column.add_attribute(renderer, "text", 1)
-
-    def update_tree_lines(self):
-        self.__treeview.set_enable_tree_lines(
-                blacfg.getboolean("general", "draw.tree.lines"))
+    def __update_filter_parameters(self, entry):
+        self.__filter_parameters = entry.get_text().strip().split()
+        if (blacfg.getboolean("playlist", "search.after.timeout") or
+                not self.__filter_parameters):
+            try: gobject.source_remove(self.__fid)
+            except AttributeError: pass
+            def activate():
+                entry.activate()
+                return False
+            self.__fid = gobject.timeout_add(500, activate)
 
     def __drag_data_get(self, drag_context, selection_data, info, timestamp):
         data = self.__treeview.get_tracks()
@@ -490,6 +475,22 @@ class BlaLibraryBrowser(gtk.VBox):
         view = combobox.get_active()
         blacfg.set("library", "organize.by", view)
         library.request_model(view)
+
+    def update_colors(self):
+        column = self.__treeview.get_column(0)
+        column.clear()
+
+        if blacfg.getboolean("library", "custom.browser"):
+            renderer = BlaCellRenderer()
+            renderer.update_colors()
+        else: renderer = gtk.CellRendererText()
+
+        column.pack_start(renderer, expand=True)
+        column.add_attribute(renderer, "text", 1)
+
+    def update_tree_lines(self):
+        self.__treeview.set_enable_tree_lines(
+                blacfg.getboolean("general", "draw.tree.lines"))
 
 class BlaFileBrowser(gtk.VBox):
     __layout = [
@@ -657,7 +658,7 @@ class BlaFileBrowser(gtk.VBox):
         entry.set_icon_from_stock(
                 gtk.ENTRY_ICON_SECONDARY, gtk.STOCK_CLEAR)
         entry.connect("icon_release", lambda *x: x[0].delete_text(0, -1))
-        entry.connect("changed", self.__filter_paramters_changed)
+        entry.connect("changed", self.__filter_parameters_changed)
         entry.connect("activate", lambda *x: self.__filt.refilter())
         hbox.pack_start(entry, expand=True)
 
@@ -691,7 +692,7 @@ class BlaFileBrowser(gtk.VBox):
                 if p not in label: return False
         return True
 
-    def __filter_paramters_changed(self, entry):
+    def __filter_parameters_changed(self, entry):
         self.__filter_parameters = entry.get_text().strip().split()
         if (blacfg.getboolean("general", "search.after.timeout") or
                 not self.__filter_parameters):

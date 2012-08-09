@@ -207,7 +207,7 @@ class BlaPreferences(blaguiutils.BlaUniqueWindow):
                     "library", "update.on.startup", cb.get_active()))
 
             # the file types
-            restrictto_entry = blaguiutils.BlaEntry()
+            restrictto_entry = gtk.Entry()
             restrictto_entry.set_tooltip_text("Comma-separated list, works on "
                     "filenames")
             restrictto_entry.set_text(
@@ -215,7 +215,7 @@ class BlaPreferences(blaguiutils.BlaUniqueWindow):
             restrictto_entry.connect("changed", lambda entry:
                     blacfg.set("library", "restrict.to", entry.get_text()))
 
-            exclude_entry = blaguiutils.BlaEntry()
+            exclude_entry = gtk.Entry()
             exclude_entry.set_tooltip_text("Comma-separated list, works on "
                     "filenames")
             exclude_entry.set_text(
@@ -494,7 +494,7 @@ class BlaPreferences(blaguiutils.BlaUniqueWindow):
             diag.set_resizable(False)
             vbox = gtk.VBox(spacing=5)
             vbox.set_border_width(10)
-            entry = blaguiutils.BlaEntry()
+            entry = gtk.Entry()
             entry.connect("activate",
                     lambda *x: diag.response(gtk.RESPONSE_OK))
             label = gtk.Label("Profile name:")
@@ -560,10 +560,10 @@ class BlaPreferences(blaguiutils.BlaUniqueWindow):
             scrobble.set_active(blacfg.getboolean("lastfm", "scrobble"))
             scrobble.connect("toggled", self.__scrobble_changed)
 
-            self.__user_entry = blaguiutils.BlaEntry()
+            self.__user_entry = gtk.Entry()
             self.__user_entry.set_text(blacfg.getstring("lastfm", "user"))
 
-            self.__ignore_entry = blaguiutils.BlaEntry()
+            self.__ignore_entry = gtk.Entry()
             self.__ignore_entry.set_text(
                     blacfg.getstring("lastfm", "ignore.pattern"))
             self.__ignore_entry.set_tooltip_text("Comma-separated list")
