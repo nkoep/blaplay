@@ -23,10 +23,6 @@ from blaplay.formats import TagParseError
 from _identifiers import *
 
 
-class KeyWriteError(Exception):
-    def __init__(self, descr): self.__descr = descr
-    def __str__(self): return repr(self.__descr)
-
 class BlaTrack(dict):
     __slots__ = ("_deleted_tags")
 
@@ -133,6 +129,7 @@ class BlaTrack(dict):
         h, x = divmod(m, 60)
         return "%d:%02d:%02d" % (h, m, s) if h else "%d:%02d" % (m, s)
 
+    # TODO: in the light of radio stations it'd be better to call this uri
     path = property(lambda self: self[PATH])
     basename = property(lambda self: os.path.basename(
             blautils.toss_extension(self.path)))
