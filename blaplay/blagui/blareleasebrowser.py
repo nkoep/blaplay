@@ -243,10 +243,6 @@ class BlaReleaseBrowser(blaguiutils.BlaScrolledWindow):
         self.__treeview.set_model(self.__models[active])
         vbox.pack_start(self.__treeview, expand=True, padding=10)
 
-        # check for new releases now and every two hours
-        self.__update_models()
-        gobject.timeout_add(2 * 3600 * 1000, self.__update_models)
-
         self.add_with_viewport(vbox)
         self.show_all()
 
@@ -388,4 +384,9 @@ class BlaReleaseBrowser(blaguiutils.BlaScrolledWindow):
         date = datetime.date(year, 1, 1)
         timedelta = datetime.timedelta(days=(week-1)*7+1)
         return date + timedelta, date + timedelta + datetime.timedelta(days=6)
+
+    def init(self):
+        # check for new releases now and every two hours
+        self.__update_models()
+        gobject.timeout_add(2 * 3600 * 1000, self.__update_models)
 

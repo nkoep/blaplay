@@ -29,7 +29,7 @@ import gtk
 import pango
 
 import blaplay
-from blaplay import blacfg, blaconst, blautils, blafm#, blasongkick
+from blaplay import blacfg, blaconst, blautils, blafm
 from blaplay.blagui import blaguiutils
 from blareleasebrowser import IMAGE_SIZE, BlaCellRendererPixbuf
 
@@ -268,9 +268,6 @@ class BlaEventBrowser(blaguiutils.BlaScrolledWindow):
         self.__treeview.set_model(self.__models[active])
         vbox.pack_start(self.__treeview, expand=True, padding=10)
 
-        # check for new events now and every two hours
-        self.__update_models()
-        gobject.timeout_add(2 * 3600 * 1000, self.__update_models)
         self.add_with_viewport(vbox)
         self.show_all()
         if active == blaconst.EVENTS_RECOMMENDED:
@@ -440,4 +437,9 @@ class BlaEventBrowser(blaguiutils.BlaScrolledWindow):
         menu.popup(None, None, None, event.button, event.time)
 
         return False
+
+    def init(self):
+        # check for new events now and every two hours
+        self.__update_models()
+        gobject.timeout_add(2 * 3600 * 1000, self.__update_models)
 

@@ -37,7 +37,7 @@ from blaplay.formats._identifiers import *
 
 class BlaSidePane(gtk.VBox):
     track = None
-    __VIEWS = ["Playlists", "Queue", "Radio", "Recommended events",
+    __VIEWS = ["Playlists", "Queue", "Internet radio", "Recommended events",
             "New releases"]
     __MIN_WIDTH = 175
     __delay = 100
@@ -233,11 +233,21 @@ class BlaSidePane(gtk.VBox):
         self.__treeview.connect("popup", self.__popup_menu)
         r = gtk.CellRendererText()
         r.set_property("ellipsize", pango.ELLIPSIZE_END)
-        self.__treeview.insert_column_with_attributes(-1, "View", r, text=0)
+        c = gtk.TreeViewColumn()
+        c.pack_start(r, expand=True)
+        c.add_attribute(r, "text", 0)
+        r = gtk.CellRendererText()
+        r.set_alignment(1.0, 0.5)
+        c.pack_start(r, expand=False)
+        def cell_data_func(column, renderer, model, iterator):
+            count = model[iterator][1]
+            renderer.set_property("text", "(%d)" % count if count > 0 else "")
+        c.set_cell_data_func(r, cell_data_func)
+        self.__treeview.append_column(c)
         viewport.add(self.__treeview)
-        model = gtk.ListStore(gobject.TYPE_STRING)
+        model = gtk.ListStore(gobject.TYPE_STRING, gobject.TYPE_INT)
         self.__treeview.set_model(model)
-        [model.append([item]) for idx, item in enumerate(self.__VIEWS)]
+        [model.append([item, 0]) for idx, item in enumerate(self.__VIEWS)]
         selection = self.__treeview.get_selection()
         selection.select_path(blacfg.getint("general", "view"))
         self.__treeview.get_selection().connect(
@@ -390,19 +400,17 @@ class BlaSidePane(gtk.VBox):
         state = player.get_state()
 
         if track == self.track: return
-        elif state == blaconst.STATE_STOPPED:
-            self.__clear()
+        self.__clear()
+        if state == blaconst.STATE_STOPPED or player.radio:
             type(self).track = None
             self.__cover_display.update(blaconst.COVER, False)
         else:
-            self.__clear()
             self.__tid = gobject.timeout_add(self.__delay, worker, track)
             type(self).track = track
 
     def update_count(self, widget, view, count):
         model = self.__treeview.get_model()
-        model[view][0] = ("%s (%d)" % (self.__VIEWS[view], count) if count > 0
-                else self.__VIEWS[view])
+        model[view][1] = count
 
 class BlaView(gtk.HPaned):
     def __init__(self):
@@ -415,11 +423,12 @@ class BlaView(gtk.HPaned):
 
         player.connect(
                 "state_changed", lambda *x: self.__side_pane.update_track())
-        [self.views[view].connect("count_changed",
-                self.__side_pane.update_count) for view in
-                [blaconst.VIEW_PLAYLISTS, blaconst.VIEW_QUEUE,
-                blaconst.VIEW_EVENTS, blaconst.VIEW_RELEASES]
-        ]
+        [view.connect("count_changed", self.__side_pane.update_count)
+                for view in self.views]
+        self.views[blaconst.VIEW_PLAYLISTS].restore()
+        self.views[blaconst.VIEW_RADIO].restore()
+        self.views[blaconst.VIEW_EVENTS].init()
+        self.views[blaconst.VIEW_RELEASES].init()
 
         self.show_all()
         self.__container.show_all()
@@ -427,8 +436,6 @@ class BlaView(gtk.HPaned):
 
         self.pack1(self.__container, resize=True, shrink=False)
         self.pack2(self.__side_pane, resize=False, shrink=False)
-
-        self.views[blaconst.VIEW_PLAYLISTS].restore()
 
         self.update_view(blacfg.getint("general", "view"))
         self.set_show_side_pane(blacfg.getboolean("general", "side.pane"))
@@ -439,6 +446,9 @@ class BlaView(gtk.HPaned):
 
     @classmethod
     def update_view(cls, view):
+        # TODO: - hide playlist info in statusbar if view is not playlists
+        #       - add statusbar info for queue as well
+
         child = cls.__container.get_child()
         if child is not None: cls.__container.remove(child)
         child = cls.views[view]
@@ -478,6 +488,7 @@ class BlaView(gtk.HPaned):
         view = blacfg.getint("general", "view")
         if view in [blaconst.VIEW_PLAYLISTS, blaconst.VIEW_QUEUE]:
             cls.views[view].copy()
+        return False
 
     @classmethod
     def paste(cls, *args):
