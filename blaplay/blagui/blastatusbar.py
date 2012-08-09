@@ -84,12 +84,14 @@ class BlaStatusbar(gtk.Table):
 
     def __state_changed(self, player):
         self.__state = player.get_state()
+        track = player.get_track()
         self.__update_track_status()
 
     def __track_changed(self, player):
         track = player.get_track()
         self.__format = track[FORMAT]
         self.__bitrate = track.bitrate
+        self.__bitrate = "%s avg." % self.__bitrate if self.__bitrate else ""
         self.__sampling_rate = track.sampling_rate
         self.__channel_mode = track[CHANNEL_MODE]
         self.__duration_nanoseconds = track[LENGTH] * 1e9
@@ -104,14 +106,14 @@ class BlaStatusbar(gtk.Table):
                 if self.__state == blaconst.STATE_PAUSED: state = "Paused"
                 else: state = "Playing"
 
-                status = "%s | %s |%s %s/%s" % (state, self.__format, "%s",
-                        self.__position, self.__duration)
-                x = ""
-                if self.__bitrate: x += " %s avg. |" % self.__bitrate
-                if self.__sampling_rate: x += " %s |" % self.__sampling_rate
-                if self.__channel_mode: x += " %s |" % self.__channel_mode
-                status %= x
-
+                status = [state]
+                items = [self.__format, self.__bitrate, self.__sampling_rate,
+                    self.__channel_mode]
+                for value in filter(None, items):
+                    status.append(value)
+                if self.__duration_nanoseconds:
+                    status.append("%s/%s" % (self.__position, self.__duration))
+                status = " | ".join(status)
                 self.__track_info.set_text(status)
 
     def __convert_time(self, value):
@@ -130,6 +132,11 @@ class BlaStatusbar(gtk.Table):
 
     @classmethod
     def update_playlist_info(cls, playlist, track_count, size, length_seconds):
+        # TODO: move this back to the playlist class. instead set up a method
+        #       that only waits for statusbar hints and updates the label based
+        #       on the current view so we can also display information about
+        #       radio the queue, radio stations, events, etc.
+
         if track_count == 0:
             cls.__instance.__playlist_info.set_text("")
             return True

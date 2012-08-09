@@ -46,6 +46,7 @@ class PositionSlider(gtk.HScale):
         self.connect("button_release_event", self.__seek_end)
         self.connect("scroll_event", self.__scroll)
         self.connect("value_changed", self.__value_changed)
+        player.connect("state_changed", self.__state_changed)
         player.connect("track_changed", self.__track_changed)
 
         self.__seekid = gobject.timeout_add(
@@ -102,6 +103,11 @@ class PositionSlider(gtk.HScale):
                 self.set_value(position)
                 BlaStatusbar.update_position(position)
         return True
+
+    def __state_changed(self, player):
+        if player.get_state() == blaconst.STATE_STOPPED or player.radio:
+            self.set_sensitive(False)
+        else: self.set_sensitive(True)
 
     def __track_changed(self, player):
         # we need to remove the timer on track changes to make sure the slider

@@ -25,6 +25,7 @@ import gst
 
 import blaplay
 from blaplay import blaconst, blacfg, blautils
+from blaplay.formats._identifiers import TITLE
 
 library = None
 player = None
@@ -35,6 +36,11 @@ def init():
 
     from blaplay import bladb
     global library, player
+
+    fluendo, mad = map(gst.element_factory_find, ["flump3dec", "mad"])
+    if fluendo and mad:
+        fluendo.set_rank(min(fluendo.get_rank(), max(mad.get_rank() - 1, 0)))
+
     library = bladb.library
     player = BlaPlayer()
 
@@ -53,6 +59,7 @@ class BlaPlayer(gobject.GObject):
     __volume = None
     __equalizer = None
     __uri = None
+    __station = None
     __state = blaconst.STATE_STOPPED
 
     def __init__(self):
@@ -66,9 +73,9 @@ class BlaPlayer(gobject.GObject):
                 "audio/x-raw-float, rate=(int)44100, channels=(int)2"))
         self.__equalizer = gst.element_factory_make("equalizer-10bands")
         tee = gst.element_factory_make("tee")
-        queue_vis = gst.element_factory_make("queue")
-        queue_vis.set_property("silent", True)
-        queue_vis.set_property("leaky", True)
+        queue = gst.element_factory_make("queue")
+        queue.set_property("silent", True)
+        queue.set_property("leaky", True)
 
         def new_buffer(sink): self.emit("new_buffer", sink.emit("pull_buffer"))
         appsink = gst.element_factory_make("appsink")
@@ -77,26 +84,29 @@ class BlaPlayer(gobject.GObject):
         appsink.set_property("emit_signals", True)
         appsink.connect("new_buffer", new_buffer)
 
-        queue_player = gst.element_factory_make("queue")
-        queue_player.set_property("silent", True)
-        queue_player.set_property("max_size_time", 500 * gst.MSECOND)
         sink = gst.element_factory_make("autoaudiosink")
 
-        elements = [filt, self.__equalizer, tee, queue_vis, appsink,
-                queue_player, sink]
+        elements = [filt, self.__equalizer, tee, queue, appsink, sink]
         map(bin.add, elements)
 
         pad = elements[0].get_static_pad("sink")
         bin.add_pad(gst.GhostPad("sink", pad))
 
         gst.element_link_many(filt, self.__equalizer, tee)
-        gst.element_link_many(tee, queue_player, sink)
-        gst.element_link_many(tee, queue_vis, appsink)
+        gst.element_link_many(tee, sink)
+        gst.element_link_many(tee, queue, appsink)
 
         self.__bin = gst.element_factory_make("playbin2")
         self.__bin.set_property("audio_sink", bin)
+        self.__bin.set_property("buffer_duration", 500 * gst.MSECOND)
         self.__bin.set_property("video_sink", None)
+        GST_PLAY_FLAG_VIDEO = 1 << 0
+        GST_PLAY_FLAG_TEXT = 1 << 2
+        flags = self.__bin.get_property("flags")
+        flags &= ~(GST_PLAY_FLAG_VIDEO | GST_PLAY_FLAG_TEXT)
+        self.__bin.set_property("flags", flags)
         self.__bin.connect("about_to_finish", self.__about_to_finish)
+        self.__bin.set_state(gst.STATE_READY)
 
         bus = self.__bin.get_bus()
         bus.add_signal_watch()
@@ -115,11 +125,32 @@ class BlaPlayer(gobject.GObject):
     @blautils.gtk_thread
     def __on_message(self, bus, message):
         if message.type == gst.MESSAGE_EOS: self.next(force_advance=False)
+        elif message.type == gst.MESSAGE_TAG:
+            self.__parse_tags(message.parse_tag())
+
+        elif message.type == gst.MESSAGE_BUFFERING:
+            percentage = message.parse_buffering()
+#            print "percentage", percentage
+
         elif message.type == gst.MESSAGE_ERROR:
             self.stop()
             err, debug = message.parse_error()
             from blaplay.blagui import blaguiutils
             blaguiutils.error_dialog("Error", "%s" % err)
+
+    def __parse_tags(self, tags):
+        MAPPING = {
+            "location": "station",
+            "organization": "organization",
+            "title": TITLE
+        }
+
+        if not self.__station: return
+        for key in tags.keys():
+            value = tags[key]
+            if key in ["organization", "location", "title"]:
+                self.__station[MAPPING[key]] = value
+        gobject.idle_add(self.emit, "state_changed")
 
     def set_equalizer_value(self, band, value):
         if self.__bin:
@@ -158,16 +189,14 @@ class BlaPlayer(gobject.GObject):
         self.emit("seek")
 
     def get_position(self):
-        try: pos = self.__bin.query_position(gst.FORMAT_TIME, None)[0]
-        except: pos = -1
-        return pos
+        if self.__station: return 0
+        try: return self.__bin.query_position(gst.FORMAT_TIME, None)[0]
+        except gst.Query: return 0
 
-    def get_track(self, uri=False):
-        if not self.__uri: return None
-        elif uri: return self.__uri
-        else:
-            try: return library[self.__uri]
-            except KeyError: return None
+    def get_track(self):
+        try: return self.__station or library[self.__uri]
+        except KeyError: pass
+        return None
 
     def get_state(self):
         return self.__state
@@ -179,11 +208,6 @@ class BlaPlayer(gobject.GObject):
         else: self.stop()
 
     def play(self):
-#        u = urllib.urlopen("http://www.wdr.de/wdrlive/media/einslive.m3u")
-#        s = u.read()
-#        u.close()
-#        bin.set_property("uri", s)
-
         if not self.__uri: self.emit("get_track", blaconst.TRACK_PLAY, True)
         else:
             # check if the resource is available. if it's not it's best to stop
@@ -207,20 +231,32 @@ class BlaPlayer(gobject.GObject):
             self.__bin.set_state(gst.STATE_NULL)
             self.__bin.set_property("uri", "file://%s" % self.__uri)
             self.__bin.set_state(gst.STATE_PLAYING)
+            self.__station = None
 
             self.__state = blaconst.STATE_PLAYING
             self.emit("track_changed")
             self.emit("state_changed")
 
+    def play_station(self, station):
+        if self.__state == blaconst.STATE_STOPPED: self.__init_pipeline()
+        self.__station = station
+        self.__uri = None
+        self.__bin.set_state(gst.STATE_NULL)
+        self.__bin.set_property("uri", "%s" % self.__station.location)
+        self.__bin.set_state(gst.STATE_PLAYING)
+        self.__state = blaconst.STATE_PLAYING
+        self.emit("track_changed")
+        self.emit("state_changed")
+
+    radio = property(lambda self: bool(self.__station))
+
     def pause(self):
         if self.__state == blaconst.STATE_PAUSED:
             self.__bin.set_state(gst.STATE_PLAYING)
             self.__state = blaconst.STATE_PLAYING
-
         elif self.__state == blaconst.STATE_PLAYING:
             self.__bin.set_state(gst.STATE_PAUSED)
             self.__state = blaconst.STATE_PAUSED
-
         self.emit("state_changed")
 
     def stop(self):
@@ -232,6 +268,7 @@ class BlaPlayer(gobject.GObject):
             self.__bin = None
             self.__equalizer = None
             self.__uri = None
+            self.__station = None
 
         self.__state = blaconst.STATE_STOPPED
         self.emit("state_changed")
