@@ -138,11 +138,10 @@ def get_image_url(images):
     return url
 
 def get_cover(track, image_base):
-    path, cover = None, blaconst.COVER
+    path, cover = None, None
 
     url = "%s&method=album.getinfo&album=%s&artist=%s&autocorrect=1" % (
-            blaconst.LASTFM_BASEURL,
-            track[ALBUM].replace("&", "and"),
+            blaconst.LASTFM_BASEURL, track[ALBUM].replace("&", "and"),
             track[ARTIST].replace("&", "and")
     )
     url = quote_url(url)
@@ -156,27 +155,13 @@ def get_cover(track, image_base):
 
     try:
         if not url: raise IOError
-        path, message = urllib.urlretrieve(url)
-    except IOError:
-        # TODO: move this to blametadata.py so we can ignore covers on disk
-        #       if the `fetch cover' method was invoked
-        base = os.path.dirname(track.path)
-        images = [f for f in os.listdir(base)
-                if blautils.get_extension(f) in ["jpg", "png"]]
-        for image in images:
-            name = image.lower()
-            if ("front" in name or "cover" in name or
-                    name.startswith("folder") or
-                    (name.startswith("albumart") and name.endswith("large"))):
-                path = os.path.join(base, image)
-                break
-    if path:
         name = os.path.basename(image_base)
         images = [os.path.join(blaconst.COVERS, f) for f in
                 os.listdir(blaconst.COVERS) if f.startswith(name)]
         map(os.unlink, images)
-        cover = "%s.%s" % (image_base, blautils.get_extension(path))
-        shutil.copy(path, cover)
+        cover, message = urllib.urlretrieve(
+                url, "%s.%s" % (image_base, blautils.get_extension(url)))
+    except IOError: pass
 
     return cover
 
@@ -188,24 +173,25 @@ def get_biography(track, image_base):
     url = quote_url(url)
     error, response = get_response(url, "artist")
 
-    if not error:
-        try: images = response["image"]
-        except (TypeError, KeyError): pass
-        else:
-            url = get_image_url(images)
-            try:
-                if not url: raise IOError
-                path, message = urllib.urlretrieve(url)
-            except IOError: pass
-            else:
-                image = "%s.%s" % (image_base, blautils.get_extension(path))
-                shutil.copy(path, image)
+    try: images = response["image"]
+    except (TypeError, KeyError): pass
+    else:
+        url = get_image_url(images)
+        try:
+            if not url: raise IOError
+            image, message = urllib.urlretrieve(
+                    url, "%s.%s" % (image_base, blautils.get_extension(url)))
+        except IOError: pass
 
-        try: biography = response["bio"]["content"]
-        except (TypeError, KeyError): pass
-        else:
-            biography = blautils.remove_html_tags(
-                    biography.replace(LEGAL_NOTICE, "").strip())
+    try: biography = response["bio"]["content"]
+    except (TypeError, KeyError): pass
+    else:
+        biography = blautils.remove_html_tags(
+                biography.replace(LEGAL_NOTICE, "").strip())
+
+    if error or not image or not biography:
+        blaplay.print_d("Failed to retrieve artist biography: %s (error %d)"
+                % (response, error))
 
     return image, biography
 
@@ -237,27 +223,32 @@ def get_events(limit, recommended, city="", country=""):
         url = quote_url(url)
         error, response = get_response(url, "events")
 
-    if error:
+    try:
+        # if webservices are unavailable we might not get an error code despite
+        # an erroneous return message
+        if error: raise TypeError
+        events = response["event"]
+    except (TypeError, KeyError):
         blaplay.print_d("Failed to retrieve recommended events: %s (error %d)"
                 % (response, error))
-    else: events = response["event"]
     return events
 
 def get_new_releases(recommended=False):
     releases = []
     user = blacfg.getstring("lastfm", "user")
-    if user:
-        url = "%s&method=user.getNewReleases&user=%s&userecs=%d" % (
-                blaconst.LASTFM_BASEURL, user, int(recommended))
-        url = quote_url(url)
-        error, response = get_response(url, "albums")
-        if error:
-            blaplay.print_d("Failed to get new releases: %s (error %d)"
-                    % (error, repsponse))
-            releases = None
-        else:
-            try: releases = response["album"]
-            except TypeError: pass
+    if not user: return releases
+
+    url = "%s&method=user.getNewReleases&user=%s&userecs=%d" % (
+            blaconst.LASTFM_BASEURL, user, int(recommended))
+    url = quote_url(url)
+    error, response = get_response(url, "albums")
+
+    try:
+        if error: raise TypeError
+        releases = response["album"]
+    except (TypeError, KeyError):
+        blaplay.print_d("Failed to get new releases: %s (error %d)"
+                % (error, repsponse))
     return releases
 
 def get_request_token():
@@ -266,7 +257,7 @@ def get_request_token():
     if not error: token = response
     else:
         token = None
-        blaplay.print_d("Failed to retrieve last.fm token: %s (error %d)"
+        blaplay.print_d("Failed to retrieve request token: %s (error %d)"
                 % (response, error))
     return token
 
@@ -295,7 +286,7 @@ def love_unlove_song(track, unlove=False):
     params.append(("api_sig", api_signature))
     error, response = post_message(params)
     if error:
-        blaplay.print_d("Failed to update nowplaying: %s (error %d)"
+        blaplay.print_d("Failed to love/unlove song: %s (error %d)"
                 % (response, error))
 
 

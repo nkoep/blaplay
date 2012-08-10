@@ -188,7 +188,29 @@ class BlaFetcher(gobject.GObject):
             self.__tid = gobject.timeout_add(2000, lambda *x: self.emit(
                     "cover", blaconst.COVER, force_download))
             cover = blafm.get_cover(track, image_base)
-            if cover != blaconst.COVER:
+            if not cover and not force_download:
+                base = os.path.dirname(track.path)
+                images = [f for f in os.listdir(base)
+                        if blautils.get_extension(f) in ["jpg", "png"]]
+                for image in images:
+                    name = image.lower()
+                    if ("front" in name or "cover" in name or
+                            name.startswith("folder") or
+                            (name.startswith("albumart") and
+                            name.endswith("large"))):
+                        path = os.path.join(base, image)
+                        name = os.path.basename(image_base)
+                        images = [f for f in os.listdir(blaconst.COVERS)
+                                if f.startswith(name)]
+                        images = [os.path.join(blaconst.COVERS, f)
+                                for f in images]
+                        map(os.unlink, images)
+                        cover = "%s.%s" % (
+                                image_base, blautils.get_extension(path))
+                        shutil.copy(path, cover)
+                        break
+
+            if cover:
                 gobject.source_remove(self.__tid)
                 self.emit("cover", cover, force_download)
 
