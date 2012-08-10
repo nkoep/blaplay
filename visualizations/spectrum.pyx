@@ -99,7 +99,6 @@ cdef np.ndarray[f32_t, ndim=1] gauss_window(int n):
         window[i] = expf(-0.5 * powf((i - c) / (sigma * c), 2.0))
     return window
 
-
 cdef inline float cubic_interpolate(float y0, float y1, float y2, float y3,
         float x):
    cdef float a, b, c, d, xx, xxx

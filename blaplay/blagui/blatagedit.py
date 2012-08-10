@@ -336,6 +336,14 @@ class BlaTagedit(blaguiutils.BlaWindow):
             except KeyError: track = library[uri]
             tracks.append(track)
 
+        # FIXME: we store multiple values of tags by joining strings with \n.
+        #        the __getitem__ method on BlaTrack, however, only returns the
+        #        first part of this string. if a tag stores lyrics there's
+        #        usually going to be \n characters which we intepret as
+        #        separators, only returning the first line of lyrics. should
+        #        lyrcis be handled separately or should we store tags as lists
+        #        instead? the latter might increase memory use again
+
         # the standard tags
         for identifier in IDENTIFIER_TAGS:
             value = tracks[0][identifier]

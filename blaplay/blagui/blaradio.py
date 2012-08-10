@@ -19,49 +19,62 @@ import gobject
 import gtk
 import pango
 import urllib
+from ConfigParser import ConfigParser
+import xml.etree.cElementTree as ETree
 
 import blaplay
 from blaplay import blaconst, blautils, blaplayer, blagui
 player = blaplayer.player
 from blaplay.formats._blatrack import BlaTrack
-from blaplay.formats._identifiers import SAMPLING_RATE, LENGTH
+from blaplay.formats._identifiers import LENGTH, TITLE
 from blaplay.blagui import blaguiutils
 
 
+# TODO: - save last-played station to config
+#       - implement get_next, get_previous methods to iterate through stations
+#         as through songs in a playlist
+#       - start playing only once buffered to 100 % (add progressbar for this)
+
 def parse_uri(uri):
     stations = []
+    if isinstance(uri, unicode): uri = uri.encode("utf-8")
     ext = blautils.get_extension(uri).lower()
     if ext in ["m3u", "pls", "asx"]:
         f = urllib.urlopen(uri)
 
         if ext == "m3u":
             for line in f:
-                print line
+                line = line.strip()
+                if line.startswith("http"):
+                    stations.append(BlaRadioStation(uri, line))
 
         elif ext == "pls":
-            for line in f:
-                line = line.strip()
-                if line.lower().startswith("file"):
-                    try: line = line[line.index("=")+1:].strip()
-                    except ValueError: pass
-                    else: uris.append(line)
+            parser = ConfigParser()
+            parser.readfp(f)
+            if "playlist" in parser.sections():
+                kwargs = dict(parser.items("playlist"))
+                entries = [key for key in kwargs.keys()
+                        if key.startswith("file")]
+                stations.extend([BlaRadioStation(uri, kwargs[e])
+                        for e in entries])
 
         elif ext == "asx":
-            import xml.etree.cElementTree as ETree
-            tree = ETree.ElementTree(None, f)
-            iterator = tree.getiterator()
-            for node in iterator:
-                keys = node.keys()
-                try: idx = map(str.lower, node.keys()).index("href")
-                except ValueError: continue
-                location = node.get(keys[idx]).strip()
-                stations.append(BlaRadioStation(uri, location))
+            try: tree = ETree.ElementTree(None, f)
+            except SyntaxError: pass
+            else:
+                iterator = tree.getiterator()
+                for node in iterator:
+                    keys = node.keys()
+                    try: idx = map(str.lower, node.keys()).index("href")
+                    except ValueError: continue
+                    location = node.get(keys[idx]).strip()
+                    stations.append(BlaRadioStation(uri, location))
 
         f.close()
 
-    else: stations.append(BlaRadioStation(uri, uri))
-
+    elif uri: stations.append(BlaRadioStation(uri, uri))
     return stations
+
 
 class BlaRadioStation(BlaTrack):
     def __init__(self, uri, location):

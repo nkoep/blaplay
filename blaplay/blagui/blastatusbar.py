@@ -109,8 +109,7 @@ class BlaStatusbar(gtk.Table):
                 status = [state]
                 items = [self.__format, self.__bitrate, self.__sampling_rate,
                     self.__channel_mode]
-                for value in filter(None, items):
-                    status.append(value)
+                for value in filter(None, items): status.append(value)
                 if self.__duration_nanoseconds:
                     status.append("%s/%s" % (self.__position, self.__duration))
                 status = " | ".join(status)

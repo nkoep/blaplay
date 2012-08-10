@@ -20,6 +20,7 @@ import cPickle as pickle
 from random import randint
 import urllib
 import re
+import xml.etree.cElementTree as ETree
 
 import gobject
 import gtk
@@ -777,7 +778,6 @@ class BlaQueue(blaguiutils.BlaScrolledWindow):
         playlists, positions = set(), {}
         cls.__queue.foreach(determine_positions, (playlists, positions))
         update_models(playlists, positions)
-
         cls.__instance.emit(
                 "count_changed", blaconst.VIEW_QUEUE, cls.get_queue_count())
 
@@ -1981,8 +1981,6 @@ class BlaPlaylist(gtk.Notebook):
     @classmethod
     def __save_xspf(cls, uris, path, name):
         # improved version of exaile's implementation
-
-        from urllib import quote
         tags = {
             "title": TITLE,
             "creator": ARTIST,
@@ -2005,7 +2003,8 @@ class BlaPlaylist(gtk.Notebook):
                         if not value: continue
                         f.write("      <%s>%s</%s>\n"
                                 % (element, value, element))
-                    f.write("      <location>%s</location>\n" % quote(uri))
+                    f.write("      <location>%s</location>\n"
+                            % urllib.quote(uri))
                     f.write("    </track>\n")
                 f.write("  </trackList>\n")
                 f.write("</playlist>\n")
@@ -2022,7 +2021,6 @@ class BlaPlaylist(gtk.Notebook):
         name, uris = "", []
         try:
             with open(path, "r") as f:
-                import xml.etree.cElementTree as ETree
                 tree = ETree.ElementTree(None, f)
                 ns = "{http://xspf.org/ns/0/}"
                 nodes = tree.find("%strackList" % ns).findall("%strack" % ns)

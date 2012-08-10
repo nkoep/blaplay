@@ -124,13 +124,14 @@ class BlaPlayer(gobject.GObject):
 
     @blautils.gtk_thread
     def __on_message(self, bus, message):
-        if message.type == gst.MESSAGE_EOS: self.next(force_advance=False)
+        if message.type == gst.MESSAGE_EOS and not self.__station:
+            self.next(force_advance=False)
         elif message.type == gst.MESSAGE_TAG:
             self.__parse_tags(message.parse_tag())
 
         elif message.type == gst.MESSAGE_BUFFERING:
+            # TODO: start playing when percentage reaches 100
             percentage = message.parse_buffering()
-#            print "percentage", percentage
 
         elif message.type == gst.MESSAGE_ERROR:
             self.stop()
@@ -148,7 +149,8 @@ class BlaPlayer(gobject.GObject):
         if not self.__station: return
         for key in tags.keys():
             value = tags[key]
-            if key in ["organization", "location", "title"]:
+            if (key in ["organization", "location", "title"] and
+                    not self.__station[MAPPING[key]]):
                 self.__station[MAPPING[key]] = value
         gobject.idle_add(self.emit, "state_changed")
 
@@ -191,7 +193,7 @@ class BlaPlayer(gobject.GObject):
     def get_position(self):
         if self.__station: return 0
         try: return self.__bin.query_position(gst.FORMAT_TIME, None)[0]
-        except gst.Query: return 0
+        except gst.QueryError: return 0
 
     def get_track(self):
         try: return self.__station or library[self.__uri]

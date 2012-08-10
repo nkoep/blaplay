@@ -1,12 +1,12 @@
 Short-term:
+- set statusbar text for views other than "playlists"
+- store tag values as list instead of strings joined by "\n"
 - enhance command-line interface
 - enhance tag editor (parse tags from filename)
 - use the logger module and add messaging functions to __builtin__'s dict
 - get a proper logo
 - write up some crude unit/regression tests
-- add support for internet radio streams:
-    http://wiki.ubuntuusers.de/Internetradio/Stationen
-    http://wiki.ubuntuusers.de/Internetradio/Internetradio-Stationen
+- see blaplay/blagui/blaradio.py
 - improve lyrics fetcher (more robust search, more search engines)
 - lower memory footprint
 - improve/speed up "remove duplicates" functionality and extend the feature to
