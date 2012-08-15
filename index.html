@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html>
+
+  <head>
+    <meta charset='utf-8' />
+    <meta http-equiv="X-UA-Compatible" content="chrome=1" />
+    <meta name="description" content="Blaplay : Minimalistic audio player for GNU/Linux written in Python" />
+
+    <link rel="stylesheet" type="text/css" media="screen" href="stylesheets/stylesheet.css">
+
+    <title>Blaplay</title>
+  </head>
+
+  <body>
+
+    <!-- HEADER -->
+    <div id="header_wrap" class="outer">
+        <header class="inner">
+          <a id="forkme_banner" href="https://github.com/nkoep/blaplay">View on GitHub</a>
+
+          <h1 id="project_title">Blaplay</h1>
+          <h2 id="project_tagline">Minimalistic audio player for GNU/Linux written in Python</h2>
+
+            <section id="downloads">
+              <a class="zip_download_link" href="https://github.com/nkoep/blaplay/zipball/master">Download this project as a .zip file</a>
+              <a class="tar_download_link" href="https://github.com/nkoep/blaplay/tarball/master">Download this project as a tar.gz file</a>
+            </section>
+        </header>
+    </div>
+
+    <!-- MAIN CONTENT -->
+    <div id="main_content_wrap" class="outer">
+      <section id="main_content" class="inner">
+        <p>blaplay - a bla that plays (or: a working title that stuck)</p>
+
+<p>blaplay is an audio player for GNU/Linux with a minimalistic design focus
+rather than feature richness. As a consequence a plugin system is neither
+implemented nor planned for the future. Instead new features that are decided
+to be added will be implemented into the core application. blaplay is written
+in Python 2.6, and relies on PyGTK, PyGST, and Mutagen to implement its basic
+functionality. Notable features include a monitored audio library, automatic
+cover art, lyrics and biography fetching, and last.fm scrobbling. In the future
+blaplay will also integrate event, artist and release recommendations (powered
+by last.fm, musicbrainz and, songkick), as well as support for internet radio
+stations and portable media devices. Refer to the TODO file for more details on
+planned features/enhancements. The BUGS file contains a description of
+currently known issues and proposed possible solutions.</p>
+
+<p>Build dependencies:</p>
+
+<ul>
+<li>python-dev (&gt;= 2.6)</li>
+<li>Cython (&gt;= 0.15.1)</li>
+<li>python-numpy</li>
+<li>libfftw3-dev (&gt;= 3.2.2)</li>
+</ul><p>Runtime dependencies:</p>
+
+<ul>
+<li>python (&gt;= 2.6)</li>
+<li>python-gtk2 (&gt;= 2.21)</li>
+<li>python-gst0.10</li>
+<li>python-mutagen (&gt;= 1.19)</li>
+<li>python-gobject (&gt;= 2.21)</li>
+<li>libfftw3-3 (&gt;= 3.2.2)</li>
+</ul><p>Recommended:</p>
+
+<ul>
+<li>gstreamer0.10-plugins-good</li>
+<li>gstreamer0.10-plugins-bad</li>
+<li>gstreamer0.10-plugins-ugly</li>
+<li>python-mmkeys</li>
+<li>python-dbus (&gt;= 0.83)</li>
+</ul><p>blaplay currently includes a spectrum analyzer element which, for performance
+reasons, is written in Cython, wrapping fftw3 in order to transfer the most
+computationally expensive operations to C-code. Building blaplay therefore
+requires a recent version of the Cython compiler (&gt;= 0.15.1), as well as the
+single-precision library of fftw3 and its development headers. To prepare and
+run blaplay locally, issue</p>
+
+<div class="highlight"><pre>  <span class="nv">$ </span>./setup.py build_ext --inplace
+  <span class="nv">$ </span>./blaplay.py
+</pre></div>
+
+<p>after satisfying all build-dependencies. To install blaplay system-wide and run
+it, simply issue</p>
+
+<div class="highlight"><pre>  <span class="nv">$ </span>./setup.py install
+  <span class="nv">$ </span>blaplay
+</pre></div>
+      </section>
+    </div>
+
+    <!-- FOOTER  -->
+    <div id="footer_wrap" class="outer">
+      <footer class="inner">
+        <p class="copyright">Blaplay maintained by <a href="https://github.com/nkoep">nkoep</a></p>
+        <p>Published with <a href="http://pages.github.com">GitHub Pages</a></p>
+      </footer>
+    </div>
+
+    
+
+  </body>
+</html>
