@@ -22,7 +22,7 @@ import blaplay
 
 
 blaplay.parse_args()
-if blaplay.manage_pidfile(__file__): sys.exit()
+if blaplay.check_singleton(__file__): sys.exit()
 
 if __name__ == "__main__":
     from blaplay import blacfg, bladb, blaplayer, blagui

@@ -442,8 +442,8 @@ class BlaTagedit(blaguiutils.BlaWindow):
         diag.set_resizable(False)
 
         table = gtk.Table(columns=2, rows=2, homogeneous=False)
-        entry_name = blaguiutils.BlaEntry()
-        entry_value = blaguiutils.BlaEntry()
+        entry_name = gtk.Entry()
+        entry_value = gtk.Entry()
 
         idx = 0
         for label, entry in [("Name", entry_name), ("Value", entry_value)]:

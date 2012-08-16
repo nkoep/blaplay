@@ -23,7 +23,6 @@ import dbus.service
 import dbus.mainloop.glib
 dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
 
-import blaplay
 from blaplay import blaconst
 from blaplay.formats._identifiers import *
 
@@ -32,7 +31,7 @@ INTERFACE = "blub.bla.blaplayInterface"
 
 
 def setup_bus():
-    blaplay.print_i("Setting up D-Bus")
+    print_i("Setting up D-Bus")
 
     bus = dbus.SessionBus()
     bus_name = dbus.service.BusName(SERVICE, bus)
@@ -52,7 +51,7 @@ def query_bus(query):
                 if arg != "": continue
                 if (idx == len(args)-1 or
                         args[idx+1][0] not in ["a", "t", "b", "c"]):
-                    blaplay.print_e("Invalid format string `%s'" % args)
+                    print_e("Invalid format string `%s'" % args)
 
             callbacks = {
                 "%a": lambda: interface.get_standard_value(ARTIST),

@@ -22,7 +22,7 @@ import blautils
 VERSION = "0.1"
 APPNAME = "blaplay"
 COMMENT = "A bla that plays"
-WEB = "https://github.com/nkoep/blaplay"
+WEB = "http://nkoep.github.com/blaplay"
 AUTHOR = "Niklas Koep"
 AUTHORS = sorted([
     AUTHOR
@@ -32,14 +32,17 @@ COPYRIGHT = "Copyright © 2012 %s\n<%s>" % (AUTHOR, EMAIL)
 MINSIZE = [-1, 400]
 STYLE_NAME = blautils.md5(APPNAME)
 
+# dirs
 USERDIR = os.path.join(os.path.expanduser("~"), ".%s" % APPNAME)
+CACHEDIR = os.path.join(USERDIR, "cache")
 BASEDIR = os.path.dirname(os.path.realpath(__file__))
 IMAGES_PATH = os.path.join(BASEDIR, "images")
+COVERS = os.path.join(CACHEDIR, "covers")
+ARTISTS = os.path.join(CACHEDIR, "artists")
+RELEASES = os.path.join(CACHEDIR, "releases")
+EVENTS = os.path.join(CACHEDIR, "events")
 
-COVERS = os.path.join(USERDIR, "covers")
-ARTISTS = os.path.join(USERDIR, "artists")
-RELEASES = os.path.join(USERDIR, "releases")
-EVENTS = os.path.join(USERDIR, "events")
+# files
 CFG_PATH = os.path.join(USERDIR, "config")
 PIDFILE = os.path.join(USERDIR, "pid")
 LIBRARY_PATH = os.path.join(USERDIR, "library")
@@ -47,6 +50,8 @@ PLAYLISTS_PATH = os.path.join(USERDIR, "playlists")
 METADATA_PATH = os.path.join(USERDIR, "metadata")
 SCROBBLES_PATH = os.path.join(USERDIR, "scrobbles")
 STATIONS_PATH = os.path.join(USERDIR, "stations")
+RELEASES_PATH = os.path.join(USERDIR, "releases")
+EVENTS_PATH = os.path.join(USERDIR, "events")
 WISDOM_PATH = os.path.join(USERDIR, "wisdom")
 LOGO = os.path.join(IMAGES_PATH, "logo.svg")
 COVER = os.path.join(IMAGES_PATH, "cover.svg")
@@ -57,9 +62,6 @@ LASTFM_SECRET = "18503e42d49e15bcd709bbdecdcf8682"
 LASTFM_BASEURL = ("http://ws.audioscrobbler.com/2.0/?api_key=%s&format=json"
         % LASTFM_APIKEY)
 LASTFM_LOGO = os.path.join(IMAGES_PATH, "lastfm.gif")
-
-# songkick
-SONGKICK_LOGO = os.path.join(IMAGES_PATH, "songkick.svg")
 
 # player constants
 STATE_PLAYING, STATE_PAUSED, STATE_STOPPED = xrange(3)

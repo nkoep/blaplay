@@ -283,11 +283,11 @@ class BlaEventBrowser(blaguiutils.BlaScrolledWindow):
 
         # country list
         country = blacfg.getstring("general", "events.country")
-        entry1 = blaguiutils.BlaEntry()
+        entry1 = gtk.Entry()
         entry1.set_text(country)
 
         city = blacfg.getstring("general", "events.city")
-        entry2 = blaguiutils.BlaEntry()
+        entry2 = gtk.Entry()
         entry2.set_text(city)
 
         table = gtk.Table(rows=2, columns=2, homogeneous=False)
@@ -351,6 +351,9 @@ class BlaEventBrowser(blaguiutils.BlaScrolledWindow):
         limit = blacfg.getint("general", "events.limit")
         country = blacfg.getstring("general", "events.country")
         city = blacfg.getstring("general", "events.city")
+
+        # FIXME: an exception is raised in this thread if the interpreter shuts
+        #        down immediately after startup when we're fetching events
         events = (
             blafm.get_events(limit=limit, recommended=True),
             blafm.get_events(limit=limit, recommended=False, country=country,
@@ -438,7 +441,7 @@ class BlaEventBrowser(blaguiutils.BlaScrolledWindow):
 
         return False
 
-    def init(self):
+    def restore(self):
         # check for new events now and every two hours
         self.__update_models()
         gobject.timeout_add(2 * 3600 * 1000, self.__update_models)

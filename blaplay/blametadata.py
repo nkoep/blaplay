@@ -80,7 +80,7 @@ class BlaFetcher(gobject.GObject):
         safestring = ":/?=+&%s" % separator
         new_url = urllib.quote(new_url.encode("utf-8"), safe=safestring)
 
-        blaplay.print_d(new_url)
+        print_d(new_url)
 
         try: f = urllib.urlopen(new_url)
         except IOError: return buf

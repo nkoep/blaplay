@@ -40,7 +40,7 @@ extensions = None
 BlaPlaylist = None
 
 def init():
-    blaplay.print_i("Initializing the database")
+    print_i("Initializing the database")
     global library
     library = BlaLibrary()
 
@@ -152,7 +152,7 @@ class BlaLibraryMonitor(gobject.GObject):
         tid = -1
         while True:
             event, path_from, path_to = self.__queue.get(block=True)
-            blaplay.print_d("New event of type `%s' for file %s (%r)" %
+            print_d("New event of type `%s' for file %s (%r)" %
                     (EVENTS[event], path_from, path_to))
 
             update_track = library.update_track
@@ -294,8 +294,7 @@ class BlaLibraryMonitor(gobject.GObject):
                 monitor.connect("changed", self.__queue_event)
                 self.__monitors[directory] = monitor
 
-        blaplay.print_d("Now monitoring everything in: %r"
-                % monitored_directories)
+        print_d("Now monitoring everything in: %r" % monitored_directories)
         self.emit("initialized", directories)
 
 class BlaLibraryModel(object):
@@ -450,10 +449,8 @@ class BlaLibrary(gobject.GObject):
                     blautils.deserialize_from_file(blaconst.PLAYLISTS_PATH)
         except TypeError: pass
 
-        blaplay.print_d("Restoring library: %d tracks in the library, "
-                "%d additional tracks" % (len(self.__tracks),
-                len(self.__tracks_ool))
-        )
+        print_d("Restoring library: %d tracks in the library, %d additional "
+                "tracks" % (len(self.__tracks), len(self.__tracks_ool)))
 
         def initialized(library_monitor, directories):
             p = self.__detect_changes(directories)
@@ -486,7 +483,7 @@ class BlaLibrary(gobject.GObject):
         # merely updates our metadata of tracks in directories we're monitoring
         yield_interval = 25
 
-        blaplay.print_i("Checking for changed library contents in: %r"
+        print_i("Checking for changed library contents in: %r"
                 % blacfg.getdotliststr("library", "directories"))
 
         # update __tracks_ool dict first
@@ -529,7 +526,7 @@ class BlaLibrary(gobject.GObject):
                 remove_track(f)
             if idx % yield_interval == 0: yield True
 
-        blaplay.print_i("%d files missing, %d possibly new ones, %d updated"
+        print_i("%d files missing, %d possibly new ones, %d updated"
                 % (missing, new_files, updated))
 
         # finally update the model for the library browser and playlists. the
@@ -653,7 +650,7 @@ class BlaLibrary(gobject.GObject):
 
     def save_library(self):
         if self.__pending_save:
-            blaplay.print_i("Updating library on disk")
+            print_i("Updating library on disk")
             blautils.serialize_to_file(self.__tracks, blaconst.LIBRARY_PATH)
         return 0
 
@@ -747,8 +744,7 @@ class BlaLibrary(gobject.GObject):
     def scan_directory(self, directory):
         def scan(directory):
             t = time.time()
-            blaplay.print_d("Scanning `%s' and its subdirectories..."
-                    % directory)
+            print_d("Scanning `%s' and its subdirectories..." % directory)
 
             self.emit("progress", "pulse")
             self.__aborted = False
@@ -795,7 +791,7 @@ class BlaLibrary(gobject.GObject):
             self.__library_monitor.add_directory(directory)
             self.emit("progress", 1.0)
 
-            blaplay.print_d("Finished parsing of %d files after %.2f seconds"
+            print_d("Finished parsing of %d files after %.2f seconds"
                     % (len(files), (time.time() - t)))
 
             ns["wait"] = False

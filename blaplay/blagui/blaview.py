@@ -29,6 +29,7 @@ player = blaplayer.player
 library = bladb.library
 from blaplay.blagui import blaguiutils
 from blaplaylist import BlaPlaylist, BlaQueue
+from blastatusbar import BlaStatusbar
 from blaradio import BlaRadio
 from blaeventbrowser import BlaEventBrowser
 from blareleasebrowser import BlaReleaseBrowser
@@ -241,7 +242,8 @@ class BlaSidePane(gtk.VBox):
         c.pack_start(r, expand=False)
         def cell_data_func(column, renderer, model, iterator):
             count = model[iterator][1]
-            renderer.set_property("text", "(%d)" % count if count > 0 else "")
+            renderer.set_property("markup", "<i>(%d)</i>" % count
+                    if count > 0 else "")
         c.set_cell_data_func(r, cell_data_func)
         self.__treeview.append_column(c)
         viewport.add(self.__treeview)
@@ -425,10 +427,10 @@ class BlaView(gtk.HPaned):
                 "state_changed", lambda *x: self.__side_pane.update_track())
         [view.connect("count_changed", self.__side_pane.update_count)
                 for view in self.views]
-        self.views[blaconst.VIEW_PLAYLISTS].restore()
-        self.views[blaconst.VIEW_RADIO].restore()
-        self.views[blaconst.VIEW_EVENTS].init()
-        self.views[blaconst.VIEW_RELEASES].init()
+        filter(
+                lambda v: v != self.views[blaconst.VIEW_QUEUE], self.views)
+        [view.restore() for view in self.views
+                if view != self.views[blaconst.VIEW_QUEUE]]
 
         self.show_all()
         self.__container.show_all()
@@ -437,7 +439,6 @@ class BlaView(gtk.HPaned):
         self.pack1(self.__container, resize=True, shrink=False)
         self.pack2(self.__side_pane, resize=False, shrink=False)
 
-        self.update_view(blacfg.getint("general", "view"))
         self.set_show_side_pane(blacfg.getboolean("general", "side.pane"))
 
     def set_show_side_pane(self, state):
@@ -445,9 +446,8 @@ class BlaView(gtk.HPaned):
         blacfg.setboolean("general", "side.pane", state)
 
     @classmethod
-    def update_view(cls, view):
-        # TODO: - hide playlist info in statusbar if view is not playlists
-        #       - add statusbar info for queue as well
+    def update_view(cls, view, init=False):
+        blacfg.set("general", "view", view)
 
         child = cls.__container.get_child()
         if child is not None: cls.__container.remove(child)
@@ -455,11 +455,13 @@ class BlaView(gtk.HPaned):
         if child.get_parent() is not None: child.unparent()
         cls.__container.add(child)
 
+        try: child.update_statusbar()
+        except AttributeError: BlaStatusbar.set_view_info(view, "")
+
         # not all menu items are available for all views so update them
         # accordingly
         blagui.update_menu(view)
         cls.__side_pane.update_view(view)
-        blacfg.set("general", "view", view)
 
     @classmethod
     def update_colors(cls):

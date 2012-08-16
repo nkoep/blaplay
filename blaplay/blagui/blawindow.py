@@ -184,10 +184,10 @@ class BlaWindow(gtk.Window):
         self.add(gtk.VBox())
 
         # create instances of the main parts of the gui
-        self.__statusbar = BlaStatusbar()
         self.__toolbar = BlaToolbar()
         self.__browsers = BlaBrowsers()
         self.__view = BlaView()
+        self.__statusbar = BlaStatusbar()
 
         player.connect("state_changed", self.__update_title)
 
@@ -205,6 +205,7 @@ class BlaWindow(gtk.Window):
                 "%d" % pane.get_position())
         )
 
+        # FIXME: the position gets reset by one of the subsequent calls
         # restore right pane handle position (of the view)
         pane_pos = blacfg.getint("general", "pane.pos.right")
         if pane_pos is not None: self.__view.set_position(pane_pos)
@@ -406,4 +407,3 @@ class BlaWindow(gtk.Window):
             BlaPlaylist.save(path, type_)
 
         diag.destroy()
-

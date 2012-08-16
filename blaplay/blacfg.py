@@ -24,9 +24,7 @@ last_save = None
 
 
 def init():
-    import blaplay
-
-    blaplay.print_i("Loading config")
+    print_i("Loading config")
 
     init = {
         "general":
@@ -170,8 +168,7 @@ def save(force=True):
     t = time.time()
     if not force and last_save and (t-last_save) < 10 * 60: return
     last_save = t
-    import blaplay
-    blaplay.print_d("Saving config")
+    print_d("Saving config")
 
     # write data to tempfile
     fd, tmp_path = tempfile.mkstemp()

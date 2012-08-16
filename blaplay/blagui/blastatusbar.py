@@ -27,7 +27,13 @@ from blaplay.formats._identifiers import *
 class BlaStatusbar(gtk.Table):
     __instance = None
 
+    __state = blaconst.STATE_STOPPED
+    __format = ""
+    __bitrate = ""
+    __sampling_rate = ""
+    __channel_mode = ""
     __position = "0:00"
+    __duration_nanoseconds = 0
     __duration = "0:00"
 
     __padding = 5
@@ -48,7 +54,7 @@ class BlaStatusbar(gtk.Table):
         hbox.pack_start(self.__pb, expand=False, fill=True)
         hbox.pack_start(self.__track_info, expand=True)
 
-        self.__playlist_info = gtk.Label("")
+        self.__view_info = gtk.Label("")
 
         # playback order
         self.__order = gtk.combo_box_new_text()
@@ -68,34 +74,36 @@ class BlaStatusbar(gtk.Table):
         table.attach(self.__order, 1, 2, 0, 1)
 
         count, xalign = 0, 0.0
-        for widget in [hbox, self.__playlist_info, table]:
+        for widget in [hbox, self.__view_info, table]:
             alignment = gtk.Alignment(xalign, 0.5, 0.0, 0.5)
             alignment.add(widget)
             self.attach(alignment, count, count+1, 0, 1)
             count += 1
             xalign += 0.5
 
-        player.connect("track_changed", self.__track_changed)
-        player.connect("state_changed", self.__state_changed)
+        player.connect("state_changed", self.__changed)
         library.connect("progress", self.update_progress)
+
+        # once the signal handlers are hooked up get the initial status string
+        # by forcing a view update
+        from blaplay.blagui.blaview import BlaView
+        BlaView.update_view(blacfg.getint("general", "view"))
 
         self.show_all()
         self.set_visibility(blacfg.getboolean("general", "statusbar"))
 
-    def __state_changed(self, player):
+    def __changed(self, player):
         self.__state = player.get_state()
-        track = player.get_track()
-        self.__update_track_status()
-
-    def __track_changed(self, player):
-        track = player.get_track()
-        self.__format = track[FORMAT]
-        self.__bitrate = track.bitrate
-        self.__bitrate = "%s avg." % self.__bitrate if self.__bitrate else ""
-        self.__sampling_rate = track.sampling_rate
-        self.__channel_mode = track[CHANNEL_MODE]
-        self.__duration_nanoseconds = track[LENGTH] * 1e9
-        self.__duration = self.__convert_time(self.__duration_nanoseconds)
+        if self.__state != blaconst.STATE_STOPPED:
+            track = player.get_track()
+            self.__format = track[FORMAT]
+            self.__bitrate = track.bitrate
+            self.__bitrate = ("%s avg." % self.__bitrate if self.__bitrate
+                    else "")
+            self.__sampling_rate = track.sampling_rate
+            self.__channel_mode = track[CHANNEL_MODE]
+            self.__duration_nanoseconds = track[LENGTH] * 1e9
+            self.__duration = self.__convert_time(self.__duration_nanoseconds)
         self.__update_track_status()
 
     def __update_track_status(self):
@@ -124,69 +132,17 @@ class BlaStatusbar(gtk.Table):
         return "%d:%02d:%02d" % (h, m, s)
 
     @classmethod
+    def set_view_info(cls, view, string):
+        if view == blacfg.getint("general", "view"):
+            try: cls.__instance.__view_info.set_text(string)
+            except AttributeError: pass
+        return False
+
+    @classmethod
     def set_order(cls, radioaction, current):
         order = current.get_current_value()
         cls.__instance.__order.set_active(order)
         blacfg.set("general", "play.order", order)
-
-    @classmethod
-    def update_playlist_info(cls, playlist, track_count, size, length_seconds):
-        # TODO: move this back to the playlist class. instead set up a method
-        #       that only waits for statusbar hints and updates the label based
-        #       on the current view so we can also display information about
-        #       radio the queue, radio stations, events, etc.
-
-        if track_count == 0:
-            cls.__instance.__playlist_info.set_text("")
-            return True
-
-        # calculate the total length of the playlist
-        values = [("seconds", 60), ("minutes", 60), ("hours", 24), ("days",)]
-        length = {}.fromkeys([v[0] for v in values], 0)
-        length["seconds"] = length_seconds
-
-        for idx in xrange(len(values)-1):
-            v = values[idx]
-            div, mod = divmod(length[v[0]], v[1])
-            length[v[0]] = mod
-            length[values[idx+1][0]] += div
-
-        labels = []
-        keys = ["days", "hours", "minutes", "seconds"]
-        for k in keys:
-            if length[k] == 1: labels.append(k[:-1])
-            else: labels.append(k)
-
-        if length["days"] != 0:
-            length = "%d %s %d %s %d %s %d %s" % (
-                    length["days"], labels[0], length["hours"], labels[1],
-                    length["minutes"], labels[2], length["seconds"], labels[3]
-            )
-        elif length["hours"] != 0:
-            length = "%d %s %d %s %d %s" % (
-                    length["hours"], labels[1], length["minutes"], labels[2],
-                    length["seconds"], labels[3]
-            )
-        elif length["minutes"] != 0:
-            length = "%d %s %d %s" % (
-                    length["minutes"], labels[2], length["seconds"], labels[3])
-        elif length["seconds"] != 0:
-            length = "%d %s" % (length["seconds"], labels[3])
-
-        mb = 1024.0 * 1024.0
-        if size > mb * 1024.0:
-            size /= mb * 1024.0
-            unit = "GB"
-        else:
-            size /= mb
-            unit = "MB"
-        size = "%.1f %s" % (size, unit)
-
-        if track_count == 1:
-            info = "%s track (%s) | %s" % (track_count, size, length)
-        else: info = "%s tracks (%s) | %s" % (track_count, size, length)
-
-        cls.__instance.__playlist_info.set_text(info)
 
     @classmethod
     def update_position(cls, position):

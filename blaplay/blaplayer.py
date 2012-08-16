@@ -32,7 +32,7 @@ player = None
 
 
 def init():
-    blaplay.print_i("Initializing the playback device")
+    print_i("Initializing the playback device")
 
     from blaplay import bladb
     global library, player
@@ -130,8 +130,20 @@ class BlaPlayer(gobject.GObject):
             self.__parse_tags(message.parse_tag())
 
         elif message.type == gst.MESSAGE_BUFFERING:
-            # TODO: start playing when percentage reaches 100
+            from blaplay.blagui.blastatusbar import BlaStatusbar
             percentage = message.parse_buffering()
+            if percentage % 10 == 0:
+                s = "Buffering: %d %%" % percentage
+                print_d(s)
+                gobject.idle_add(
+                        BlaStatusbar.set_view_info, blaconst.VIEW_RADIO, s)
+            if percentage == 100:
+                self.__bin.set_state(gst.STATE_PLAYING)
+                self.__state = blaconst.STATE_PLAYING
+                self.emit("track_changed")
+                self.emit("state_changed")
+                gobject.timeout_add(2000,
+                        BlaStatusbar.set_view_info, blaconst.VIEW_RADIO, "")
 
         elif message.type == gst.MESSAGE_ERROR:
             self.stop()
@@ -149,8 +161,9 @@ class BlaPlayer(gobject.GObject):
         if not self.__station: return
         for key in tags.keys():
             value = tags[key]
-            if (key in ["organization", "location", "title"] and
-                    not self.__station[MAPPING[key]]):
+            try: value = value.encode("utf-8")
+            except AttributeError: pass
+            if key in ["organization", "location", "title"]:
                 self.__station[MAPPING[key]] = value
         gobject.idle_add(self.emit, "state_changed")
 
@@ -214,7 +227,8 @@ class BlaPlayer(gobject.GObject):
         else:
             # check if the resource is available. if it's not it's best to stop
             # trying and inform the user about the situation. if we'd just ask
-            # for another track we'd potentially end up in an infinite loop
+            # for another track we'd potentially end up exceeding python's
+            # recursion limit if lots of tracks turn out to be invalid
             if (not os.path.exists(self.__uri) or
                     not os.path.isfile(self.__uri)):
                 from blaplay.blagui import blaguiutils
@@ -245,8 +259,8 @@ class BlaPlayer(gobject.GObject):
         self.__uri = None
         self.__bin.set_state(gst.STATE_NULL)
         self.__bin.set_property("uri", "%s" % self.__station.location)
-        self.__bin.set_state(gst.STATE_PLAYING)
-        self.__state = blaconst.STATE_PLAYING
+        self.__bin.set_state(gst.STATE_PAUSED)
+        self.__state = blaconst.STATE_PAUSED
         self.emit("track_changed")
         self.emit("state_changed")
 

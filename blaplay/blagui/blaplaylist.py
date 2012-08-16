@@ -33,8 +33,8 @@ from blaplay import (blaconst, blacfg, blautils, blaplayer, bladb, blafm,
         blagui)
 player = blaplayer.player
 library = bladb.library
-from blatagedit import BlaTagedit
 from blastatusbar import BlaStatusbar
+from blatagedit import BlaTagedit
 from blaplay.blagui import blaguiutils
 from blaplay.formats._identifiers import *
 
@@ -60,6 +60,51 @@ MODE_NORMAL, MODE_SORTED, MODE_FILTERED = 1 << 0, 1 << 1, 1 << 2
 def force_view():
     from blaview import BlaView
     BlaView.update_view(blaconst.VIEW_PLAYLISTS)
+
+def parse_content_info(count, size, length_seconds):
+    values = [("seconds", 60), ("minutes", 60), ("hours", 24), ("days",)]
+    length = {}.fromkeys([v[0] for v in values], 0)
+    length["seconds"] = length_seconds
+
+    for idx in xrange(len(values)-1):
+        v = values[idx]
+        div, mod = divmod(length[v[0]], v[1])
+        length[v[0]] = mod
+        length[values[idx+1][0]] += div
+
+    labels = []
+    keys = ["days", "hours", "minutes", "seconds"]
+    for k in keys:
+        if length[k] == 1: labels.append(k[:-1])
+        else: labels.append(k)
+
+    if length["days"] != 0:
+        length = "%d %s %d %s %d %s %d %s" % (
+                length["days"], labels[0], length["hours"], labels[1],
+                length["minutes"], labels[2], length["seconds"], labels[3]
+        )
+    elif length["hours"] != 0:
+        length = "%d %s %d %s %d %s" % (
+                length["hours"], labels[1], length["minutes"], labels[2],
+                length["seconds"], labels[3]
+        )
+    elif length["minutes"] != 0:
+        length = "%d %s %d %s" % (
+                length["minutes"], labels[2], length["seconds"], labels[3])
+    elif length["seconds"] != 0:
+        length = "%d %s" % (length["seconds"], labels[3])
+
+    mb = 1024.0 * 1024.0
+    if size > mb * 1024.0:
+        size /= mb * 1024.0
+        unit = "GB"
+    else:
+        size /= mb
+        unit = "MB"
+    size = "%.1f %s" % (size, unit)
+
+    if count == 1: return "%s track (%s) | %s" % (count, size, length)
+    return "%s tracks (%s) | %s" % (count, size, length)
 
 def update_columns(treeview, view_id):
     treeview.disconnect_changed_signal()
@@ -591,6 +636,8 @@ class BlaQueue(blaguiutils.BlaScrolledWindow):
     __treeview = BlaTreeView(view_id=blaconst.VIEW_QUEUE)
     __instance = None
     __added_rows = []
+    __size = 0
+    __length = 0
 
     clipboard = []
 
@@ -699,6 +746,12 @@ class BlaQueue(blaguiutils.BlaScrolledWindow):
         if blacfg.getboolean("general", "queue.remove.when.activated"):
             self.update_queue_positions([self.__queue.get_iter(path)])
 
+    def update_statusbar(self):
+        count = self.__queue.iter_n_children(None)
+        if count == 0: info = ""
+        else: info = parse_content_info(count, self.__size, self.__length)
+        BlaStatusbar.set_view_info(blaconst.VIEW_QUEUE, info)
+
     @classmethod
     def select(cls, type_):
         treeview = cls.__instance.__treeview
@@ -778,8 +831,10 @@ class BlaQueue(blaguiutils.BlaScrolledWindow):
         playlists, positions = set(), {}
         cls.__queue.foreach(determine_positions, (playlists, positions))
         update_models(playlists, positions)
+        # TODO: calculate size and length
         cls.__instance.emit(
                 "count_changed", blaconst.VIEW_QUEUE, cls.get_queue_count())
+        cls.__instance.update_statusbar()
 
     @classmethod
     def get_queued_tracks(cls):
@@ -861,8 +916,7 @@ class BlaQueue(blaguiutils.BlaScrolledWindow):
 class BlaPlaylist(gtk.Notebook):
     __gsignals__ = {
         "play_track": blaplay.signal(1),
-        "count_changed": blaplay.signal(2),
-        "update_playlist_info": blaplay.signal(3)
+        "count_changed": blaplay.signal(2)
     }
 
     pages = []          # list of playlists (needed for the queue)
@@ -996,7 +1050,7 @@ class BlaPlaylist(gtk.Notebook):
             self.show()
             self.__entry.connect("activate", self.__filter)
 
-        def clear(self, init=False):
+        def clear(self):
             self.__treeview.freeze_notify()
             self.__treeview.freeze_child_notify()
             model = self.__treeview.get_model()
@@ -1020,8 +1074,6 @@ class BlaPlaylist(gtk.Notebook):
             else: self.__treeview.set_model(model)
             self.__treeview.thaw_child_notify()
             self.__treeview.thaw_notify()
-
-            self.update_playlist_info()
 
         def get_path_from_id(self, identifier, unfiltered=False):
             if self.__mode & MODE_FILTERED and not unfiltered:
@@ -1125,6 +1177,7 @@ class BlaPlaylist(gtk.Notebook):
 
         def add_tracks(self, uris, drop_info=None, flush=False, current=None,
                 select_rows=False, restore=False):
+            # FIXME: the sort indicator isn't reset when flushing
             if flush: self.clear()
             if not uris: return
 
@@ -1195,6 +1248,7 @@ class BlaPlaylist(gtk.Notebook):
                 [insert_func(ns, [identifier, "", []]) for identifier in ids]
                 self.__treeview.set_model(model)
                 self.__thaw_treeview()
+                if not restore: self.update_playlist_info()
             elif query: self.enable_search(query)
             elif sort_parameters: self.sort(*sort_parameters)
             else: raise NotImplementedError("This shouldn't happen")
@@ -1225,8 +1279,6 @@ class BlaPlaylist(gtk.Notebook):
 
                 path = self.get_path_from_id(scroll_id)
                 self.set_row(path=path, row_align=1.0, keep_selection=True)
-
-            self.update_playlist_info()
 
         def get_tracks(self, remove=False, paths=None):
             ids = []
@@ -1540,19 +1592,24 @@ class BlaPlaylist(gtk.Notebook):
             return track
 
         def update_playlist_info(self):
-            try: count = self.__treeview.get_model().iter_n_children(None)
-            except TypeError: count = 0
+#            try: count = self.__treeview.get_model().iter_n_children(None)
+#            except TypeError: count = 0
 
-            if self.__mode & MODE_FILTERED:
-                tracks = map(BlaPlaylist.get_track_from_id, self.__tracks)
-                size = sum([track[FILESIZE] for track in tracks])
-                length = sum([track[LENGTH] for track in tracks])
-            else:
-                tracks = map(BlaPlaylist.get_track_from_id, self.__all_tracks)
-                size = self.__size
-                length = self.__length
+#            if self.__mode & MODE_FILTERED:
+#                tracks = map(BlaPlaylist.get_track_from_id, self.__tracks)
+#                self.__size = sum([track[FILESIZE] for track in tracks])
+#                self.__length = sum([track[LENGTH] for track in tracks])
+#            else:
+#                tracks = map(BlaPlaylist.get_track_from_id, self.__all_tracks)
+#                size = self.__size
+#                length = self.__length
 
-            BlaPlaylist.update_playlist_info(count, size, length)
+            BlaPlaylist.update_statusbar()
+
+        def get_playlist_info(self):
+            ids = (self.__tracks if self.__mode & MODE_FILTERED else
+                    self.__all_tracks)
+            return (len(ids), self.__size, self.__length)
 
         def update_state(self):
             if self.__current is None: return
@@ -1844,13 +1901,13 @@ class BlaPlaylist(gtk.Notebook):
         self.set_scrollable(True)
 
         # hook up signals
-        self.connect_object("switch_page", BlaPlaylist.__switch_page, self)
+        self.connect("switch_page",
+                lambda *x: self.update_statusbar(self.get_nth_page(x[-1])))
         self.connect_object(
                 "page_reordered", BlaPlaylist.__page_reordered, self)
         self.connect("button_press_event", self.__button_press_event)
         self.connect("key_press_event", self.__key_press_event)
         self.connect("play_track", player.play_track)
-        self.connect("update_playlist_info", BlaStatusbar.update_playlist_info)
         player.connect("state_changed", lambda *x: self.active.update_state())
         player.connect("get_track", self.get_track)
 
@@ -2096,7 +2153,7 @@ class BlaPlaylist(gtk.Notebook):
         return 0
 
     def get_playlists(self):
-        blaplay.print_i("Saving playlists")
+        print_i("Saving playlists")
 
         playlists = []
         for playlist in self:
@@ -2108,7 +2165,7 @@ class BlaPlaylist(gtk.Notebook):
         return playlists
 
     def restore(self):
-        blaplay.print_i("Restoring playlists")
+        print_i("Restoring playlists")
 
         playlists, queue = library.get_playlists()
 
@@ -2123,8 +2180,6 @@ class BlaPlaylist(gtk.Notebook):
                     type(self).active = playlist
             BlaQueue.restore_queue(queue)
         else: self.add_playlist()
-
-        self.active.update_playlist_info()
 
     @classmethod
     def add_playlist(cls, name=None, query_name=False, focus=False):
@@ -2187,7 +2242,7 @@ class BlaPlaylist(gtk.Notebook):
             playlist.destroy()
             del playlist
 
-        # if we just removed the last playlist, create an empty new one
+        # create an empty new playlist if we just removed the last one
         if cls.__instance.get_n_pages() < 1: cls.__instance.add_playlist()
 
         # select the actively viewed playlist as the new current playlist to
@@ -2267,10 +2322,18 @@ class BlaPlaylist(gtk.Notebook):
         force_view()
 
     @classmethod
-    def update_playlist_info(cls, count, size, length):
+    def update_statusbar(cls, playlist=None):
         # this is called by BlaPlaylist.Playlist instances to make the playlist
         # wrapper update the statusbar
-        cls.__instance.emit("update_playlist_info", count, size, length)
+
+        if playlist is None: playlist = cls.__instance.__get_current_page()
+        try:
+            count, size, length_seconds = playlist.get_playlist_info()
+        except AttributeError: return
+
+        if count == 0: info = ""
+        else: info = parse_content_info(count, size, length_seconds)
+        BlaStatusbar.set_view_info(blaconst.VIEW_PLAYLISTS, info)
 
     @classmethod
     def update_uris(cls, uris):
@@ -2338,10 +2401,6 @@ class BlaPlaylist(gtk.Notebook):
         if (blacfg.getint("general", "view") == blaconst.VIEW_PLAYLISTS and
                 cls.active == cls.__instance.__get_current_page()):
             cls.active.jump_to_playing_track()
-
-    def __switch_page(self, *args):
-        page = self.get_nth_page(args[-1])
-        page.update_playlist_info()
 
     def __page_reordered(self, page, page_num):
         BlaPlaylist.pages.remove(page)

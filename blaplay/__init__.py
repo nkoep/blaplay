@@ -38,31 +38,42 @@ quiet = False
 metadata = {"bio": {}, "lyrics": {}}
 
 
-def signal(nargs):
-    return (gobject.SIGNAL_RUN_LAST, gobject.TYPE_NONE, (object,) * nargs)
+def signal(n_args):
+    return (gobject.SIGNAL_RUN_LAST, gobject.TYPE_NONE, (object,) * n_args)
 
-# some very crude message functions
-# TODO: enhance output of these and add them to __builtin__ so we don't have to
-#       import blaplay to use them
-def print_d(msg):
-    if debug and not quiet: print "*** DEBUG: %s ***" % msg
+def check_singleton(filepath):
+    # set up logger and messaging functions
+    def critical(msg):
+        logging.critical(msg)
+        sys.exit()
 
-def print_i(msg):
-    if quiet: return
-    print "*** INFO: %s ***" % msg
+    format = "*** %%(levelname)s%s: %%(message)s"
+    if debug:
+        format %= " (%(filename)s:%(lineno)d)"
+        level = logging.DEBUG
+    else:
+        format %= ""
+        level = logging.INFO
+    logging.basicConfig(format=format, level=level)
 
-def print_w(msg, force=False):
-    if quiet and not force: return
-    print "*** WARNING: %s ***" % msg
+    # FIXME: if colors are set for WARNING and CRITICAL no output is produced
+    colors = [
+        (logging.INFO, "34"), (logging.DEBUG, "35"),
+#            (logging.WARNING, "32"), (logging.CRITICAL, "31")
+    ]
+    for level, color in colors:
+        logging.addLevelName(level, "\033[1;%sm%s\033[1;m"
+                % (color, logging.getLevelName(level)))
 
-def print_e(msg):
-    if quiet: return
-    print "*** ERROR: %s ***" % msg
-    sys.exit()
+    __builtin__.__dict__["print_d"] = logging.debug
+    __builtin__.__dict__["print_i"] = logging.info
+    __builtin__.__dict__["print_w"] = logging.warning
+    __builtin__.__dict__["print_c"] = critical
 
-def manage_pidfile(filepath):
-    directories = [blaconst.USERDIR, blaconst.COVERS, blaconst.ARTISTS,
-                blaconst.RELEASES, blaconst.EVENTS]
+    # set up user directories
+    directories = [blaconst.CACHEDIR, blaconst.USERDIR, blaconst.COVERS,
+            blaconst.ARTISTS, blaconst.RELEASES, blaconst.EVENTS]
+
     if not all(map(os.path.isdir, directories)):
         print_i("Setting up user directories")
         for directory in [blaconst.USERDIR, blaconst.COVERS, blaconst.ARTISTS,

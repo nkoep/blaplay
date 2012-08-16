@@ -22,16 +22,16 @@ import json
 import time
 import threading
 import urllib
+import urllib2
 import httplib
 import socket
 import webbrowser
-quote_url = lambda url: urllib.quote(url.encode("utf-8"), safe=":/?=+&")
+quote_url = lambda url: urllib2.quote(url.encode("utf-8"), safe=":/?=+&")
 import cPickle as pickle
 
 import gtk
 import gobject
 
-import blaplay
 from blaplay import blacfg, blaconst, blautils, bladb, blaplayer
 from blaplay.formats._identifiers import *
 
@@ -39,6 +39,7 @@ player = None
 library = None
 scrobbler = None
 
+TIMEOUT = 10
 LEGAL_NOTICE = str(
     "User-contributed text is available under the Creative Commons By-SA "
     "License and may also be available under the GNU FDL."
@@ -116,8 +117,8 @@ def post_message(params):
 
 def get_response(url, key):
     error, response = 0, None
-    try: f = urllib.urlopen(url)
-    except IOError: pass
+    try: f = urllib2.urlopen(url, timeout=TIMEOUT)
+    except (urllib2.URLError, IOError): pass
     else:
         try: response = json.loads(f.read())
         except ValueError: pass
@@ -190,7 +191,7 @@ def get_biography(track, image_base):
                 biography.replace(LEGAL_NOTICE, "").strip())
 
     if error or not image or not biography:
-        blaplay.print_d("Failed to retrieve artist biography: %s (error %d)"
+        print_d("Failed to retrieve artist biography: %s (error %d)"
                 % (response, error))
 
     return image, biography
@@ -200,7 +201,7 @@ def get_events(limit, recommended, city="", country=""):
 
     if recommended:
         session_key = BlaScrobbler.get_session_key()
-        if not session_key: events
+        if not session_key: return events
 
         # since this is an authorized service the location information from the
         # associated last.fm user account is used. passing the country kwarg ,
@@ -214,7 +215,8 @@ def get_events(limit, recommended, city="", country=""):
         api_signature = sign_api_call(params)
         params.append(("api_sig", api_signature))
         error, response = post_message(params)
-        if not error: response = response["events"]
+        try: response = response["events"]
+        except (TypeError, KeyError): pass
 
     else:
         location = ", ".join([city, country] if country else [city])
@@ -229,7 +231,7 @@ def get_events(limit, recommended, city="", country=""):
         if error: raise TypeError
         events = response["event"]
     except (TypeError, KeyError):
-        blaplay.print_d("Failed to retrieve recommended events: %s (error %d)"
+        print_d("Failed to retrieve recommended events: %s (error %d)"
                 % (response, error))
     return events
 
@@ -247,8 +249,8 @@ def get_new_releases(recommended=False):
         if error: raise TypeError
         releases = response["album"]
     except (TypeError, KeyError):
-        blaplay.print_d("Failed to get new releases: %s (error %d)"
-                % (error, repsponse))
+        print_d("Failed to get new releases: %s (error %d)"
+                % (response, error))
     return releases
 
 def get_request_token():
@@ -257,7 +259,7 @@ def get_request_token():
     if not error: token = response
     else:
         token = None
-        blaplay.print_d("Failed to retrieve request token: %s (error %d)"
+        print_d("Failed to retrieve request token: %s (error %d)"
                 % (response, error))
     return token
 
@@ -286,7 +288,7 @@ def love_unlove_song(track, unlove=False):
     params.append(("api_sig", api_signature))
     error, response = post_message(params)
     if error:
-        blaplay.print_d("Failed to love/unlove song: %s (error %d)"
+        print_d("Failed to love/unlove song: %s (error %d)"
                 % (response, error))
 
 
@@ -346,7 +348,7 @@ class BlaScrobbler(object):
                 params.append(("api_sig", api_signature))
                 error, response = post_message(params)
                 if error:
-                    blaplay.print_d("Failed to submit %d scrobbles to "
+                    print_d("Failed to submit %d scrobbles to "
                             "last.fm: %s (error %d)" % (len(item), response,
                             error)
                     )
@@ -355,7 +357,7 @@ class BlaScrobbler(object):
         def __restore(self):
             items = blautils.deserialize_from_file(blaconst.SCROBBLES_PATH)
             if items:
-                blaplay.print_d("Queuing %d unsubmitted scrobble(s)"
+                print_d("Queuing %d unsubmitted scrobble(s)"
                         % len(items))
                 self.put(items)
 
@@ -424,7 +426,7 @@ class BlaScrobbler(object):
         params.append(("api_sig", api_signature))
         error, response = post_message(params)
         if error:
-            blaplay.print_d("Failed to update nowplaying: %s (error %d)"
+            print_d("Failed to update nowplaying: %s (error %d)"
                     % (response, error))
 
     def __query_status(self):
@@ -452,7 +454,7 @@ class BlaScrobbler(object):
                     blacfg.getboolean("lastfm", "scrobble") and
                     (self.__elapsed > track[LENGTH] / 2 or
                     self.__elapsed > 240)):
-                blaplay.print_d("Submitting track to scrobbler queue")
+                print_d("Submitting track to scrobbler queue")
                 self.__queue.put([(self.__uri, self.__start_time)])
 
         if shutdown:
@@ -470,6 +472,12 @@ class BlaScrobbler(object):
             if not cls.__token: return None
             cls.__request_authorization()
             return None
+
+        # FIXME: on start when there are unsubmitted scrobbles and no session
+        #        key but a user name the request auth window will pop up which
+        #        causes the statusbar to not update properly
+
+        # TODO: check this more than once
 
         # we have a token, but it still might be unauthorized, i.e. we can't
         # create a session key from it. if that is the case, ignore the
@@ -519,6 +527,5 @@ class BlaScrobbler(object):
             self.__tid = gobject.timeout_add(1000, self.__query_status)
         else:
             self.__uri = None
-            blaplay.print_d("Not submitting track \"%s - %s\" to the scrobbler"
+            print_d("Not submitting track \"%s - %s\" to the scrobbler"
                     % (track[ARTIST], track[TITLE]))
-

@@ -1,12 +1,11 @@
 Short-term:
-- set statusbar text for views other than "playlists"
 - store tag values as list instead of strings joined by "\n"
 - enhance command-line interface
 - enhance tag editor (parse tags from filename)
 - use the logger module and add messaging functions to __builtin__'s dict
 - get a proper logo
 - write up some crude unit/regression tests
-- see blaplay/blagui/blaradio.py
+- improve internet radio support (cf. blaplay/blagui/blaradio.py)
 - improve lyrics fetcher (more robust search, more search engines)
 - lower memory footprint
 - improve/speed up "remove duplicates" functionality and extend the feature to
@@ -27,5 +26,5 @@ Long-term:
   (required for grouping in playlists)
 - port to GI once stability/performance is satisfying
 - py3k port once all required modules are ported (the main requirement
-  being mutagen as gtk and gst won't be a problem once we ported to GI)
+  being mutagen as Gtk and Gst won't be a problem once we ported to GI)
 

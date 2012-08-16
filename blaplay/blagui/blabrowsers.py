@@ -417,7 +417,7 @@ class BlaLibraryBrowser(gtk.VBox):
         if not path in self.__expanded_rows: self.__expanded_rows.append(path)
 
     def __update_library_contents(self, library, model):
-        blaplay.print_i("Updating library browser")
+        print_i("Updating library browser")
         self.__expanded_rows = []
         self.__model = model
         self.__update_treeview()

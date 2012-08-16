@@ -33,7 +33,6 @@ from blaplay.blagui import blaguiutils
 # TODO: - save last-played station to config
 #       - implement get_next, get_previous methods to iterate through stations
 #         as through songs in a playlist
-#       - start playing only once buffered to 100 % (add progressbar for this)
 
 def parse_uri(uri):
     stations = []
@@ -113,15 +112,21 @@ class BlaRadio(gtk.VBox):
         button.connect("clicked", self.__remove_stations)
         hbox.pack_start(button, expand=False)
 
-        model = gtk.ListStore(gobject.TYPE_PYOBJECT)
+        model = gtk.ListStore(gobject.TYPE_STRING, gobject.TYPE_PYOBJECT)
         self.__treeview = blaguiutils.BlaTreeViewBase()
         self.__treeview.set_model(model)
         self.__treeview.set_enable_search(True)
         self.__treeview.set_rubber_banding(True)
         self.__treeview.set_property("rules_hint", True)
 
+        # playing column
+        r = gtk.CellRendererPixbuf()
+        self.__treeview.insert_column_with_attributes(
+                -1, "Playing", r, stock_id=0)
+
+        # remaining columns
         def cell_data_func(column, renderer, model, iterator, identifier):
-            renderer.set_property("text", model[iterator][0][identifier])
+            renderer.set_property("text", model[iterator][1][identifier])
 
         columns = [
             ("Organization", "organization"), ("Station", "station"),
@@ -154,13 +159,22 @@ class BlaRadio(gtk.VBox):
         self.show_all()
 
     def __update_rows(self, player):
-        if not player.radio: return
-        station = player.get_track()
-        model = self.__treeview.get_model()
-        for row in model:
-            if row[0] == station:
-                model.row_changed(row.path, row.iter)
-                break
+        if not player.radio:
+            model = self.__treeview.get_model()
+            for row in model: row[0] = None
+        else:
+            station = player.get_track()
+            model = self.__treeview.get_model()
+            state = player.get_state()
+            stock = (gtk.STOCK_MEDIA_PLAY if state == blaconst.STATE_PLAYING
+                    else gtk.STOCK_MEDIA_PAUSE
+                    if state == blaconst.STATE_PAUSED else None
+            )
+            for row in model:
+                if row[1] == station:
+                    row[0] = stock
+                    model.row_changed(row.path, row.iter)
+                    break
 
     def __add_station(self, uri):
         uri = uri.strip()
@@ -170,17 +184,20 @@ class BlaRadio(gtk.VBox):
                     "Invalid URL", "Failed to open location %s." % uri)
         else:
             model = self.__treeview.get_model()
-            [model.append([station]) for station in stations]
+            [model.append([None, station]) for station in stations]
             self.emit("count_changed",
                     blaconst.VIEW_RADIO, model.iter_n_children(None))
 
     def __remove_stations(self, *args):
         model, paths = self.__treeview.get_selection().get_selected_rows()
         map(model.remove, map(model.get_iter, paths))
+        self.send_status_update()
 
     def __save_stations(self):
-        stations = [row[0] for row in self.__treeview.get_model()]
-        blautils.serialize_to_file(stations, blaconst.STATIONS_PATH)
+        stations = [row[1] for row in self.__treeview.get_model()]
+        if player.radio: station = player.get_track()
+        else: station = None
+        blautils.serialize_to_file([station, stations], blaconst.STATIONS_PATH)
         return 0
 
     def __popup_menu(self, treeview, event):
@@ -198,17 +215,20 @@ class BlaRadio(gtk.VBox):
         menu.popup(None, None, None, event.button, event.time)
 
     def __play_station(self, treeview, path, column):
-        player.play_station(self.__treeview.get_model()[path][0])
+        model = self.__treeview.get_model()
+        for row in model: row[0] = None
+        player.play_station(model[path][1])
 
     def __key_press_event(self, treeview, event):
         if blagui.is_accel(event, "Delete"): self.__remove_stations()
         return False
 
     def restore(self):
-        stations = blautils.deserialize_from_file(blaconst.STATIONS_PATH)
+        station, stations = blautils.deserialize_from_file(
+                blaconst.STATIONS_PATH)
         if not stations: return
         model = self.__treeview.get_model()
-        [model.append([station]) for station in stations]
+        [model.append([None, station]) for station in stations]
         self.emit("count_changed",
                 blaconst.VIEW_RADIO, model.iter_n_children(None))
 

@@ -385,7 +385,9 @@ class BlaReleaseBrowser(blaguiutils.BlaScrolledWindow):
         timedelta = datetime.timedelta(days=(week-1)*7+1)
         return date + timedelta, date + timedelta + datetime.timedelta(days=6)
 
-    def init(self):
+    def restore(self):
+        # TODO: restore saved releases
+
         # check for new releases now and every two hours
         self.__update_models()
         gobject.timeout_add(2 * 3600 * 1000, self.__update_models)

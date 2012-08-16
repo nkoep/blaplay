@@ -22,7 +22,6 @@ pygtk.require("2.0")
 import gtk
 gtk.gdk.threads_init()
 
-import blaplay
 from blaplay import blaconst, blacfg, blaplayer, blafm
 from blaguiutils import BlaTreeViewBase
 
@@ -150,7 +149,7 @@ def is_accel(event, accel):
     # since no one should use them, complain
     non_default = accel_mod & ~default_mod
     if non_default:
-        blaplay.print_w("Accelerator `%s' contains a non default modifier "
+        print_w("Accelerator `%s' contains a non default modifier "
                 "`%s'." % (accel, gtk.accelerator_name(0, non_default) or ""))
 
     # remove everything except default modifiers and compare
