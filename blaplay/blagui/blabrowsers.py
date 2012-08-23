@@ -95,6 +95,7 @@ class BlaCellRenderer(blaguiutils.BlaCellRendererBase):
 
         # render active resp. inactive rows
         layout = self.get_layout(widget)
+        layout.set_font_description(widget.get_style().font_desc)
         width, height = layout.get_pixel_size()
 
         if (flags == (gtk.CELL_RENDERER_SELECTED|gtk.CELL_RENDERER_PRELIT) or

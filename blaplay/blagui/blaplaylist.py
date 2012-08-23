@@ -433,6 +433,7 @@ class BlaCellRenderer(blaguiutils.BlaCellRendererBase):
             width, height = layout.get_pixel_size()
             layout.set_width((expose_area.width + expose_area.x) * pango.SCALE)
             layout.set_ellipsize(pango.ELLIPSIZE_END)
+            layout.set_font_description(widget.get_style().font_desc)
 
             if blacfg.getboolean("colors", "overwrite"):
                 if (flags == (gtk.CELL_RENDERER_SELECTED |
@@ -749,7 +750,9 @@ class BlaQueue(blaguiutils.BlaScrolledWindow):
     def update_statusbar(self):
         count = self.__queue.iter_n_children(None)
         if count == 0: info = ""
-        else: info = parse_content_info(count, self.__size, self.__length)
+        else:
+            info = parse_content_info(
+                    count, type(self).__size, type(self).__length)
         BlaStatusbar.set_view_info(blaconst.VIEW_QUEUE, info)
 
     @classmethod
@@ -813,7 +816,7 @@ class BlaQueue(blaguiutils.BlaScrolledWindow):
                 items = zip(d.keys(), d.values())
 
                 # if a playlist is removed from the notebook the garbage
-                # collector might not pick it up if the queue still holds a
+                # collector will not pick it up if the queue still holds a
                 # reference to it. however, since the model of the playlist is
                 # already destroyed the following call raises a TypeError we
                 # need to catch
@@ -831,7 +834,15 @@ class BlaQueue(blaguiutils.BlaScrolledWindow):
         playlists, positions = set(), {}
         cls.__queue.foreach(determine_positions, (playlists, positions))
         update_models(playlists, positions)
-        # TODO: calculate size and length
+
+        # calculate size and length of the queue and update the statusbar
+        cls.__size = cls.__length = 0
+        for row in cls.__queue:
+            identifier = row[0]
+            try: track = library[BlaPlaylist.uris[identifier]]
+            except KeyError: track = library[identifier]
+            cls.__size += track[FILESIZE]
+            cls.__length += track[LENGTH]
         cls.__instance.emit(
                 "count_changed", blaconst.VIEW_QUEUE, cls.get_queue_count())
         cls.__instance.update_statusbar()
