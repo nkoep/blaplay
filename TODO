@@ -2,7 +2,6 @@ Short-term:
 - store tag values as list instead of strings joined by "\n"
 - enhance command-line interface
 - enhance tag editor (parse tags from filename)
-- use the logger module and add messaging functions to __builtin__'s dict
 - get a proper logo
 - write up some crude unit/regression tests
 - improve internet radio support (cf. blaplay/blagui/blaradio.py)
@@ -11,7 +10,6 @@ Short-term:
 - improve/speed up "remove duplicates" functionality and extend the feature to
   the queue as well
 - improve startup speed/reduce import overhead
-- add DND support for the playlist notebook tab strip
 - implement shuffle albums/repeat album playback modes
 - implement peeking (tooltips for previous/next/random buttons showing which
   track would be played if button was clicked)

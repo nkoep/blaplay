@@ -1259,7 +1259,7 @@ class BlaPlaylist(gtk.Notebook):
                 [insert_func(ns, [identifier, "", []]) for identifier in ids]
                 self.__treeview.set_model(model)
                 self.__thaw_treeview()
-                if not restore: self.update_playlist_info()
+                if not restore: BlaPlaylist.update_statusbar()
             elif query: self.enable_search(query)
             elif sort_parameters: self.sort(*sort_parameters)
             else: raise NotImplementedError("This shouldn't happen")
@@ -1327,7 +1327,7 @@ class BlaPlaylist(gtk.Notebook):
                         map(self.__all_sorted.remove, ids)
                     map(self.__all_tracks.remove, ids)
 
-                    self.update_playlist_info()
+                    BlaPlaylist.update_statusbar()
 
             return ids
 
@@ -1602,21 +1602,6 @@ class BlaPlaylist(gtk.Notebook):
 
             return track
 
-        def update_playlist_info(self):
-#            try: count = self.__treeview.get_model().iter_n_children(None)
-#            except TypeError: count = 0
-
-#            if self.__mode & MODE_FILTERED:
-#                tracks = map(BlaPlaylist.get_track_from_id, self.__tracks)
-#                self.__size = sum([track[FILESIZE] for track in tracks])
-#                self.__length = sum([track[LENGTH] for track in tracks])
-#            else:
-#                tracks = map(BlaPlaylist.get_track_from_id, self.__all_tracks)
-#                size = self.__size
-#                length = self.__length
-
-            BlaPlaylist.update_statusbar()
-
         def get_playlist_info(self):
             ids = (self.__tracks if self.__mode & MODE_FILTERED else
                     self.__all_tracks)
@@ -1842,7 +1827,7 @@ class BlaPlaylist(gtk.Notebook):
             self.__set_selection_and_row(
                     row_align, selected_ids, scroll_identifier)
             self.update_state()
-            self.update_playlist_info()
+            BlaPlaylist.update_statusbar()
 
         def __drag_data_get(self, treeview, drag_context, selection_data, info,
                 time):
@@ -1910,6 +1895,13 @@ class BlaPlaylist(gtk.Notebook):
         type(self).__instance = self
 
         self.set_scrollable(True)
+        targets = [
+            ("tracks/library", gtk.TARGET_SAME_APP, 0),
+            ("tracks/filesystem", gtk.TARGET_SAME_APP, 1),
+            ("text/uri-list", 0, 3)
+        ]
+        self.drag_dest_set(gtk.DEST_DEFAULT_MOTION|gtk.DEST_DEFAULT_DROP,
+                targets, gtk.gdk.ACTION_COPY)
 
         # hook up signals
         self.connect("switch_page",
@@ -1919,6 +1911,9 @@ class BlaPlaylist(gtk.Notebook):
         self.connect("button_press_event", self.__button_press_event)
         self.connect("key_press_event", self.__key_press_event)
         self.connect("play_track", player.play_track)
+        self.connect_object(
+                "drag_data_received", BlaPlaylist.__drag_data_recv, self)
+
         player.connect("state_changed", lambda *x: self.active.update_state())
         player.connect("get_track", self.get_track)
 
@@ -1929,6 +1924,17 @@ class BlaPlaylist(gtk.Notebook):
 
     def __get_current_page(self):
         return self.get_nth_page(self.get_current_page())
+
+    def __drag_data_recv(self, drag_context, x, y, selection_data, info, time):
+        if info == 0:
+            uris = pickle.loads(selection_data.data)
+            resolve = False
+        elif info in [1, 3]:
+            uris = selection_data.data.strip("\n\r\x00")
+            resolve_uri = blautils.resolve_uri
+            uris = map(resolve_uri, uris.split())
+            resolve = True
+        self.send_to_new_playlist("", uris, resolve=resolve)
 
     def __query_name(self, title, default=""):
         diag = gtk.Dialog(title=title, buttons=(gtk.STOCK_CANCEL,
