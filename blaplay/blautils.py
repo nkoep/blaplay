@@ -135,22 +135,30 @@ def serialize_to_file(data, path):
     f.close()
 
     # move old file
-    try: shutil.move(path, "%s.bak" % path)
+    new_path = "%s.bak" % path
+    try: os.unlink(new_path)
+    except OSError: pass
+
+    try: shutil.move(path, new_path)
     except IOError: pass
 
     # move tempfile to actual location and remove backup file on success
     try: shutil.move(tmp_path, path)
     except IOError: pass
     else:
-        try: os.unlink("%s.bak" % path)
+        try: os.unlink(new_path)
         except OSError: pass
 
 def deserialize_from_file(path):
+    new_path = "%s.bak" % path
     data = None
     try: f = open(path, "rb")
     except IOError:
-        try: f = open("%s.bak" % path, "rb")
+        try: f = open(new_path, "rb")
         except IOError: pass
+    else:
+        try: os.unlink(new_path)
+        except OSError: pass
 
     # reading the file into memory first possibly reduces the number of context
     # switches compared to pickle.load(f)
