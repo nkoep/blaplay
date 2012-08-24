@@ -104,6 +104,60 @@ class BlaCellRendererPixbuf(blaguiutils.BlaCellRendererBase):
 
 gobject.type_register(BlaCellRendererPixbuf)
 
+class BlaRelease(object):
+    __EMPTY_PIXBUF = gtk.gdk.Pixbuf(gtk.gdk.COLORSPACE_RGB, True, 8,
+                IMAGE_SIZE, IMAGE_SIZE)
+    __EMPTY_PIXBUF.fill(0)
+
+    def __init__(self, raw):
+        self.__raw = raw
+        self.release_name = raw["name"]
+        self.release_url = raw["url"]
+        self.artist_name = raw["artist"]["name"]
+        self.artist_url = raw["artist"]["url"]
+        self.date = parse_rfc_time(raw["@attr"]["releasedate"])
+        self.cover = BlaRelease.__EMPTY_PIXBUF
+
+    @property
+    def release_date(self):
+        return time.strftime("%A %d %B %Y", self.date[:-1])
+
+    @property
+    def calender_week(self):
+        return datetime.date(*self.date[:3]).isocalendar()[:2]
+
+    def get_cover(self, restore=False):
+        pixbuf = path = None
+        image_base = os.path.join(blaconst.RELEASES, ("%s-%s" % (
+                    self.artist_name, self.release_name)).replace(
+                    " ", "_")
+            )
+        for ext in ["jpg", "png"]:
+            try:
+                path = "%s.%s" % (image_base, ext)
+                pixbuf = gtk.gdk.pixbuf_new_from_file(path)
+            except gobject.GError: pass
+            else:
+                pixbuf = pixbuf.scale_simple(IMAGE_SIZE, IMAGE_SIZE,
+                        gtk.gdk.INTERP_HYPER)
+                break
+        else:
+            if not restore:
+                url = blafm.get_image_url(self.__raw["image"])
+                try:
+                    image, message = urllib.urlretrieve(url)
+                    path = "%s.%s" % (
+                            image_base, blautils.get_extension(image))
+                    shutil.move(image, path)
+                    pixbuf = gtk.gdk.pixbuf_new_from_file(
+                            path).scale_simple(IMAGE_SIZE, IMAGE_SIZE,
+                            gtk.gdk.INTERP_HYPER
+                    )
+                except (IOError, gobject.GError): pass
+
+        self.cover = pixbuf or BlaRelease.__EMPTY_PIXBUF
+        return path
+
 class BlaReleaseBrowser(blaguiutils.BlaScrolledWindow):
     __gsignals__ = {
         "count_changed": blaplay.signal(2)
@@ -111,51 +165,6 @@ class BlaReleaseBrowser(blaguiutils.BlaScrolledWindow):
     __count_library = 0
     __count_recommended = 0
     __lock = blautils.BlaLock(strict=True)
-
-    class Release(object):
-        def __init__(self, raw):
-            self.__raw = raw
-            self.release_name = raw["name"]
-            self.release_url = raw["url"]
-            self.artist_name = raw["artist"]["name"]
-            self.artist_url = raw["artist"]["url"]
-            self.date = parse_rfc_time(raw["@attr"]["releasedate"])
-            self.cover = gtk.gdk.Pixbuf(gtk.gdk.COLORSPACE_RGB, True, 8,
-                    IMAGE_SIZE, IMAGE_SIZE)
-            self.cover.fill(0)
-
-        @property
-        def release_date(self):
-            return time.strftime("%A %d %B %Y", self.date[:-1])
-
-        @property
-        def calender_week(self):
-            return datetime.date(*self.date[:3]).isocalendar()[:2]
-
-        def get_cover(self, image_base):
-            pixbuf = path = None
-            for ext in ["jpg", "png"]:
-                try:
-                    path = "%s.%s" % (image_base, ext)
-                    pixbuf = gtk.gdk.pixbuf_new_from_file(path)
-                except gobject.GError: pass
-                else:
-                    pixbuf = pixbuf.scale_simple(IMAGE_SIZE, IMAGE_SIZE,
-                            gtk.gdk.INTERP_HYPER)
-                    break
-            else:
-                url = blafm.get_image_url(self.__raw["image"])
-                try:
-                    image, message = urllib.urlretrieve(url)
-                    path = "%s.%s" % (
-                            image_base, blautils.get_extension(image))
-                    shutil.move(image, path)
-                    pixbuf = gtk.gdk.pixbuf_new_from_file(path).scale_simple(
-                            IMAGE_SIZE, IMAGE_SIZE, gtk.gdk.INTERP_HYPER)
-                except (IOError, gobject.GError): pass
-
-            self.cover = pixbuf
-            return path
 
     def __init__(self):
         super(BlaReleaseBrowser, self).__init__()
@@ -246,6 +255,13 @@ class BlaReleaseBrowser(blaguiutils.BlaScrolledWindow):
         self.add_with_viewport(vbox)
         self.show_all()
 
+        gtk.quit_add(0, self.__save)
+
+    def __save(self):
+        releases = [row[0] for row in self.__treeview.get_model()]
+        blautils.serialize_to_file(releases, blaconst.RELEASES_PATH)
+        return 0
+
     @blautils.gtk_thread
     @blautils.thread
     def __update_models(self):
@@ -260,11 +276,7 @@ class BlaReleaseBrowser(blaguiutils.BlaScrolledWindow):
         def worker():
             while True:
                 release = queue.get()
-                image_base = os.path.join(blaconst.RELEASES, ("%s-%s" % (
-                        release.artist_name, release.release_name)).replace(
-                        " ", "_")
-                )
-                path = release.get_cover(image_base)
+                path = release.get_cover()
                 if path: images.add(path)
                 queue.task_done()
         images = set()
@@ -290,7 +302,7 @@ class BlaReleaseBrowser(blaguiutils.BlaScrolledWindow):
             model = gtk.ListStore(gobject.TYPE_PYOBJECT)
             previous_week = None
             for release in releases:
-                release = BlaReleaseBrowser.Release(release)
+                release = BlaRelease(release)
                 week = release.calender_week
                 if previous_week != week:
                     previous_week = week
@@ -348,7 +360,7 @@ class BlaReleaseBrowser(blaguiutils.BlaScrolledWindow):
 
         model = treeview.get_model()
         release = model[path][0]
-        if not isinstance(release, BlaReleaseBrowser.Release): return True
+        if not isinstance(release, BlaRelease): return True
         if event.button in [1, 2]:
             if event.type in [gtk.gdk._2BUTTON_PRESS, gtk.gdk._3BUTTON_PRESS]:
                 return True
@@ -386,7 +398,18 @@ class BlaReleaseBrowser(blaguiutils.BlaScrolledWindow):
         return date + timedelta, date + timedelta + datetime.timedelta(days=6)
 
     def restore(self):
-        # TODO: restore saved releases
+        releases = blautils.deserialize_from_file(blaconst.RELEASES_PATH)
+        if releases:
+            model = gtk.ListStore(gobject.TYPE_PYOBJECT)
+            # pixbufs aren't initialized when they're unpickled so we need to
+            # instantiate them while restoring. to speed up restoring we force
+            # the use of possibly cached images by passing True as `restore'
+            # kwarg
+            for release in releases:
+                try: release.get_cover(restore=True)
+                except AttributeError: pass
+            [model.append([release]) for release in releases]
+            self.__treeview.set_model(model)
 
         # check for new releases now and every two hours
         self.__update_models()

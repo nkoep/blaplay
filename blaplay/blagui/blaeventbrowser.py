@@ -33,47 +33,43 @@ from blaplay import blacfg, blaconst, blautils, blafm
 from blaplay.blagui import blaguiutils
 from blareleasebrowser import IMAGE_SIZE, BlaCellRendererPixbuf
 
+class BlaEvent(object):
+    __EMPTY_PIXBUF = gtk.gdk.Pixbuf(gtk.gdk.COLORSPACE_RGB, True, 8,
+                IMAGE_SIZE, IMAGE_SIZE)
+    __EMPTY_PIXBUF.fill(0)
 
-class BlaEventBrowser(blaguiutils.BlaScrolledWindow):
-    __gsignals__ = {
-        "count_changed": blaplay.signal(2)
-    }
-    __count_recommended = 0
-    __count_all = 0
-    __lock = blautils.BlaLock(strict=True)
+    def __init__(self, raw):
+        self.__raw = raw
+        self.event_name = raw["title"]
+        self.event_url = raw["url"]
+        self.cancelled = bool(int(raw["cancelled"]))
+        self.artists = [raw["artists"]["headliner"]]
+        artists = raw["artists"]["artist"]
+        if not hasattr(artists, "__iter__"): artists = [artists]
+        [self.artists.append(artist) for artist in artists
+                if artist not in self.artists]
+        try: self.artists.remove(self.event_name)
+        except ValueError: pass
+        self.date = time.strftime(
+                "%A %d %B %Y", parse_rfc_time(raw["startDate"])[:-1])
+        self.image = BlaEvent.__EMPTY_PIXBUF
+        venue = raw["venue"]
+        self.venue = venue["name"]
+        self.city = venue["location"]["city"]
+        self.country = venue["location"]["country"]
 
-    class Event(object):
-        def __init__(self, raw):
-            self.__raw = raw
-            self.event_name = raw["title"]
-            self.event_url = raw["url"]
-            self.cancelled = bool(int(raw["cancelled"]))
-            self.artists = [raw["artists"]["headliner"]]
-            artists = raw["artists"]["artist"]
-            if not hasattr(artists, "__iter__"): artists = [artists]
-            [self.artists.append(artist) for artist in artists
-                    if artist not in self.artists]
-            try: self.artists.remove(self.event_name)
-            except ValueError: pass
-            self.date = time.strftime(
-                    "%A %d %B %Y", parse_rfc_time(raw["startDate"])[:-1])
-            self.image = gtk.gdk.Pixbuf(gtk.gdk.COLORSPACE_RGB, True, 8,
-                    IMAGE_SIZE, IMAGE_SIZE)
-            self.image.fill(0)
-            venue = raw["venue"]
-            self.venue = venue["name"]
-            self.city = venue["location"]["city"]
-            self.country = venue["location"]["country"]
-
-        def get_image(self, image_base):
-            pixbuf = path = None
-            for ext in ["jpg", "png"]:
-                try:
-                    path = "%s.%s" % (image_base, ext)
-                    pixbuf = gtk.gdk.pixbuf_new_from_file(path)
-                    break
-                except gobject.GError: pass
-            else:
+    def get_image(self, restore=False):
+        image_base = os.path.join(
+                blaconst.EVENTS, ("%s" % self.event_name).replace(" ", "_"))
+        pixbuf = path = None
+        for ext in ["jpg", "png"]:
+            try:
+                path = "%s.%s" % (image_base, ext)
+                pixbuf = gtk.gdk.pixbuf_new_from_file(path)
+                break
+            except gobject.GError: pass
+        else:
+            if not restore:
                 url = blafm.get_image_url(self.__raw["image"])
                 try:
                     image, message = urllib.urlretrieve(url)
@@ -83,30 +79,38 @@ class BlaEventBrowser(blaguiutils.BlaScrolledWindow):
                     pixbuf = gtk.gdk.pixbuf_new_from_file(path)
                 except (IOError, gobject.GError): pass
 
-            # resize until the smaller dimension reaches IMAGE_SIZE, then crop
-            # IMAGE_SIZE x IMAGE_SIZE pixels from the center of the image in
-            # case of a landscape image and from the top in case of a portrait
-            try:
-                width, height = pixbuf.get_width(), pixbuf.get_height()
-                # portrait
-                if width < height:
-                    height = int(height * (IMAGE_SIZE / float(width)))
-                    width = IMAGE_SIZE
-                    x = y = 0
-                # landscape
-                else:
-                    width = int(width * (IMAGE_SIZE / float(height)))
-                    height = IMAGE_SIZE
-                    x = int((width - IMAGE_SIZE) / 2)
-                    y = 0
-                pixbuf = pixbuf.scale_simple(
-                        width, height, gtk.gdk.INTERP_HYPER).subpixbuf(
-                        x, y, IMAGE_SIZE, IMAGE_SIZE
-                )
+        # resize until the smaller dimension reaches IMAGE_SIZE, then crop
+        # IMAGE_SIZE x IMAGE_SIZE pixels from the center of the image in
+        # case of a landscape image and from the top in case of a portrait
+        try:
+            width, height = pixbuf.get_width(), pixbuf.get_height()
+            # portrait
+            if width < height:
+                height = int(height * (IMAGE_SIZE / float(width)))
+                width = IMAGE_SIZE
+                x = y = 0
+            # landscape
+            else:
+                width = int(width * (IMAGE_SIZE / float(height)))
+                height = IMAGE_SIZE
+                x = int((width - IMAGE_SIZE) / 2)
+                y = 0
+            pixbuf = pixbuf.scale_simple(
+                    width, height, gtk.gdk.INTERP_HYPER).subpixbuf(
+                    x, y, IMAGE_SIZE, IMAGE_SIZE
+            )
 
-            except (AttributeError, gobject.GError): pass
-            self.image = pixbuf
-            return path
+        except (AttributeError, gobject.GError): pass
+        self.image = pixbuf or BlaEvent.__EMPTY_PIXBUF
+        return path
+
+class BlaEventBrowser(blaguiutils.BlaScrolledWindow):
+    __gsignals__ = {
+        "count_changed": blaplay.signal(2)
+    }
+    __count_recommended = 0
+    __count_all = 0
+    __lock = blautils.BlaLock(strict=True)
 
     def __init__(self):
         super(BlaEventBrowser, self).__init__()
@@ -273,6 +277,13 @@ class BlaEventBrowser(blaguiutils.BlaScrolledWindow):
         if active == blaconst.EVENTS_RECOMMENDED:
             hbox_location.set_visible(False)
 
+        gtk.quit_add(0, self.__save)
+
+    def __save(self):
+        events = [row[0] for row in self.__treeview.get_model()]
+        blautils.serialize_to_file(events, blaconst.EVENTS_PATH)
+        return 0
+
     def __change_location(self, button, location):
         diag = gtk.Dialog(title="Change location",
                 buttons=(gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL,
@@ -333,9 +344,7 @@ class BlaEventBrowser(blaguiutils.BlaScrolledWindow):
         def worker():
             while True:
                 event = queue.get()
-                image_base = os.path.join(blaconst.EVENTS, ("%s" %
-                        event.event_name).replace(" ", "_"))
-                path = event.get_image(image_base)
+                path = event.get_image()
                 if path: images.add(path)
                 queue.task_done()
         images = set()
@@ -369,7 +378,7 @@ class BlaEventBrowser(blaguiutils.BlaScrolledWindow):
             model = gtk.ListStore(gobject.TYPE_PYOBJECT)
             previous_date = None
             for event in events:
-                event = BlaEventBrowser.Event(event)
+                event = BlaEvent(event)
                 date = event.date
                 if previous_date != date:
                     previous_date = date
@@ -391,6 +400,9 @@ class BlaEventBrowser(blaguiutils.BlaScrolledWindow):
         # changes to any gtk elements should be done in the main thread so wrap
         # the respective calls in idle_add's
         gobject.idle_add(set_sensitive, True)
+        # TODO: only set the model when we verified that we successfully
+        #       retrieved event information. this avoids that we delete a
+        #       restored model
         gobject.idle_add(self.__treeview.set_model, self.__models[active])
 
         if active == blaconst.EVENTS_RECOMMENDED:
@@ -424,7 +436,7 @@ class BlaEventBrowser(blaguiutils.BlaScrolledWindow):
 
         model = treeview.get_model()
         event_ = model[path][0]
-        if not isinstance(event_, BlaEventBrowser.Event): return True
+        if not isinstance(event_, BlaEvent): return True
         if event.button in [1, 2]:
             if event.type in [gtk.gdk._2BUTTON_PRESS, gtk.gdk._3BUTTON_PRESS]:
                 return True
@@ -442,6 +454,19 @@ class BlaEventBrowser(blaguiutils.BlaScrolledWindow):
         return False
 
     def restore(self):
+        events = blautils.deserialize_from_file(blaconst.EVENTS_PATH)
+        if events:
+            model = gtk.ListStore(gobject.TYPE_PYOBJECT)
+            # pixbufs aren't initialized when they're unpickled so we need to
+            # instantiate them while restoring. to speed up restoring we force
+            # the use of possibly cached images by passing True as `restore'
+            # kwarg
+            for event in events:
+                try: event.get_image(restore=True)
+                except AttributeError: pass
+            [model.append([event]) for event in events]
+            self.__treeview.set_model(model)
+
         # check for new events now and every two hours
         self.__update_models()
         gobject.timeout_add(2 * 3600 * 1000, self.__update_models)
