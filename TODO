@@ -1,15 +1,14 @@
 Short-term:
 - store tag values as list instead of strings joined by "\n"
-- enhance command-line interface
+- enhance command-line interface (goes hand in hand with conforming to the
+  MPRIS specifications as defined by freedesktop.org)
 - enhance tag editor (parse tags from filename)
 - get a proper logo
 - write up some crude unit/regression tests
 - improve internet radio support (cf. blaplay/blagui/blaradio.py)
 - improve lyrics fetcher (more robust search, more search engines)
-- lower memory footprint
 - improve/speed up "remove duplicates" functionality and extend the feature to
   the queue as well
-- improve startup speed/reduce import overhead
 - implement shuffle albums/repeat album playback modes
 - implement peeking (tooltips for previous/next/random buttons showing which
   track would be played if button was clicked)
@@ -20,6 +19,8 @@ Short-term:
 - add spectrogram (+ 3D spectrogram) visualization(s) if feasible
 
 Long-term:
+- lower memory footprint
+- improve startup speed/reduce import overhead
 - QTableView clone in GTK to allow cells to span across multiple columns
   (required for grouping in playlists)
 - port to GI once stability/performance is satisfying

@@ -120,6 +120,7 @@ class BlaFetcher(gobject.GObject):
             ("http://megalyrics.ru/lyric/%s/%s.htm", artist, title, "_",
              "//pre[@class=\"lyric\"]", FORMAT_HTML)
         ]
+        # http://www.lyricscollege.com/artist_name-track_title_lyrics/
 
         # FIXME: line feeds in results from megalyrics are somehow removed
 

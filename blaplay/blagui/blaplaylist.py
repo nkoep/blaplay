@@ -2259,12 +2259,8 @@ class BlaPlaylist(gtk.Notebook):
             playlist.destroy()
             del playlist
 
-        # create an empty new playlist if we just removed the last one
         if cls.__instance.get_n_pages() < 1: cls.__instance.add_playlist()
-
-        # select the actively viewed playlist as the new current playlist to
-        # pick tracks from on track change
-        cls.active = cls.__instance.__get_current_page()
+        if cls.active is None: cls.active = cls.__instance.__get_current_page()
 
         cls.__instance.emit("count_changed", blaconst.VIEW_PLAYLISTS,
                 cls.__instance.get_n_pages())
