@@ -840,9 +840,12 @@ class BlaQueue(blaguiutils.BlaScrolledWindow):
         for row in cls.__queue:
             identifier = row[0]
             try: track = library[BlaPlaylist.uris[identifier]]
-            except KeyError: track = library[identifier]
-            cls.__size += track[FILESIZE]
-            cls.__length += track[LENGTH]
+            except KeyError:
+                try: track = library[identifier]
+                except KeyError: track = None
+            if track:
+                cls.__size += track[FILESIZE]
+                cls.__length += track[LENGTH]
         cls.__instance.emit(
                 "count_changed", blaconst.VIEW_QUEUE, cls.get_queue_count())
         cls.__instance.update_statusbar()
