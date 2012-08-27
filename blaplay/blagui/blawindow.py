@@ -189,7 +189,7 @@ class BlaWindow(gtk.Window):
         self.__view = BlaView()
         self.__statusbar = BlaStatusbar()
 
-        player.connect("state_changed", self.__update_title)
+        player.connect("state_changed", self.update_title)
 
         # pack the browser + view-widget into a gtk.HPane instance
         hpane = gtk.HPaned()
@@ -233,6 +233,31 @@ class BlaWindow(gtk.Window):
         self.child.show()
         self.show()
         self.__keys = BlaKeys()
+
+    def update_title(self, *args):
+        track = player.get_track()
+        state = player.get_state()
+
+        if state == blaconst.STATE_STOPPED or not track:
+            title = "%s %s" % (blaconst.APPNAME, blaconst.VERSION)
+            tooltip = "Stopped"
+
+        else:
+            if player.radio:
+                title = track[TITLE] or "%s - %s" % (
+                        blaconst.APPNAME, track["organization"])
+            else:
+                artist = track[ARTIST]
+                title = track[TITLE] or "?"
+                if artist and title: title = "%s - %s" % (artist, title)
+                else: title = track.basename
+
+            tooltip = title
+
+        self.set_title(title)
+        blagui.tray.set_tooltip(tooltip)
+        if not blacfg.getboolean("general", "tray.tooltip"):
+            blagui.tray.set_has_tooltip(False)
 
     def raise_window(self):
         self.show()
@@ -314,31 +339,6 @@ class BlaWindow(gtk.Window):
         if not blacfg.getboolean("general", "maximized"):
             blacfg.set("general", "size", "%d, %d" % size)
             blacfg.set("general", "position", "%d, %d" % position)
-
-    def __update_title(self, *args):
-        track = player.get_track()
-        state = player.get_state()
-
-        if state == blaconst.STATE_STOPPED or not track:
-            title = "%s %s" % (blaconst.APPNAME, blaconst.VERSION)
-            tooltip = "Stopped"
-
-        else:
-            if player.radio:
-                title = track[TITLE] or "%s - %s" % (
-                        blaconst.APPNAME, track["organization"])
-            else:
-                artist = track[ARTIST]
-                title = track[TITLE] or "?"
-                if artist and title: title = "%s - %s" % (artist, title)
-                else: title = track.basename
-
-            tooltip = title
-
-        self.set_title(title)
-        blagui.tray.set_tooltip(tooltip)
-        if not blacfg.getboolean("general", "tray.tooltip"):
-            blagui.tray.set_has_tooltip(False)
 
     def __open_playlist(self, window):
         diag = gtk.FileChooserDialog("Select playlist",
