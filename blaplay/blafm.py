@@ -93,20 +93,15 @@ def get_popup_menu(track=None):
     return menu
 
 def post_message(params):
-    error, response = 1, ""
+    error, response = 1, "Socket error"
     conn = httplib.HTTPConnection("ws.audioscrobbler.com")
     params.append(("format", "json"))
     header = {"Content-type": "application/x-www-form-urlencoded"}
     try: conn.request("POST", "/2.0/?", urllib.urlencode(dict(params)), header)
-    except socket.gaierror as (error, response): pass
-    except socket.error as (error, response): pass
+    except (socket.gaierror, socket.error) as (error, response): pass
     else:
         try: response = conn.getresponse()
-        # FIXME: catching only BadStatusLine exceptions might be what's still
-        #        causing exceptions being raised on interpreter shutdown. it's
-        #        also the place where a lot of exceptions are raised if last.fm
-        #        is down again
-        except: pass# httplib.BadStatusLine: pass
+        except httplib.BadStatusLine: pass
         else:
             try: response = json.loads(response.read())
             except ValueError:
@@ -140,7 +135,6 @@ def get_image_url(images):
 
 def get_cover(track, image_base):
     path, cover = None, None
-
     url = "%s&method=album.getinfo&album=%s&artist=%s&autocorrect=1" % (
             blaconst.LASTFM_BASEURL, track[ALBUM].replace("&", "and"),
             track[ARTIST].replace("&", "and")
@@ -172,6 +166,7 @@ def get_biography(track, image_base):
     url = "%s&method=artist.getinfo&artist=%s" % (
             blaconst.LASTFM_BASEURL, track[ARTIST])
     url = quote_url(url)
+    print url
     error, response = get_response(url, "artist")
 
     try: images = response["image"]
@@ -190,7 +185,7 @@ def get_biography(track, image_base):
         biography = blautils.remove_html_tags(
                 biography.replace(LEGAL_NOTICE, "").strip())
 
-    if error or not image or not biography:
+    if error or response is None:
         print_d("Failed to retrieve artist biography: %s (error %d)"
                 % (response, error))
 
