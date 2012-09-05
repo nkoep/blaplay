@@ -68,14 +68,15 @@ class BlaPlayer(gobject.GObject):
     def __init_pipeline(self):
         bin = gst.Bin()
 
-        filt = gst.element_factory_make('capsfilter')
+        filt = gst.element_factory_make("capsfilter")
         filt.set_property("caps", gst.caps_from_string(
-                "audio/x-raw-float, rate=(int)44100, channels=(int)2"))
+                "audio/x-raw-float, rate=(int)44100, channels=(int)2, "
+                "width=(int)32, depth=(int)32, endianness=(int)1234")
+        )
         self.__equalizer = gst.element_factory_make("equalizer-10bands")
         tee = gst.element_factory_make("tee")
         queue = gst.element_factory_make("queue")
         queue.set_property("silent", True)
-        queue.set_property("leaky", True)
 
         def new_buffer(sink): self.emit("new_buffer", sink.emit("pull_buffer"))
         appsink = gst.element_factory_make("appsink")
@@ -128,23 +129,23 @@ class BlaPlayer(gobject.GObject):
             self.next(force_advance=False)
         elif message.type == gst.MESSAGE_TAG:
             self.__parse_tags(message.parse_tag())
-
         elif message.type == gst.MESSAGE_BUFFERING:
+            # we can't import from blastatusbar on module level as it'd create
+            # circular imports
             from blaplay.blagui.blastatusbar import BlaStatusbar
             percentage = message.parse_buffering()
-            if percentage % 10 == 0:
-                s = "Buffering: %d %%" % percentage
-                print_d(s)
-                gobject.idle_add(
-                        BlaStatusbar.set_view_info, blaconst.VIEW_RADIO, s)
-            if percentage == 100:
+            s = "Buffering: %d %%" % percentage
+            gobject.idle_add(
+                    BlaStatusbar.set_view_info, blaconst.VIEW_RADIO, s)
+            if percentage == 0: print_d("Start buffering...")
+            elif percentage == 100:
                 self.__bin.set_state(gst.STATE_PLAYING)
                 self.__state = blaconst.STATE_PLAYING
                 self.emit("track_changed")
                 self.emit("state_changed")
                 gobject.timeout_add(2000,
                         BlaStatusbar.set_view_info, blaconst.VIEW_RADIO, "")
-
+                print_d("Finished buffering")
         elif message.type == gst.MESSAGE_ERROR:
             self.stop()
             err, debug = message.parse_error()
