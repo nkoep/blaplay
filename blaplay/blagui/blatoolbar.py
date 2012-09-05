@@ -38,7 +38,6 @@ class PositionSlider(gtk.HScale):
 
     def __init__(self):
         super(PositionSlider, self).__init__()
-
         self.set_draw_value(False)
 
         self.connect("key_press_event", lambda *x: True)
@@ -52,7 +51,7 @@ class PositionSlider(gtk.HScale):
         self.__seekid = gobject.timeout_add(
                 self.__seek_interval, self.__update_position)
 
-    def __scroll_timeout(self, direction):
+    def __scroll_timeout(self):
         player.seek(self.get_value())
         self.__seeking = False
         return False
@@ -63,7 +62,7 @@ class PositionSlider(gtk.HScale):
         if self.__scrollid: gobject.source_remove(self.__scrollid)
         self.__seeking = True
         self.__scrollid = gobject.timeout_add(
-                self.__scroll_delay, self.__scroll_timeout, event.direction)
+                self.__scroll_delay, self.__scroll_timeout)
         return False
 
     def __value_changed(self, scale):
@@ -86,8 +85,8 @@ class PositionSlider(gtk.HScale):
             # the slider length (upper bound of the adjustment) is directly
             # proportional to the track length (in fact, it's the length of the
             # track in nanoseconds). the offset we should add to the position
-            # (number of units the slider would move in one update step) can be
-            # calculated as 1e6 * __seek_interval.
+            # (number of units the slider would move in one update step) can
+            # thus be calculated to 1e6 * __seek_interval.
             player.seek(self.get_value() + 1e6 * self.__seek_interval)
             self.__changed = False
 
@@ -99,7 +98,7 @@ class PositionSlider(gtk.HScale):
                 not state == blaconst.STATE_STOPPED and
                 not self.__seeking):
             position = player.get_position()
-            if position != -1:
+            if position != 0:
                 self.set_value(position)
                 BlaStatusbar.update_position(position)
         return True
