@@ -36,7 +36,7 @@ import pango
 import numpy as np
 
 import blaplay
-from blaplay import blacfg, blaconst
+from blaplay import blacfg, blaconst, blautils
 
 cdef extern from "math.h":
     float fmaxf(float, float)
@@ -124,6 +124,7 @@ cdef class Spectrum(object):
         def __get__(self): return 154
 
     # variables needed to calculate the spectrum
+    cdef object __lock
     cdef object __adapter
     cdef int __bands
     cdef fftwf_plan __plan
@@ -147,6 +148,8 @@ cdef class Spectrum(object):
         self.__log_freq = NULL
 
     def __init__(self):
+        self.__lock = blautils.BlaLock(strict=True)
+
         # basically we want a 65 dB dynamic range to cover the entire height.
         # we draw seven levels so we choose a height which is divisible by it,
         # i.e. 154 / 7 = 22. now we add a margin of 5 dB to the top and bottom
@@ -253,13 +256,18 @@ cdef class Spectrum(object):
 
     @cython.boundscheck(False)
     cpdef new_buffer(self, object buf):
-        self.__adapter.push(buf)
-        # when the main window is hidden the draw method isn't called which
-        # means buffers are never flushed. therefore we make sure here that we
-        # never store more than 500 ms worth of buffers (two channels, four
-        # bytes per sample, 22050 samples every 500 ms: 44100 * 4 bytes)
-        cdef int l = self.__adapter.available() - 44100 * 4
-        if l > 0: self.__adapter.flush(l)
+        # buffers are added and consumed in different threads so we need to
+        # lock the GstAdapter as it's not thread-safe
+        cdef int l
+        with self.__lock:
+            self.__adapter.push(buf)
+            # when the main window is hidden the draw method isn't called which
+            # means buffers are never flushed. therefore we make sure here that
+            # we never store more than 500 ms worth of samples (two channels,
+            # four bytes per sample, 22050 samples every 500 ms:
+            # 44100 * 4 bytes)
+            l = self.__adapter.available() - 44100 * 4
+            if l > 0: self.__adapter.flush(l)
 
     @cython.boundscheck(False)
     cpdef flush_buffers(self):
@@ -280,11 +288,13 @@ cdef class Spectrum(object):
         cdef float *log_freq = self.__log_freq
         cdef float offset = OFFSET
 
+        # get buffers from the adapter
         cdef np.ndarray[f32_t, ndim=1] np_buf
-        if self.__adapter.available() > 0:
-            np_buf = np.frombuffer(self.__adapter.take_buffer(
-                    min(self.__adapter.available(), 2 * 4 * 1260)), dtype=f32)
-        else: np_buf = np.zeros(NFFT * 2, f32)
+        with self.__lock:
+            if self.__adapter.available() > 0:
+                np_buf = np.frombuffer(self.__adapter.take_buffer(min(
+                        self.__adapter.available(), 2 * 4 * 1260)), dtype=f32)
+            else: np_buf = np.zeros(NFFT * 2, f32)
 
         _buf = <float*> np_buf.data
         l = min(len(np_buf), NFFT * 2)
