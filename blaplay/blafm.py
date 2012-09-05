@@ -101,7 +101,7 @@ def post_message(params):
     except (socket.gaierror, socket.error) as (error, response): pass
     else:
         try: response = conn.getresponse()
-        except httplib.BadStatusLine: pass
+        except (httplib.BadStatusLine, socket.error): pass
         else:
             try: response = json.loads(response.read())
             except ValueError:
@@ -166,7 +166,6 @@ def get_biography(track, image_base):
     url = "%s&method=artist.getinfo&artist=%s" % (
             blaconst.LASTFM_BASEURL, track[ARTIST])
     url = quote_url(url)
-    print url
     error, response = get_response(url, "artist")
 
     try: images = response["image"]
