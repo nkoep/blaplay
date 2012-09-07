@@ -16,13 +16,11 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-import sys
-
 import blaplay
 
 
 blaplay.parse_args()
-if blaplay.check_singleton(__file__): sys.exit()
+blaplay.force_singleton(__file__)
 
 if __name__ == "__main__":
     from blaplay import blacfg, bladb, blaplayer, blagui

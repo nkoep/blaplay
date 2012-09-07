@@ -18,6 +18,7 @@
 import __builtin__
 import sys
 import os
+import fcntl
 import logging
 
 import gobject
@@ -35,6 +36,7 @@ except ImportError:
             sys.exit()
     bladbus = BlaDBus()
 
+fd = None
 debug = False
 quiet = False
 metadata = {"bio": {}, "lyrics": {}}
@@ -43,7 +45,9 @@ metadata = {"bio": {}, "lyrics": {}}
 def signal(n_args):
     return (gobject.SIGNAL_RUN_LAST, gobject.TYPE_NONE, (object,) * n_args)
 
-def check_singleton(filepath):
+def force_singleton(filepath):
+    global fd
+
     # set up logger and messaging functions
     def critical(msg):
         logging.critical(msg)
@@ -58,10 +62,9 @@ def check_singleton(filepath):
         level = logging.INFO
     logging.basicConfig(format=format, level=level)
 
-    # FIXME: if colors are set for WARNING and CRITICAL no output is produced
     colors = [
         (logging.INFO, "34"), (logging.DEBUG, "35"),
-#            (logging.WARNING, "32"), (logging.CRITICAL, "31")
+        (logging.WARNING, "32"), (logging.CRITICAL, "31")
     ]
     for level, color in colors:
         logging.addLevelName(level, "\033[1;%sm%s\033[1;m"
@@ -86,32 +89,10 @@ def check_singleton(filepath):
                 if errno != 17: raise
 
     pid = os.getpid()
-    if os.path.isfile(blaconst.PIDFILE):
-        filepath = os.path.realpath(filepath)
-        # pidfile exists so check if it names a zombie or re-assigned pid
-        try:
-            with open(blaconst.PIDFILE, "r") as f: old_pid = f.read()
-        except IOError: pass
-
-        try:
-            with open("/proc/%s/cmdline" % old_pid, "r") as f:
-                cmdline = f.read().strip()
-        except IOError:
-            # there is no process associated with old_pid so get rid of it
-            os.unlink(blaconst.PIDFILE)
-        else:
-            # old_pid actually has an entry in /proc, so check if the cmdline
-            # corresponds to an invocation of blaplay or if the pid was
-            # reassigned to another process
-            cmdline = filter(None, cmdline.split("\x00"))
-            if ("python" in cmdline[0].lower() and
-                    filepath == os.path.realpath(cmdline[-1])):
-                bladbus.query_bus("raise_window")
-                return True
-
-    # we're running the first instance of `blaplay' so create a proper pidfile
-    with open(blaconst.PIDFILE, "w") as f: f.write(str(pid))
-    return False
+    fd = open(blaconst.PIDFILE, "w")
+    try: fcntl.lockf(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except IOError: sys.exit()
+    fd.write(str(pid))
 
 def parse_args():
     from argparse import ArgumentParser, RawTextHelpFormatter
@@ -227,6 +208,8 @@ def clean_up():
     blautils.BlaThread.clean_up()
     save_metadata()
     blacfg.save()
+
+    fcntl.lockf(fd, fcntl.LOCK_UN)
     try: os.unlink(blaconst.PIDFILE)
     except OSError: pass
 
