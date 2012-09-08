@@ -36,17 +36,18 @@ except ImportError:
             sys.exit()
     bladbus = BlaDBus()
 
-fd = None
+lock_file = None
 debug = False
 quiet = False
 metadata = {"bio": {}, "lyrics": {}}
+cli_queue = None
 
 
 def signal(n_args):
     return (gobject.SIGNAL_RUN_LAST, gobject.TYPE_NONE, (object,) * n_args)
 
 def force_singleton(filepath):
-    global fd
+    global lock_file, cli_queue
 
     # set up logger and messaging functions
     def critical(msg):
@@ -89,14 +90,17 @@ def force_singleton(filepath):
                 if errno != 17: raise
 
     pid = os.getpid()
-    fd = open(blaconst.PIDFILE, "w")
-    try: fcntl.lockf(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-    except IOError: sys.exit()
-    fd.write(str(pid))
+    lock_file = open(blaconst.PIDFILE, "w")
+    try: fcntl.lockf(lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except IOError:
+        bladbus.query_bus(*cli_queue)
+        cli_queue = None
+        sys.exit()
+    lock_file.write(str(pid))
 
 def parse_args():
     from argparse import ArgumentParser, RawTextHelpFormatter
-    global quiet, debug
+    global quiet, debug, cli_queue
 
     def parse_cmdline(args=None):
         parser = ArgumentParser(add_help=False,
@@ -144,14 +148,12 @@ def parse_args():
     # player info formatting
     if args["format"]: bladbus.query_bus(args["format"][0])
 
-    # TODO: if URI is not empty on first run we need to wait for blaplay to be
-    #       initialized before we can add the URIs to any playlist
     if args["URI"]:
-        uris = args["URI"]
         if args["append"]: action = "append"
         elif args["new"]: action = "new"
         else: action = "replace"
-#        bladbus.query_bus(uris, action)
+        n = lambda uri: os.path.normpath(os.path.abspath(uri))
+        cli_queue = (action, map(n, args["URI"]))
 
     # player commands
     if args["play_pause"]: bladbus.query_bus("play_pause")
@@ -209,7 +211,7 @@ def clean_up():
     save_metadata()
     blacfg.save()
 
-    fcntl.lockf(fd, fcntl.LOCK_UN)
+    fcntl.lockf(lock_file, fcntl.LOCK_UN)
     try: os.unlink(blaconst.PIDFILE)
     except OSError: pass
 

@@ -2201,6 +2201,14 @@ class BlaPlaylist(gtk.Notebook):
             BlaQueue.restore_queue(queue)
         else: self.add_playlist()
 
+        try: action, uris = blaplay.cli_queue
+        except TypeError: pass
+        else:
+            if action == "append": f = BlaPlaylist.add_to_current_playlist
+            elif action == "new": f = BlaPlaylist.send_to_new_playlist
+            else: f = BlaPlaylist.send_to_current_playlist
+            f("", uris, resolve=True)
+
     @classmethod
     def add_playlist(cls, name=None, query_name=False, focus=False):
         list_name = ""
@@ -2309,6 +2317,7 @@ class BlaPlaylist(gtk.Notebook):
         cls.__instance.__get_current_page().remove_invalid_tracks()
 
     @classmethod
+    @blautils.gtk_thread
     def send_to_current_playlist(cls, name, uris, resolve=False):
         playlist = cls.__instance.__get_current_page()
         if resolve: uris = library.parse_ool_uris(uris)
@@ -2320,6 +2329,7 @@ class BlaPlaylist(gtk.Notebook):
         force_view()
 
     @classmethod
+    @blautils.gtk_thread
     def add_to_current_playlist(cls, name, uris, resolve=False):
         playlist = cls.__instance.__get_current_page()
         if resolve: uris = library.parse_ool_uris(uris)
@@ -2329,6 +2339,7 @@ class BlaPlaylist(gtk.Notebook):
         force_view()
 
     @classmethod
+    @blautils.gtk_thread
     def send_to_new_playlist(cls, name, uris, resolve=False):
         if resolve: uris = library.parse_ool_uris(uris)
         if not uris: return

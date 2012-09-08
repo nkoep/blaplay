@@ -37,15 +37,14 @@ def setup_bus():
     bus_name = dbus.service.BusName(SERVICE, bus)
     BlaDBus(object_path="/BlaDBus", bus_name=bus_name)
 
-# TODO: abstract this in a better way
-def query_bus(query):
+def query_bus(query, arg=None):
     try:
         bus = dbus.SessionBus()
         try: proxy = bus.get_object(SERVICE, "/BlaDBus")
         except: sys.exit()
         interface = dbus.Interface(proxy, INTERFACE)
 
-        if type(query) == list:
+        if isinstance(query, list):
             args = query[0].split("%")
             for idx, arg in enumerate(args):
                 if arg != "": continue
@@ -72,7 +71,9 @@ def query_bus(query):
             elif query == "next": interface.next()
             elif query == "previous": interface.previous()
             elif query == "raise_window": interface.raise_window()
-    except: pass
+            elif query in ["append", "new", "replace"] and arg:
+                interface.parse_uris(query, arg)
+    except: raise#pass
     sys.exit()
 
 
@@ -132,15 +133,12 @@ class BlaDBus(dbus.service.Object):
         from blaplay import blagui
         blagui.bla.raise_window()
 
-    @dbus.service.method(dbus_interface=INTERFACE, in_signature="as",
+    @dbus.service.method(dbus_interface=INTERFACE, in_signature="sas",
             out_signature="")
-    def add_to_current_playlist(self, filenames):
+    def parse_uris(self, action, uris):
         from blaplay.blagui.blaplaylist import BlaPlaylist
-        BlaPlaylist.add_to_current_playlist("", filenames, resolve=True)
-
-    @dbus.service.method(dbus_interface=INTERFACE, in_signature="as",
-            out_signature="")
-    def send_to_new_playlist(self, filenames):
-        from blaplay.blagui.blaplaylist import BlaPlaylist
-        BlaPlaylist.send_to_new_playlist("", filenames, resolve=True)
+        if action == "append": f = BlaPlaylist.add_to_current_playlist
+        elif action == "new": f = BlaPlaylist.send_to_new_playlist
+        else: f = BlaPlaylist.send_to_current_playlist
+        f("", uris, True)
 

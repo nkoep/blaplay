@@ -16,6 +16,8 @@
 # Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
 import os
+import locale
+locale.setlocale(locale.LC_ALL, "")
 import shutil
 import time
 import re
@@ -114,6 +116,10 @@ class BlaLibraryMonitor(gobject.GObject):
         self.__process_events()
 
     def __queue_event(self, monitor, path_from, path_to, type_):
+        # FIXME: creating an empty directory and moving existing directories to
+        #        it causes an erroneous directory layout. at least the
+        #        `__detect_changes()' method of BlaLibrary fixes it on startup
+
         if type_ == gio.FILE_MONITOR_EVENT_CHANGES_DONE_HINT:
             event = EVENT_CHANGED
         elif type_ == gio.FILE_MONITOR_EVENT_DELETED:
@@ -596,6 +602,9 @@ class BlaLibrary(gobject.GObject):
         except KeyError: pass
 
     def move_track(self, path_from, path_to, md=""):
+        # FIXME: catch KeyError exceptions when moving files that are not in
+        #        the library
+
         # when a file is moved we create an entry for the new path in the
         # __tracks dict and move the old track to __tracks_ool. this is
         # necessary because some elements like the player, scrobbler or a
@@ -706,7 +715,7 @@ class BlaLibrary(gobject.GObject):
             gobject.source_remove(tid)
 
             pb.switch_mode()
-            uris = sorted(files, key=str.lower)
+            uris = sorted(files, cmp=locale.strcoll)
             try: c = 1.0 / len(uris)
             except ZeroDivisionError: pass
 
@@ -734,6 +743,10 @@ class BlaLibrary(gobject.GObject):
         ns = {"uris": [], "wait": True, "done": False}
         p = process(ns, uris, pb)
         gobject.idle_add(p.next)
+
+        # FIXME: gtk.main_iteration() always returns True when it's called
+        #        before we entered a mainloop. this prevents the following loop
+        #        from properly processing all files passed to the CL on startup
 
         # this guarantees that we don't return before all URIs have been
         # checked, but normal event-processing still commences
