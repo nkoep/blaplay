@@ -104,7 +104,7 @@ def post_message(params):
         except (httplib.BadStatusLine, socket.error): pass
         else:
             try: response = json.loads(response.read())
-            except ValueError:
+            except (socket.timeout, ValueError):
                 error, response = response.status, response.reason
             else: error, response = 0, response
     conn.close()
@@ -113,10 +113,10 @@ def post_message(params):
 def get_response(url, key):
     error, response = 0, None
     try: f = urllib2.urlopen(url, timeout=TIMEOUT)
-    except (urllib2.URLError, IOError): pass
+    except (socket.timeout, urllib2.URLError, IOError): pass
     else:
         try: response = json.loads(f.read())
-        except ValueError: pass
+        except (socket.timeout, ValueError): pass
         else:
             f.close()
             try: response = response[key]

@@ -73,7 +73,7 @@ def query_bus(query, arg=None):
             elif query == "raise_window": interface.raise_window()
             elif query in ["append", "new", "replace"] and arg:
                 interface.parse_uris(query, arg)
-    except: raise#pass
+    except: pass
     sys.exit()
 
 
@@ -140,5 +140,5 @@ class BlaDBus(dbus.service.Object):
         if action == "append": f = BlaPlaylist.add_to_current_playlist
         elif action == "new": f = BlaPlaylist.send_to_new_playlist
         else: f = BlaPlaylist.send_to_current_playlist
-        f("", uris, True)
+        f("", uris, resolve=True)
 

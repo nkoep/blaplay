@@ -29,6 +29,8 @@ from blaplay.formats._identifiers import *
 
 FORMAT_XML, FORMAT_HTML = xrange(2)
 
+# TODO: - rewrite this
+#       - let urlopen and read calls on Request instances time out
 
 class BlaFetcher(gobject.GObject):
     __gsignals__ = {
