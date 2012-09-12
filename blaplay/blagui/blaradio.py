@@ -224,9 +224,10 @@ class BlaRadio(gtk.VBox):
         return False
 
     def restore(self):
-        station, stations = blautils.deserialize_from_file(
-                blaconst.STATIONS_PATH)
-        if not stations: return
+        try:
+            station, stations = blautils.deserialize_from_file(
+                  blaconst.STATIONS_PATH)
+        except TypeError: return
         model = self.__treeview.get_model()
         [model.append([None, station]) for station in stations]
         self.emit("count_changed",
