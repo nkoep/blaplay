@@ -40,3 +40,7 @@ BUGS/KNOWN ISSUES
   module is set to None. it might be related to killing a thread while we're
   trying to receive a reply from an httplib.HTTPConnection object. this might
   be avoidable by catching all exceptions, not just httplib.BadStatusLine
+- the GUI occasionally deadlocks on start-up. this is most-likely caused by
+  functions/methods which call gtk functions without encapsulating calls in a
+  gtk_threads_enter ... gtk_threads_leave block when they actually should
+

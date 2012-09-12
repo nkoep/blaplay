@@ -52,7 +52,7 @@ class Mp4(BlaTrack):
                 key = key[5:]
                 value = values
             elif self.__tag_to_literal.has_key(key):
-                value = "\n".join(map(unicode, values))
+                value = map(unicode, values)
             else: continue
             try: self[self.__tag_to_literal[key]] = value
             except KeyError: self[key] = value
@@ -96,7 +96,7 @@ class Mp4(BlaTrack):
                 try: v2 = int(values[1])
                 except (IndexError, ValueError): v2 = 0
                 audio[tag] = [(v1, v2)]
-            else: audio[tag] = values.split("\n")
+            else: audio[tag] = values
 
         audio.save()
         return True

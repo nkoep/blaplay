@@ -144,8 +144,8 @@ class Mp3(BlaTrack):
                 except IndexError: continue
 
             enc = frame.encoding
-            self[identifier] = "\n".join(map(
-                    fix_encoding, zip(value, [enc] * len(value))))
+            self[identifier] = map(
+                    fix_encoding, zip(value, [enc] * len(value)))
 
         # get all custom tags
         for tag in tags.getall("TXXX"):
@@ -153,8 +153,8 @@ class Mp3(BlaTrack):
             # special treatment
             if tag.desc == "ALBUM ARTIST": tag.desc = ALBUM_ARTIST
             enc = frame.encoding
-            self[tag.desc] = "\n".join(map(
-                    fix_encoding, zip(tag.text, [enc] * len(value))))
+            self[tag.desc] = map(
+                    fix_encoding, zip(tag.text, [enc] * len(value)))
 
         self._parse_info(audio.info)
         self[FORMAT] = "MP3"
@@ -184,9 +184,9 @@ class Mp3(BlaTrack):
             if not text: continue
 
             # utf-8 is ascii-compatible
-            if isascii(text): encoding = 3
+            if isascii("\n".join(text)): encoding = 3
             else: encoding = 1
-            kwargs = dict(encoding=encoding, text=text.split("\n"))
+            kwargs = dict(encoding=encoding, text=text)
 
             try:
                 tag = self.__literal_to_tag[identifier]

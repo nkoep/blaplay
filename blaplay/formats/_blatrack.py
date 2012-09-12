@@ -56,8 +56,10 @@ class BlaTrack(dict):
         # used
         try: item = dict.__getitem__(self, key)
         except KeyError: return ""
-        try: return item.split("\n")[0]
-        except AttributeError: return item
+        try:
+            if not isinstance(item, list): raise IndexError
+            return item[0]
+        except IndexError: return item
 
     def _parse_info(self, info):
         self[SAMPLING_RATE] = info.sample_rate

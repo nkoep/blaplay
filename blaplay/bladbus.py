@@ -49,13 +49,15 @@ def query_bus(query, arg=None):
             for idx, arg in enumerate(args):
                 if arg != "": continue
                 if (idx == len(args)-1 or
-                        args[idx+1][0] not in ["a", "t", "b", "c"]):
+                        args[idx+1][0] not in ["a", "t", "b", "y", "g", "c"]):
                     print_e("Invalid format string `%s'" % args)
 
             callbacks = {
-                "%a": lambda: interface.get_standard_value(ARTIST),
-                "%t": lambda: interface.get_standard_value(TITLE),
-                "%b": lambda: interface.get_standard_value(ALBUM),
+                "%a": lambda: interface.get_tag(ARTIST),
+                "%t": lambda: interface.get_tag(TITLE),
+                "%b": lambda: interface.get_tag(ALBUM),
+                "%y": lambda: interface.get_tag(DATE),
+                "%g": lambda: interface.get_tag(GENRE),
                 "%c": lambda: interface.get_cover()
             }
 
@@ -85,17 +87,16 @@ class BlaDBus(dbus.service.Object):
 
     @dbus.service.method(dbus_interface=INTERFACE, in_signature="i",
             out_signature="s")
-    def get_standard_value(self, value):
+    def get_tag(self, identifier):
         track = self.__player.get_track()
-        ret = ""
-        if not track[value]:
-            if value == ARTIST:
+        ret = track[identifier]
+        if not ret:
+            if identifier == ARTIST:
                 if self.__player.radio: ret = track["organization"]
                 else: ret = "?"
-            elif value == TITLE: ret = os.path.basename(track.path)
+            elif identifier == TITLE: ret = os.path.basename(track.path)
             else: ret = ""
-        else: ret = track[value]
-        return ret
+        return str(ret)
 
     @dbus.service.method(dbus_interface=INTERFACE, in_signature="",
             out_signature="s")

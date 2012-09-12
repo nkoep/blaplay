@@ -416,10 +416,8 @@ class BlaTagedit(blaguiutils.BlaWindow):
         try:
             r = self.__treeview_metadata.get_column(1).get_cell_renderers()[0]
             if r.get_property("editing"): raise AttributeError
-        except AttributeError: pass
-        else:
             if blagui.is_accel(event, "Escape"): self.__apply_and_close()
-
+        except AttributeError: pass
         return False
 
     def __cell_data_func_name(self, column, renderer, model, iterator):

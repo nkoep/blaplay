@@ -74,7 +74,7 @@ cdef float eps = np.finfo(f32).eps, OFFSET = 2 * log10f(NFFT)
 soname = ctypes.util.find_library("fftw3f")
 if soname is None:
     raise ImportError("Failed to locate the single-precision library of fftw3")
-lib = ctypes.cdll.LoadLibrary(soname)
+lib = ctypes.CDLL(soname)
 
 PyFile_AsFile = ctypes.pythonapi.PyFile_AsFile
 PyFile_AsFile.argtypes = [ctypes.py_object]

@@ -65,7 +65,7 @@ class Xiph(BlaTrack):
         for key, values in (audio.tags or {}).items():
             try: identifier = self.__tag_to_literal[key]
             except KeyError: identifier = key
-            self[identifier] = "\n".join(map(unicode, values))
+            self[identifier] = map(unicode, values)
 
         # in vorbis comments tracknumber and number of total tracks are stored
         # in different keys. the same goes for discs. we construct the form we
@@ -114,7 +114,7 @@ class Xiph(BlaTrack):
                 if (len(values) > 1 and
                         total not in self.keys_tags()):
                     tags[total] = values[1]
-            else: tags[tag] = values.split("\n")
+            else: tags[tag] = values
 
         audio.save()
         return True

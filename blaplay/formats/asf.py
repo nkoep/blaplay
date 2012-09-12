@@ -49,7 +49,7 @@ class Asf(BlaTrack):
 
         for key, values in (audio.tags or {}).items():
             try:
-                values = "\n".join(map(unicode, values))
+                values = map(unicode, values)
                 self[self.__tag_to_literal[key]] = values
             except UnicodeDecodeError: pass
             except KeyError: self[key] = values
@@ -79,7 +79,7 @@ class Asf(BlaTrack):
 
             try: tag = self.__literal_to_tag[identifier]
             except KeyError: tag = identifier
-            tags[tag] = values.split("\n")
+            tags[tag] = values
 
         audio.save()
         return True

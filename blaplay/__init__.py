@@ -124,7 +124,8 @@ def parse_args():
                 help="play previous track in current playlist")
         parser.add_argument("-f", "--format", nargs=1, help="print track "
                 "information and exit\n   %%a: artist\n   %%t: "
-                "title\n   %%b: album\n   %%c: cover", action="append"
+                "title\n   %%b: album\n   %%y: year"
+                "\n   %%g: genre\n   %%c: cover", action="append"
         )
         parser.add_argument("-d", "--debug", action="store_true", help="print "
                 "debug messages")
@@ -163,6 +164,7 @@ def parse_args():
 
 def init():
     import ctypes
+    import ctypes.util
     import gtk
     import signal
     from blaplay import blacfg, blafm
@@ -173,9 +175,11 @@ def init():
     signal.signal(signal.SIGINT, main_quit)
 
     gobject.set_prgname(blaconst.APPNAME)
-    lib = ctypes.CDLL("libc.so.6")
-    # 15 == PR_SET_NAME
-    lib.prctl(15, blaconst.APPNAME, 0, 0, 0)
+    try:
+        soname = ctypes.util.find_library("c")
+        # 15 == PR_SET_NAME
+        ctypes.CDLL(soname).prctl(15, blaconst.APPNAME, 0, 0, 0)
+    except AttributeError: pass
 
     # set up the D-Bus interface and last.fm services
     bladbus.setup_bus()

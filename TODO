@@ -1,6 +1,4 @@
 till 0.1:
-- store tag values as list instead of strings joined by "\n"
-- finish command-line interface
 - improve internet radio support (cf. blaplay/blagui/blaradio.py)
 - improve/speed up "remove duplicates" functionality and add the feature to the
   BlaQueue class
@@ -9,7 +7,8 @@ till 0.1:
 - add iPod support, possibly other players, too
 - support for CUE sheets
 - gapless playback
-- conform to the MPRIS specifications as defined by freedesktop.org
+- conform to the MPRIS specifications as defined by freedesktop.org and use
+  these exposed interfaces for respective CLI invocations
 - get covers from covertartarchive/musicbrainz if they're not on last.fm
 - implement shuffle albums/repeat album playback modes
 - implement peeking (tooltips for previous/next/random buttons showing which
@@ -22,8 +21,8 @@ till 0.1:
 0.3+:
 - lower memory footprint
 - improve startup speed/reduce import overhead
-- Qt's QTableView clone in GTK to allow cells to span across multiple columns
-  (required for grouping in playlists)
+- Qt's QTableView clone in GTK+ to allow cells to span across multiple columns
+  in order to be able to group tracks in playlists
 - port to GI once stability/performance is satisfying
 - py3k port once all required modules are ported (the main requirement
   being mutagen as Gtk and Gst won't be a problem once we ported to GI)
