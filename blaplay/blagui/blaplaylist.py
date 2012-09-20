@@ -736,13 +736,23 @@ class BlaQueue(blaguiutils.BlaScrolledWindow):
             if not paths or path == "append": raise TypeError
             if not path:
                 path, column = cls.__instance.__treeview.get_cursor()
-        except TypeError: insert_func = append
+        except TypeError:
+            path = (cls.__queue.iter_n_children(None),)
+            insert_func = append
         else:
             ns["iterator"] = cls.__queue.get_iter(path)
             insert_func = insert_before
             items.reverse()
 
         [insert_func(ns, item) for item in items]
+        if select_rows:
+            cls.__instance.__treeview.freeze_child_notify()
+            selection = cls.__instance.__treeview.get_selection()
+            s = selection.unselect_path
+            map(s, selection.get_selected_rows()[-1])
+            s = selection.select_path
+            map(s, xrange(path[0], path[0] + len(items)))
+            cls.__instance.__treeview.thaw_child_notify()
         cls.update_queue_positions()
 
     def play_track(self, treeview, path, column=None):
