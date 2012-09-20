@@ -1137,7 +1137,7 @@ class BlaPlaylist(gtk.Notebook):
             eval_ = BlaEval(column_id).eval
             tracks = map(BlaPlaylist.get_track_from_id, ids)
             values = set()
-            [values.add(eval_(track)) for track in tracks]
+            [values.add(eval_(track).lower()) for track in tracks]
 
             if self.__mode & MODE_FILTERED:
                 if self.__mode & MODE_SORTED: ids = self.__sorted
@@ -1148,7 +1148,7 @@ class BlaPlaylist(gtk.Notebook):
 
             tracks = map(BlaPlaylist.get_track_from_id, ids)
             ids = [identifier for identifier, track in zip(ids, tracks)
-                    if eval_(track) in values]
+                    if eval_(track).lower() in values]
 
             paths = map(self.get_path_from_id, ids)
             selection.unselect_all()
@@ -1172,7 +1172,7 @@ class BlaPlaylist(gtk.Notebook):
                 eval_ = BlaEval(column_id).eval
                 tracks = map(BlaPlaylist.get_track_from_id, ids)
                 values = set()
-                [values.add(eval_(track)) for track in tracks]
+                [values.add(eval_(track).lower()) for track in tracks]
 
                 if self.__mode & MODE_FILTERED:
                     if self.__mode & MODE_SORTED: ids = self.__sorted
@@ -1183,7 +1183,7 @@ class BlaPlaylist(gtk.Notebook):
 
                 tracks = map(BlaPlaylist.get_track_from_id, ids)
                 ids = [identifier for identifier, track in zip(ids, tracks)
-                        if eval_(track) in values]
+                        if eval_(track).lower() in values]
 
             uris = [BlaPlaylist.uris[identifier] for identifier in ids]
             playlist = BlaPlaylist.add_playlist(focus=True)
@@ -1697,10 +1697,11 @@ class BlaPlaylist(gtk.Notebook):
             BlaQueue.remove_tracks(tracks, self)
 
         def jump_to_playing_track(self):
-            if (self.__current is None or
-                    BlaPlaylist.uris[self.__current] !=
-                    player.get_track().path):
-                return
+            try:
+                if self.__current is None: raise KeyError
+                track = BlaPlaylist.uris[self.__current]
+                if track != player.get_track().path: raise KeyError
+            except KeyError: return
             self.set_row(self.get_path_from_id(self.__current))
 
         def set_row(self, path, row_align=0.5, keep_selection=False,
