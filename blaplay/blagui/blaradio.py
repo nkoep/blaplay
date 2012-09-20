@@ -30,8 +30,7 @@ from blaplay.formats._identifiers import LENGTH, TITLE
 from blaplay.blagui import blaguiutils
 
 
-# TODO: - save last-played station to config
-#       - implement get_next, get_previous methods to iterate through stations
+# TODO: - implement get_next, get_previous methods to iterate through stations
 #         as through songs in a playlist
 
 def parse_uri(uri):
@@ -92,6 +91,7 @@ class BlaRadio(gtk.VBox):
     __gsignals__ = {
         "count_changed": blaplay.signal(2)
     }
+    __station = None
 
     def __init__(self):
         super(BlaRadio, self).__init__(spacing=3)
@@ -225,7 +225,7 @@ class BlaRadio(gtk.VBox):
 
     def restore(self):
         try:
-            station, stations = blautils.deserialize_from_file(
+            self.__station, stations = blautils.deserialize_from_file(
                   blaconst.STATIONS_PATH)
         except TypeError: return
         model = self.__treeview.get_model()

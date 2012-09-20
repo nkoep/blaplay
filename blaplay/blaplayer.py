@@ -224,35 +224,39 @@ class BlaPlayer(gobject.GObject):
         else: self.stop()
 
     def play(self):
-        if not self.__uri: self.emit("get_track", blaconst.TRACK_PLAY, True)
-        else:
-            # check if the resource is available. if it's not it's best to stop
-            # trying and inform the user about the situation. if we'd just ask
-            # for another track we'd potentially end up exceeding python's
-            # recursion limit if lots of tracks turn out to be invalid
-            if (not os.path.exists(self.__uri) or
-                    not os.path.isfile(self.__uri)):
-                from blaplay.blagui import blaguiutils
-                uri = self.__uri
-                self.stop()
-                blaguiutils.error_dialog("Playback error",
-                        "Resource \"%s\" unavailable." % uri)
-                return
+        # TODO: if we quit with a radio station playing emit a get_station
+        #       signal instead
+        if not self.__uri:
+            self.emit("get_track", blaconst.TRACK_PLAY, True)
+            return
 
-            # if update returns None it means the track needed updating, but
-            # failed to be parsed properly so request another song
-            if not library.update_track(self.__uri, return_track=True):
-                self.emit("get_track", blaconst.TRACK_PLAY, True)
+        # check if the resource is available. if it's not it's best to stop
+        # trying and inform the user about the situation. if we'd just ask
+        # for another track we'd potentially end up exceeding python's
+        # recursion limit if lots of tracks turn out to be invalid
+        if (not os.path.exists(self.__uri) or
+                not os.path.isfile(self.__uri)):
+            from blaplay.blagui import blaguiutils
+            uri = self.__uri
+            self.stop()
+            blaguiutils.error_dialog("Playback error",
+                    "Resource \"%s\" unavailable." % uri)
+            return
 
-            if self.__state == blaconst.STATE_STOPPED: self.__init_pipeline()
-            self.__bin.set_state(gst.STATE_NULL)
-            self.__bin.set_property("uri", "file://%s" % self.__uri)
-            self.__bin.set_state(gst.STATE_PLAYING)
-            self.__station = None
+        # if update returns None it means the track needed updating, but
+        # failed to be parsed properly so request another song
+        if not library.update_track(self.__uri, return_track=True):
+            self.emit("get_track", blaconst.TRACK_PLAY, True)
 
-            self.__state = blaconst.STATE_PLAYING
-            self.emit("track_changed")
-            self.emit("state_changed")
+        if self.__state == blaconst.STATE_STOPPED: self.__init_pipeline()
+        self.__bin.set_state(gst.STATE_NULL)
+        self.__bin.set_property("uri", "file://%s" % self.__uri)
+        self.__bin.set_state(gst.STATE_PLAYING)
+        self.__station = None
+
+        self.__state = blaconst.STATE_PLAYING
+        self.emit("track_changed")
+        self.emit("state_changed")
 
     def play_station(self, station):
         if self.__state == blaconst.STATE_STOPPED: self.__init_pipeline()

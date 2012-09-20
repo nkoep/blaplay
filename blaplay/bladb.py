@@ -116,10 +116,6 @@ class BlaLibraryMonitor(gobject.GObject):
         self.__process_events()
 
     def __queue_event(self, monitor, path_from, path_to, type_):
-        # FIXME: creating an empty directory and moving existing directories to
-        #        it causes an erroneous directory layout. at least the
-        #        `__detect_changes()' method of BlaLibrary fixes it on startup
-
         if type_ == gio.FILE_MONITOR_EVENT_CHANGES_DONE_HINT:
             event = EVENT_CHANGED
         elif type_ == gio.FILE_MONITOR_EVENT_DELETED:
@@ -147,6 +143,19 @@ class BlaLibraryMonitor(gobject.GObject):
         #        main_iteration from a thread seems to deadlock the
         #        application, not to mention the fact that this isn't the
         #        fastest approach either
+
+        # FIXME: creating a new folder in nautilus (which is first known as
+        #        `unknown folder', and then removed when it's properly named)
+        #        seems to cause the removal of the library monitor for the
+        #        parent directory. no events will be triggered in it anymore
+        #        from then on, i.e.:
+        #        *** DEBUG (bladb.py:162): New event of type `EVENT_CREATED'
+        #               for file /media/Eigene/Musik/untitled folder (None)
+        #        *** DEBUG (bladb.py:162): New event of type `EVENT_DELETED'
+        #               for file /media/Eigene/Musik/untitled folder (None)
+        #        apart from that, no EVENT_CHANGED or EVENT_MOVED is triggered
+        #        meaning we don't know the actual name of the folder after it
+        #        was renamed. do we have to abandon gio for pyinotify again?
 
         EVENTS = {
             EVENT_CREATED: "EVENT_CREATED",
@@ -176,7 +185,7 @@ class BlaLibraryMonitor(gobject.GObject):
                     # why we can't add any paths to the ignore set here as they
                     # might not be removed again. unfortunately we have no
                     # choice but to let the event handlers do their job even if
-                    # it means checking certain files twice
+                    # it means checking certain files multiple times
                     library.add_tracks(blautils.discover(path_from))
 
             elif event == EVENT_CHANGED:
@@ -202,7 +211,7 @@ class BlaLibraryMonitor(gobject.GObject):
                         if uri.startswith(path_from) and uri[l] == "/":
                             library.remove_track(uri)
                 except IndexError:
-                    # IndexError will only be raised for exact matches meaning
+                    # IndexError will only be raised for exact matches, meaning
                     # we removed a file
                     library.remove_track(uri)
                 else:
@@ -541,7 +550,8 @@ class BlaLibrary(gobject.GObject):
         # `import blagui' we would have used `from blaplay import blagui'
         # python would have marked the name `blaplay' as variable local to this
         # generator function and thus masking the fact that it's actually an
-        # already imported module that resides in the globals dict
+        # already imported module that resides in the globals dict, making it
+        # unusable as a module in this method's context
         import blagui
         while blagui.bla is None: yield True
         if missing or new_files or updated: update_library()
@@ -602,16 +612,13 @@ class BlaLibrary(gobject.GObject):
         except KeyError: pass
 
     def move_track(self, path_from, path_to, md=""):
-        # FIXME: catch KeyError exceptions when moving files that are not in
-        #        the library
-
         # when a file is moved we create an entry for the new path in the
         # __tracks dict and move the old track to __tracks_ool. this is
         # necessary because some elements like the player, scrobbler or a
-        # playlist still might try to get metadata using the old URI so we
+        # playlist might still try to get metadata using the old URI so we
         # have to guarantee that it's still available somewhere. the redundant
         # data will be removed from __tracks_ool on shutdown when we sync
-        # playlist contents to entries in __tracks_ool
+        # entries in __tracks_ool to playlist contents
 
         # get first match for a monitored directory if none is given
         if not md:
@@ -619,7 +626,18 @@ class BlaLibrary(gobject.GObject):
                 if path_to.startswith(md): break
             else: md = ""
 
-        track = self.__tracks[path_from]
+        # try to get the corresponding track from the library. if it's not in
+        # it we might have to try and parse it cause it could just be a rename.
+        # chrome, for instance, appends a .crdownload to downloads and then
+        # renames them properly on completion
+        try: track = self.__tracks[path_from]
+        except KeyError:
+            track = get_track(path_to)
+            if track:
+                track[MONITORED_DIRECTORY] = md
+                self.add(track)
+            return
+
         if path_from in self.__tracks and path_from != path_to:
             self.__tracks_ool[path_from] = self.__tracks.pop(path_from)
         track[PATH] = path_to

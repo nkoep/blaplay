@@ -86,7 +86,7 @@ def force_singleton(filepath):
                 blaconst.RELEASES, blaconst.EVENTS]:
             try: os.makedirs(directory)
             except OSError as (errno, strerror):
-                # file exists
+                # inode exists, but it's a file. we can only bail in this case
                 if errno != 17: raise
 
     pid = os.getpid()
@@ -189,7 +189,7 @@ def init():
     _metadata = blautils.deserialize_from_file(blaconst.METADATA_PATH)
     if _metadata: metadata = _metadata
 
-    gtk.quit_add(0, clean_up)
+    gtk.quit_add(0, shutdown)
     # write config to disk every 10 minutes
     gobject.timeout_add(10 * 60 * 1000, blacfg.save, False)
     gtk.main()
@@ -205,12 +205,13 @@ def get_metadata(section, key):
 def save_metadata():
     blautils.serialize_to_file(metadata, blaconst.METADATA_PATH)
 
-def clean_up():
+def shutdown():
     print_i("Cleaning up")
 
     from blaplay import blacfg, blaplayer
+    player = blaplayer.player
 
-    blaplayer.player.stop()
+    player.stop()
     blautils.BlaThread.clean_up()
     save_metadata()
     blacfg.save()
