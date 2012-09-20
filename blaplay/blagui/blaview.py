@@ -390,8 +390,6 @@ class BlaSidePane(gtk.VBox):
 
     def update_track(self):
         def worker(track):
-            # the track title and artist names need to be set first. only after
-            # that is done do we spawn threads to fetch lyrics and biography
             self.__update_track(track)
             self.fetcher.start(track)
             return False

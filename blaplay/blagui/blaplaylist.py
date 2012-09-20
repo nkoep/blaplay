@@ -669,7 +669,10 @@ class BlaQueue(blaguiutils.BlaScrolledWindow):
         self.show_all()
 
     def __key_press_event(self, treeview, event):
-        if blagui.is_accel(event, "Delete"): self.remove()
+        if blagui.is_accel(event, "<Ctrl>X"): self.cut()
+        elif blagui.is_accel(event, "<Ctrl>C"): self.copy()
+        elif blagui.is_accel(event, "<Ctrl>V"): self.paste()
+        elif blagui.is_accel(event, "Delete"): self.remove()
         elif blagui.is_accel(event, "<Alt>Return"): self.show_properties()
         return False
 
