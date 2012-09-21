@@ -126,10 +126,7 @@ MENU = """
                 <menuitem action="PlaylistTabs"/>
                 <menuitem action="SidePane"/>
                 <menuitem action="Statusbar"/>
-                <menu action="Visualization">
-                    <menuitem action="Off"/>
-                    <menuitem action="Spectrum"/>
-                </menu>
+                <menuitem action="Visualization"/>
                 <separator/>
                 <menuitem action="JumpToPlayingTrack"/>
             </menu>
@@ -164,9 +161,6 @@ MENU_VIEWS = map(lambda entry: "/Menu/View/%s" % entry,
 BROWSER_LIBRARY, BROWSER_FILESYSTEM = xrange(2)
 (ACTION_SEND_TO_CURRENT, ACTION_ADD_TO_CURRENT, ACTION_SEND_TO_NEW,
  ACTION_EXPAND_COLLAPSE) = xrange(4)
-
-# visualizations
-VISUALIZATION_OFF, VISUALIZATION_SPECTRUM = xrange(2)
 
 # view constants
 VIEW_PLAYLISTS, VIEW_QUEUE, VIEW_RADIO, VIEW_EVENTS, VIEW_RELEASES = xrange(5)

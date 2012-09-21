@@ -31,6 +31,8 @@ class BlaVisualization(gtk.DrawingArea):
 
     def __init__(self, viewport):
         self.__viewport = viewport
+        self.__viewport.connect_object("button_press_event",
+                BlaVisualization.__button_press_event, self)
         super(BlaVisualization, self).__init__()
         type(self).__instance = self
 
@@ -41,27 +43,29 @@ class BlaVisualization(gtk.DrawingArea):
             try: self.__module.set_width(allocation.width)
             except AttributeError: pass
         self.connect("size_allocate", size_allocate)
-
-        self.__initialize_module(blacfg.getint("general", "visualization"))
-
+        self.set_visibility(blacfg.getboolean("general", "show.visualization"))
         self.show_all()
 
-    def __initialize_module(self, element):
-        def disable():
-            gobject.source_remove(self.__tid)
-            try: del self.__module
-            except AttributeError: pass
-            self.__module = None
-            self.__viewport.set_visible(False)
+    def __disable(self):
+        gobject.source_remove(self.__tid)
+        try: del self.__module
+        except AttributeError: pass
+        self.__module = None
+        self.__viewport.set_visible(False)
+        blacfg.setboolean("general", "show.visualization", False)
 
+    def __initialize_module(self, identifier):
         try:
-            if element == blaconst.VISUALIZATION_OFF: return disable()
-            module = visualizations.modules[element]
-        except KeyError:
-            blaguiutils.error_dialog("Failed to initialize the requested "
-                    "visualization.")
-            disable()
-            blacfg.set("general", "visualization", VISUALIZATION_OFF)
+            # get module class and check if necessary attributes are present
+            module = visualizations.modules[identifier]
+            for method in ["set_width", "new_buffer", "flush_buffers", "draw"]:
+                method = getattr(module, method)
+                if not callable(method): raise AttributeError
+            if not hasattr(module, "height"): raise AttributeError
+        except (KeyError, AttributeError):
+            blaguiutils.error_dialog("Failed to initialize \"%s\" "
+                    "visualization." % identifier)
+            self.__disable()
         else:
             self.__module = module()
             self.__module.set_width(self.get_allocation().width)
@@ -80,13 +84,35 @@ class BlaVisualization(gtk.DrawingArea):
         gobject.source_remove(self.__tid)
         self.__tid = gobject.timeout_add(int(1000/self.__rate), queue_draw)
 
+    def __button_press_event(self, event):
+        if (event.button != 3 or event.type in [gtk.gdk._2BUTTON_PRESS,
+                gtk.gdk._3BUTTON_PRESS]):
+            return False
+
+        def activate(item, identifier):
+            blacfg.set("general", "visualization", identifier)
+            self.__initialize_module(identifier)
+
+        identifier = blacfg.getstring("general", "visualization")
+
+        menu = gtk.Menu()
+        for module in sorted(visualizations.modules.keys(), key=str.lower):
+            m = gtk.CheckMenuItem(module)
+            m.set_draw_as_radio(True)
+            m.connect("activate", activate, module)
+            menu.append(m)
+            if module == identifier: m.set_active(True)
+
+        menu.show_all()
+        menu.popup(None, None, None, event.button, event.time)
+
     def __expose(self, drawingarea, event):
         # this callback does not fire if the main window is hidden which means
         # that nothing is actually calculated in a visualization element which
         # saves some CPU time. this is not the case if the window is just
         # obscured by another one
-        self.__module.draw(
-                self.window.cairo_create(), self.get_pango_context(), self.get_style())
+        self.__module.draw(self.window.cairo_create(),
+                self.get_pango_context(), self.get_style())
 
     @classmethod
     def flush_buffers(cls, *args):
@@ -94,8 +120,16 @@ class BlaVisualization(gtk.DrawingArea):
         except AttributeError: pass
 
     @classmethod
-    def update_element(cls, radioaction, current):
-        element = current.get_current_value()
-        blacfg.set("general", "visualization", element)
-        cls.__instance.__initialize_module(element)
+    def set_visibility(cls, state):
+        blacfg.setboolean("general", "show.visualization", state)
+        if not state: return cls.__instance.__disable()
+
+        identifier = blacfg.getstring("general", "visualization")
+        if not identifier:
+            try:
+                identifier = sorted(
+                        visualizations.modules.keys(), key=str.lower)[0]
+                blacfg.set("general", "visualization", identifier)
+            except IndexError: pass
+        cls.__instance.__initialize_module(identifier)
 

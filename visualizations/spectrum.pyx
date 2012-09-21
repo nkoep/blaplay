@@ -119,7 +119,7 @@ cdef class Spectrum(object):
     # change this in the future. for now it really doesn't matter as the job is
     # done and the class does what it's supposed to do
 
-    identifier = blaconst.VISUALIZATION_SPECTRUM
+    identifier = "Spectrum"
     property height:
         def __get__(self): return 154
 
@@ -384,7 +384,7 @@ cdef class Spectrum(object):
 
             # draw the label (0 dB takes up less space than -10 dB etc., hence
             # the distinction between i == 0 and every other case)
-            cr.move_to(w - (21 if i == 0 else 29), y - 8)
+            move_to(w - (21 if i == 0 else 29), y - 8)
             layout.set_text("%d dB" % (i * (-10)))
             cr.show_layout(layout)
 
