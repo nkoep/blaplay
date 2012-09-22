@@ -112,6 +112,25 @@ class BlaRadio(gtk.VBox):
         button.connect("clicked", self.__remove_stations)
         hbox.pack_start(button, expand=False)
 
+        def open_(*args):
+            diag = gtk.FileChooserDialog("Select files",
+                    action=gtk.FILE_CHOOSER_ACTION_OPEN,
+                    buttons=(gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL,
+                    gtk.STOCK_OPEN, gtk.RESPONSE_OK)
+            )
+            diag.set_local_only(True)
+            response = diag.run()
+            filename = diag.get_filename()
+            diag.destroy()
+
+            if response == gtk.RESPONSE_OK and filename:
+                filename = filename.strip()
+                filename and self.__add_station(filename)
+
+        button = gtk.Button("Open...")
+        button.connect("clicked", open_)
+        hbox.pack_start(button, expand=False)
+
         model = gtk.ListStore(gobject.TYPE_STRING, gobject.TYPE_PYOBJECT)
         self.__treeview = blaguiutils.BlaTreeViewBase()
         self.__treeview.set_model(model)
@@ -150,9 +169,11 @@ class BlaRadio(gtk.VBox):
         self.pack_start(sw, expand=True)
 
         self.__treeview.connect("popup", self.__popup_menu)
-        self.__treeview.connect("row_activated", self.__play_station)
+        self.__treeview.connect("row_activated",
+                lambda treeview, path, column: self.__play_station(path))
         self.__treeview.connect("key_press_event", self.__key_press_event)
 
+        player.connect_object("get_station", BlaRadio.__play_station, self)
         player.connect("state_changed", self.__update_rows)
 
         gtk.quit_add(0, self.__save_stations)
@@ -178,20 +199,25 @@ class BlaRadio(gtk.VBox):
 
     def __add_station(self, uri):
         uri = uri.strip()
-        try: stations = parse_uri(uri)
+        try:
+            stations = parse_uri(uri)
+            if not stations: return
         except IOError:
             blaguiutils.error_dialog(
                     "Invalid URL", "Failed to open location %s." % uri)
         else:
             model = self.__treeview.get_model()
-            [model.append([None, station]) for station in stations]
+            iterators = [model.append([None, station])
+                    for station in stations]
             self.emit("count_changed",
                     blaconst.VIEW_RADIO, model.iter_n_children(None))
+            self.__treeview.set_cursor(model.get_path(iterators[0]))
+            select_path = self.__treeview.get_selection().select_path
+            map(select_path, map(model.get_path, iterators))
 
     def __remove_stations(self, *args):
         model, paths = self.__treeview.get_selection().get_selected_rows()
         map(model.remove, map(model.get_iter, paths))
-        self.send_status_update()
 
     def __save_stations(self):
         stations = [row[1] for row in self.__treeview.get_model()]
@@ -214,9 +240,35 @@ class BlaRadio(gtk.VBox):
         menu.show_all()
         menu.popup(None, None, None, event.button, event.time)
 
-    def __play_station(self, treeview, path, column):
+    def __play_station(self, choice):
+        # TODO: implement history, random and shuffle stations, keep track of
+        #       current station
+
         model = self.__treeview.get_model()
         for row in model: row[0] = None
+        path = (0,)
+
+        if not isinstance(choice, tuple):
+            if not model.iter_n_children(None):
+                return player.play_station(None)
+
+            if player.radio:
+                station = player.get_track()
+                for row in model:
+                    if row[1] == station:
+                        path = row.path
+                        break
+
+            if choice == blaconst.TRACK_NEXT:
+                iterator = model.iter_next(model.get_iter(path))
+                if not iterator: return player.play_station(None)
+                path = model.get_path(iterator)
+            else: # choice == blaconst.TRACK_PREVIOUS:
+                if path[0] < 1: return player.play_station(None)
+                path = (path[0]-1,)
+        else: path = choice
+
+        self.__treeview.set_cursor(path)
         player.play_station(model[path][1])
 
     def __key_press_event(self, treeview, event):

@@ -48,6 +48,7 @@ def init():
 class BlaPlayer(gobject.GObject):
     __gsignals__ = {
         "get_track": blaplay.signal(2),
+        "get_station": blaplay.signal(1),
         "state_changed": blaplay.signal(0),
         "track_changed": blaplay.signal(0),
         "track_stopped": blaplay.signal(0),
@@ -125,7 +126,7 @@ class BlaPlayer(gobject.GObject):
 
     @blautils.gtk_thread
     def __on_message(self, bus, message):
-        if message.type == gst.MESSAGE_EOS and not self.__station:
+        if message.type == gst.MESSAGE_EOS:
             self.next(force_advance=False)
         elif message.type == gst.MESSAGE_TAG:
             self.__parse_tags(message.parse_tag())
@@ -159,7 +160,7 @@ class BlaPlayer(gobject.GObject):
             "title": TITLE
         }
 
-        if not self.__station: return
+        if not self.radio: return
         for key in tags.keys():
             value = tags[key]
             try: value = value.encode("utf-8")
@@ -205,7 +206,7 @@ class BlaPlayer(gobject.GObject):
         self.emit("seek")
 
     def get_position(self):
-        if self.__station: return 0
+        if self.radio: return 0
         try: return self.__bin.query_position(gst.FORMAT_TIME, None)[0]
         except gst.QueryError: return 0
 
@@ -259,6 +260,7 @@ class BlaPlayer(gobject.GObject):
         self.emit("state_changed")
 
     def play_station(self, station):
+        if not station: return self.stop()
         if self.__state == blaconst.STATE_STOPPED: self.__init_pipeline()
         self.__station = station
         self.__uri = None
@@ -297,11 +299,15 @@ class BlaPlayer(gobject.GObject):
 
     def previous(self):
         if self.__bin: self.__bin.set_state(gst.STATE_NULL)
-        self.emit("get_track", blaconst.TRACK_PREVIOUS, True)
+        if self.radio: args = ("get_station", blaconst.TRACK_PREVIOUS)
+        else: args = ("get_track", blaconst.TRACK_PREVIOUS, True)
+        self.emit(*args)
 
     def next(self, force_advance=True):
         if self.__bin: self.__bin.set_state(gst.STATE_NULL)
-        self.emit("get_track", blaconst.TRACK_NEXT, force_advance)
+        if self.radio: args = ("get_station", blaconst.TRACK_NEXT)
+        else: args = ("get_track", blaconst.TRACK_NEXT, force_advance)
+        self.emit(*args)
 
     def random(self):
         if self.__bin: self.__bin.set_state(gst.STATE_NULL)
