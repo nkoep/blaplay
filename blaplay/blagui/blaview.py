@@ -183,6 +183,7 @@ class BlaSidePane(gtk.VBox):
                 self.__bg_color = gtk.gdk.Color(
                         blacfg.getstring("colors", "background"))
             else: self.__bg_color = self.get_style().bg[gtk.STATE_NORMAL]
+            self.__da.queue_draw()
 
     def __init__(self):
         super(BlaSidePane, self).__init__(spacing=5)
@@ -387,6 +388,7 @@ class BlaSidePane(gtk.VBox):
                 tv.modify_style(self.__style)
                 tag.set_property("foreground-gdk",
                         self.__style.fg[gtk.STATE_NORMAL])
+        self.__cover_display.update_colors()
 
     def update_track(self):
         def worker(track):
