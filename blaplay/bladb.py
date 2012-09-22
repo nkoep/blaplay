@@ -294,7 +294,7 @@ class BlaLibraryMonitor(gobject.GObject):
 
         with self.__lock:
             cancel = gio.FileMonitor.cancel
-            map(cancel, self.__monitors.values())
+            map(cancel, self.__monitors.itervalues())
             self.__monitors.clear()
 
             # according to the GIO C API documentation there are backends which
@@ -356,7 +356,7 @@ class BlaLibraryModel(object):
         old_iterator, old_comps = None, None
         append = model.append
 
-        for uri, track in tracks.items():
+        for uri, track in tracks.iteritems():
             if not filt(os.path.basename(uri)): continue
 
             comps, leaf = cb(uri, track)
@@ -491,7 +491,7 @@ class BlaLibrary(gobject.GObject):
         return self.next()
 
     def next(self):
-        for uri in self.__tracks.keys(): yield uri
+        for uri in self.__tracks.iterkeys(): yield uri
 
     def __detect_changes(self, directories):
         # this function does not perform any write operations on files. it
@@ -852,7 +852,7 @@ class BlaLibrary(gobject.GObject):
         if self.__currently_scanning == directory: self.__aborted = True
 
         remove_track = self.remove_track
-        tracks = [(uri, track) for uri, track in self.__tracks.items()
+        tracks = [(uri, track) for uri, track in self.__tracks.iteritems()
                 if track[MONITORED_DIRECTORY] == directory]
         mds = self.__monitored_directories
 
@@ -868,9 +868,7 @@ class BlaLibrary(gobject.GObject):
 
         # if there are no more monitored directories but still tracks in the
         # library something went wrong so move them to __tracks_ool as well
-        uris = self.__tracks.keys()
-        if not mds and uris: map(remove_track, uris)
-
+        if not mds: map(remove_track, self.__tracks.iterkeys())
         self.update_library()
         self.__library_monitor.remove_directories(directory)
 

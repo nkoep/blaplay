@@ -47,7 +47,7 @@ class Asf(BlaTrack):
     def _read_tags(self):
         audio = _ASF(self.path)
 
-        for key, values in (audio.tags or {}).items():
+        for key, values in (audio.tags or {}).iteritems():
             try:
                 values = map(unicode, values)
                 self[self.__tag_to_literal[key]] = values

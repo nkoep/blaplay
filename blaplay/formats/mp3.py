@@ -124,7 +124,7 @@ class Mp3(BlaTrack):
         # present in the id3v2 tags
         ttr = set(self.__id3v1)
         ttr.update(set(self.__tag_to_literal.keys()).intersection(
-                [k.split(":")[0] for k in tags.keys()
+                [k.split(":")[0] for k in tags.iterkeys()
                 if not k.startswith("TXXX")])
         )
         for tag in ttr:

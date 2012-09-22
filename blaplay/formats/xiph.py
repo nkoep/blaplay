@@ -62,7 +62,7 @@ class Xiph(BlaTrack):
                 blautils.get_extension(path)]
         audio = baseclass(path)
 
-        for key, values in (audio.tags or {}).items():
+        for key, values in (audio.tags or {}).iteritems():
             try: identifier = self.__tag_to_literal[key]
             except KeyError: identifier = key
             self[identifier] = map(unicode, values)
@@ -70,7 +70,7 @@ class Xiph(BlaTrack):
         # in vorbis comments tracknumber and number of total tracks are stored
         # in different keys. the same goes for discs. we construct the form we
         # normally work with here
-        for identifier, (num, total) in self.__split_keys.items():
+        for identifier, (num, total) in self.__split_keys.iteritems():
             if num in self.keys_tags():
                 self[identifier] = self.pop(num)
             if self[identifier] and total in self.keys_tags():

@@ -46,7 +46,7 @@ class Mp4(BlaTrack):
     def _read_tags(self):
         audio = _MP4(self.path)
 
-        for key, values in (audio.tags or {}).items():
+        for key, values in (audio.tags or {}).iteritems():
             if key in ["disk", "trkn"]: value = ["%d/%d" % values[0]]
             elif key.startswith("----:"):
                 key = key[5:]

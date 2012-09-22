@@ -282,7 +282,7 @@ class BlaTagedit(blaguiutils.BlaWindow):
             except ZeroDivisionError: yield False
             else: self.__pb.set_visible(True)
             idx = 0
-            for uri, track in self.__tracks.items():
+            for uri, track in self.__tracks.iteritems():
                 self.__pb.set_fraction(c * (idx+1))
                 self.__pb.set_text(uri)
                 if uri in library: ns["update_library"] = True
