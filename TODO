@@ -1,7 +1,5 @@
 till 0.1:
 - improve internet radio support (cf. blaplay/blagui/blaradio.py)
-- improve/speed up "remove duplicates" functionality and add the feature to the
-  BlaQueue class
 
 0.2:
 - add iPod support, possibly other players, too

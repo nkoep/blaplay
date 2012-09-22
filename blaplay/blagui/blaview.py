@@ -504,3 +504,15 @@ class BlaView(gtk.HPaned):
         if view in [blaconst.VIEW_PLAYLISTS, blaconst.VIEW_QUEUE]:
             cls.views[view].remove()
 
+    @classmethod
+    def remove_duplicates(cls, *args):
+        view = blacfg.getint("general", "view")
+        if view in [blaconst.VIEW_PLAYLISTS, blaconst.VIEW_QUEUE]:
+            cls.views[view].remove_duplicates()
+
+    @classmethod
+    def remove_invalid_tracks(cls, *args):
+        view = blacfg.getint("general", "view")
+        if view in [blaconst.VIEW_PLAYLISTS, blaconst.VIEW_QUEUE]:
+            cls.views[view].remove_invalid_tracks()
+

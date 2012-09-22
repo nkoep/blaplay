@@ -65,7 +65,6 @@ class BlaWindow(gtk.Window):
             ("NewPlaylistFrom", None, "_New playlist from"),
             ("PlayOrder", None, "_Order"),
             ("View", None, "_View"),
-            ("Visualization", None, "_Visualization"),
             ("Help", None, "_Help"),
 
             # menuitems
@@ -116,9 +115,9 @@ class BlaWindow(gtk.Window):
                     blaconst.PLAYLIST_FROM_GENRE)
             ),
             ("RemoveDuplicates", None, "Remove _duplicates", None, "",
-             lambda *x: BlaPlaylist.remove_duplicates()),
+             BlaView.remove_duplicates),
             ("RemoveInvalidTracks", None, "Remove _invalid tracks", None, "",
-             lambda *x: BlaPlaylist.remove_invalid_tracks()),
+             BlaView.remove_invalid_tracks),
             ("Search", None, "_Search...", "<Ctrl>F", "",
              lambda *x: BlaPlaylist.enable_search()),
             ("Preferences", None, "Pre_ferences...", None, "", BlaPreferences),
@@ -140,6 +139,10 @@ class BlaWindow(gtk.Window):
             ("Statusbar", None, "St_atusbar", None, "",
                     self.__toggle_statusbar,
                     blacfg.getboolean("general", "statusbar")
+            ),
+            ("Visualization", None, "Visualization", None, "",
+                    self.__toggle_visualization,
+                    blacfg.getboolean("general", "show.visualization")
             )
         ]
         radio_actions0 = [
@@ -158,11 +161,6 @@ class BlaWindow(gtk.Window):
             ("NewReleases", None, "_New releases", None, "",
              blaconst.VIEW_RELEASES),
         ]
-        radio_actions2 = [
-            ("Off", None, "Off", None, "", blaconst.VISUALIZATION_OFF),
-            ("Spectrum", None, "Spectrum", None, "",
-             blaconst.VISUALIZATION_SPECTRUM)
-        ]
         actiongroup.add_actions(actions)
         actiongroup.add_toggle_actions(toggle_actions)
         actiongroup.add_radio_actions(radio_actions0,
@@ -172,10 +170,6 @@ class BlaWindow(gtk.Window):
         actiongroup.add_radio_actions(radio_actions1, value=blacfg.getint(
                 "general", "view"), on_change=lambda *x: BlaView.update_view(
                 x[-1].get_current_value())
-        )
-        actiongroup.add_radio_actions(radio_actions2,
-                value=blacfg.getint("general", "visualization"),
-                on_change=BlaVisualization.update_element
         )
         uimanager.insert_action_group(actiongroup, 0)
         uimanager.add_ui_from_string(blaconst.MENU)
@@ -298,6 +292,9 @@ class BlaWindow(gtk.Window):
 
     def __toggle_statusbar(self, event):
         self.__statusbar.set_visibility(event.get_active())
+
+    def __toggle_visualization(self, event):
+        BlaVisualization.set_visibility(event.get_active())
 
     def __delete_event(self, window, event):
         if blacfg.getboolean("general", "close.to.tray"):

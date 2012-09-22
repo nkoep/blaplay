@@ -924,6 +924,29 @@ class BlaQueue(blaguiutils.BlaScrolledWindow):
         cls.__get_items(remove=True)
 
     @classmethod
+    def remove_duplicates(cls):
+        unique = set()
+        iterators = []
+        for row in cls.__queue:
+            identifier = row[0]
+            try: uri = BlaPlaylist.uris[identifier]
+            except KeyError: uri = identifier
+            if uri not in unique: unique.add(uri)
+            else: iterators.append(row.iter)
+        cls.update_queue_positions(iterators)
+
+    @classmethod
+    def remove_invalid_tracks(cls):
+        isfile = os.path.isfile
+        iterators = []
+        for row in cls.__queue:
+            identifier = row[0]
+            try: uri = BlaPlaylist.uris[identifier]
+            except KeyError: uri = identifier
+            if not isfile(uri): iterators.append(row.iter)
+        cls.update_queue_positions(iterators)
+
+    @classmethod
     def clear(cls):
         cls.update_queue_positions([row.iter for row in cls.__queue])
 
@@ -1093,6 +1116,8 @@ class BlaPlaylist(gtk.Notebook):
             self.__tracks = []      # visible tracks when unsorted
             self.__sorted = []      # visible tracks when sorted
             self.__sort_parameters = None
+            [column.set_sort_indicator(False)
+                    for column in self.__treeview.get_columns()]
             self.__mode = MODE_NORMAL
 
             try: model.clear()
@@ -1204,7 +1229,6 @@ class BlaPlaylist(gtk.Notebook):
 
         def add_tracks(self, uris, drop_info=None, flush=False, current=None,
                 select_rows=False, restore=False):
-            # FIXME: the sort indicator isn't reset when flushing
             if flush: self.clear()
             if not uris: return
 
@@ -1271,9 +1295,10 @@ class BlaPlaylist(gtk.Notebook):
             if not (restore and (query or sort_parameters)):
                 scroll_id = ids[-1]
                 if reverse: ids.reverse()
-                model = self.__freeze_treeview()
+                self.__freeze_treeview()
                 [insert_func(ns, [identifier, "", []]) for identifier in ids]
-                self.__treeview.set_model(model)
+                [column.set_sort_indicator(False)
+                        for column in self.__treeview.get_columns()]
                 self.__thaw_treeview()
                 if not restore: BlaPlaylist.update_statusbar()
             elif query: self.enable_search(query)
@@ -1344,7 +1369,6 @@ class BlaPlaylist(gtk.Notebook):
                     map(self.__all_tracks.remove, ids)
 
                     BlaPlaylist.update_statusbar()
-
             return ids
 
         def insert(self, inserted_ids, path, restore=False):
@@ -1386,41 +1410,43 @@ class BlaPlaylist(gtk.Notebook):
             self.__length += sum([track[LENGTH] for track in tracks])
             self.__size += sum([track[FILESIZE] for track in tracks])
 
-        # FIXME: these two are still slow. should be considerably faster to
-        #        just create a list of ids that should be in the model and
-        #        repopulate it
         def remove_duplicates(self):
             def remove_duplicates():
-                def f(identifier):
-                    try: return (ids.index(identifier),)
-                    except ValueError: return None
+                if self.__mode & MODE_FILTERED:
+                    if self.__mode & MODE_SORTED: ids = self.__sorted
+                    else: ids = self.__tracks
+                else:
+                    if self.__mode & MODE_SORTED: ids = self.__all_sorted
+                    else: ids = self.__all_tracks
 
-                ids = (self.__all_sorted if self.__mode & MODE_SORTED else
-                        self.__all_tracks)
-                unique_ids = set()
-                unique_uris = set()
+                unique_ids = blautils.BlaOrderedSet()
+                unique_uris = blautils.BlaOrderedSet()
                 uris = BlaPlaylist.uris
 
-                # don't remove the current track if there is one
-                if self.__current is not None:
-                    unique_ids.add(self.__current)
-                    unique_uris.add(uris[self.__current])
+                paths = self.__treeview.get_selection().get_selected_rows()[-1]
+                get_id_from_path = self.get_id_from_path
+                selected_ids = []
+                for idx, path in enumerate(paths):
+                    selected_ids.append(get_id_from_path(path))
+                    if idx % 25 == 0: yield True
 
-                # check the remaining ids
+                # determine unique tracks
                 for identifier in ids:
                     uri = uris[identifier]
                     if uri not in unique_uris:
                         unique_ids.add(identifier)
                         unique_uris.add(uri)
+                unique_ids = list(unique_ids)
+                unique_uris = list(unique_uris)
+
+                # place __current at correct position in the list if possible
+                if self.__current is not None:
+                    uri = uris[self.__current]
+                    try: unique_ids[unique_uris.index(uri)] = self.__current
+                    except ValueError: pass
                 yield True
 
-                # remove duplicates
-                dupes = list(set(ids).difference(unique_ids))
-                paths = []
-                for idx, dupe in enumerate(dupes):
-                    if idx % 5 == 0: yield True
-                    paths.append(f(dupe))
-                self.get_tracks(remove=True, paths=(dupes, paths))
+                self.__repopulate_model(unique_ids, selected_ids)
                 self.__treeview.set_sensitive(True)
                 yield False
 
@@ -1430,15 +1456,30 @@ class BlaPlaylist(gtk.Notebook):
 
         def remove_invalid_tracks(self):
             def remove_invalid_tracks():
-                uris = [BlaPlaylist.uris[identifier]
-                        for identifier in self.__all_tracks]
-                yield True
-                exists = os.path.exists
-                invalid = [identifier for uri, identifier
-                        in zip(uris, self.__all_tracks) if not exists(uri)]
-                yield True
-                paths = map(self.get_path_from_id, invalid)
-                self.get_tracks(remove=True, paths=paths)
+                if self.__mode & MODE_FILTERED:
+                    if self.__mode & MODE_SORTED: ids = self.__sorted
+                    else: ids = self.__tracks
+                else:
+                    if self.__mode & MODE_SORTED: ids = self.__all_sorted
+                    else: ids = self.__all_tracks
+                # create a copy to leave the referenced list unchanged
+                ids_copy = list(ids)
+                uris = BlaPlaylist.uris
+
+                isfile = os.path.isfile
+                for idx, identifier in enumerate(ids):
+                    uri = uris[identifier]
+                    if not isfile(uri): ids_copy.remove(identifier)
+                    if idx % 25 == 0: yield True
+
+                paths = self.__treeview.get_selection().get_selected_rows()[-1]
+                get_id_from_path = self.get_id_from_path
+                selected_ids = []
+                for idx, path in enumerate(paths):
+                    selected_ids.append(get_id_from_path(path))
+                    if idx % 25 == 0: yield True
+
+                self.__repopulate_model(ids_copy, selected_ids)
                 self.__treeview.set_sensitive(True)
                 yield False
 
@@ -1745,6 +1786,48 @@ class BlaPlaylist(gtk.Notebook):
                     in self.get_tracks(remove=False)]
             if uris: BlaTagedit(uris)
 
+        def __repopulate_model(self, ids, selected_ids):
+            row_align, selected_ids, scroll_identifier = \
+                    self.__get_selection_and_row()
+
+            # determine new playlist metadata for the statusbar and update the
+            # appropriate id lists
+            tracks = map(BlaPlaylist.get_track_from_id, ids)
+            self.__length = sum([track[LENGTH] for track in tracks])
+            self.__size = sum([track[FILESIZE] for track in tracks])
+
+            if self.__mode & MODE_FILTERED:
+                removed_ids = set(self.__tracks).difference(ids)
+                map(self.__tracks.remove, removed_ids)
+                if self.__mode & MODE_SORTED: self.__sorted = list(ids)
+            else:
+                removed_ids = set(self.__all_tracks).difference(ids)
+                if self.__mode & MODE_SORTED: self.__all_sorted = list(ids)
+            map(self.__all_tracks.remove, removed_ids)
+
+            if self.__mode & MODE_SORTED or self.__sort_parameters:
+                # selection is handled in the sort function
+                selected_ids = None
+                try: self.sort(*self.__sort_parameters, scroll=True)
+                except TypeError: self.sort(-1, None)
+            else:
+                self.__freeze_treeview()
+                model = gtk.ListStore(*self.__layout)
+                append = model.append
+                [append([identifier, "", []]) for identifier in ids]
+                self.__treeview.set_model(model)
+                selected_ids = set(ids).intersection(selected_ids)
+                select_path = self.__treeview.get_selection().select_path
+                get_path_from_id = self.get_path_from_id
+                map(select_path, map(get_path_from_id, selected_ids))
+                self.__thaw_treeview()
+
+            # update the statusbar and the state icon in the playlist
+            self.__set_selection_and_row(
+                    row_align, selected_ids, scroll_identifier)
+            self.update_state()
+            BlaPlaylist.update_statusbar()
+
         def __freeze_treeview(self):
             self.__treeview.freeze_notify()
             self.__treeview.freeze_child_notify()
@@ -1824,7 +1907,6 @@ class BlaPlaylist(gtk.Notebook):
             if self.__filter_parameters: self.__mode |= MODE_FILTERED
             else: self.__mode ^= MODE_FILTERED
 
-            # FIXME: query isn't GC'ed
             query = BlaQuery(self.__filter_parameters).query
             self.__tracks = filter(query, self.__all_tracks)
 
@@ -2089,7 +2171,7 @@ class BlaPlaylist(gtk.Notebook):
                 for uri in uris:
                     track = library[uri]
                     f.write("    <track>\n")
-                    for element, identifier in tags.items():
+                    for element, identifier in tags.iteritems():
                         value = track[identifier].replace("&", "&amp;amp;")
                         if not value: continue
                         f.write("      <%s>%s</%s>\n"

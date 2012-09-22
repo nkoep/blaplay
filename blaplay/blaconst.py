@@ -138,8 +138,7 @@ MENU = """
 """
 MENU_PLAYLISTS = map(lambda entry: "/Menu/%s" % entry,
         ["File/AddFiles", "File/AddDirectories", "File/SavePlaylist",
-         "Edit/NewPlaylistFrom", "Edit/RemoveDuplicates",
-         "Edit/RemoveInvalidTracks", "Edit/Search", "View/PlaylistTabs",
+         "Edit/NewPlaylistFrom", "Edit/Search", "View/PlaylistTabs",
          "View/JumpToPlayingTrack"]
          + map(lambda entry: "Edit/Select/Select%s" % entry,
          ["All", "ByArtist", "ByAlbum", "ByAlbumArtist", "ByGenre"])
@@ -147,7 +146,7 @@ MENU_PLAYLISTS = map(lambda entry: "/Menu/%s" % entry,
 MENU_EDIT = map(lambda entry: "/Menu/Edit/%s" % entry,
         ["Paste", "Clear", "Select", "Select/SelectAll",
          "Select/SelectComplement", "Selection/Cut", "Selection/Copy",
-         "Selection/Remove"]
+         "Selection/Remove", "RemoveDuplicates", "RemoveInvalidTracks"]
 )
 MENU_ORDER = map(lambda entry: "/Menu/PlayOrder/%s" % entry,
         ["OrderNormal", "OrderRepeat", "OrderShuffle"])
