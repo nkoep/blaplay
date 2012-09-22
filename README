@@ -1,19 +1,16 @@
 blaplay - a bla that plays (or: a working title that stuck)
 
-blaplay is an audio player for GNU/Linux with a minimalistic design focus
-rather than feature richness. As a consequence a plugin system is neither
-implemented nor planned for the future. Instead new features that are decided
-to be added will be implemented into the core application. blaplay is written
-in Python 2.6, and relies on PyGTK, PyGST, and Mutagen to implement its basic
-functionality. Notable features include a monitored audio library, automatic
-cover art, lyrics and biography fetching, as well as last.fm scrobbling. In
-addition to that it offers event and release recommendations based on the
-user's last.fm library.
+blaplay is an audio player for GNU/Linux with a minimalistic design approach
+rather than feature richness. It is written in Python 2.6, and relies on PyGTK,
+PyGST, and Mutagen to implement its core functionality. Notable features
+include a monitored audio library, automatic cover art, lyrics and biography
+fetching, and last.fm scrobbling. In addition to that it offers event and
+release recommendations based on the user's last.fm library, as well as support
+for internet radio streams.
 
-In the future blaplay will also integrate support for internet radio stations
-and portable media devices. Refer to the TODO file for more details on
-planned features/enhancements. The BUGS file contains a description of
-currently known issues and proposed solutions.
+Refer to the TODO file for more details on planned features/enhancements, and
+the BUGS file for a description of currently known issues and proposed possible
+solutions.
 
 Build dependencies:
     * python-dev (>= 2.6)
@@ -36,8 +33,8 @@ Recommended:
     * python-mmkeys
     * python-dbus (>= 0.83)
 
-blaplay currently includes a spectrum analyzer element which, for performance
-reasons, is written in Cython, wrapping fftw3 in order to transfer the most
+blaplay currently includes visualization elements which, for performance
+reasons, are written in Cython, wrapping fftw3 in order to transfer the most
 computationally expensive operations to C-code. Building blaplay therefore
 requires a recent version of the Cython compiler (>= 0.15.1), as well as the
 single-precision library of fftw3 and its development headers. To prepare and
