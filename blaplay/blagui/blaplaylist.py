@@ -1582,10 +1582,16 @@ class BlaPlaylist(gtk.Notebook):
             return [BlaPlaylist.uris[identifier] for identifier in ids]
 
         def get_track(self, choice=blaconst.TRACK_PLAY, force_advance=True):
-            def get_random():
+            def get_random(old=None):
                 idx_max = model.iter_n_children(None)-1
                 if idx_max < 0: return None
-                return model[randint(0, idx_max)][0]
+                path = randint(0, idx_max)
+                identifier = model[path][0]
+                if old is not None and idx_max > 0:
+                    old = self.get_path_from_id(old)[0]
+                    while path == old: path = randint(0, idx_max)
+                    else: identifier = model[path][0]
+                return identifier
 
             order = blacfg.getint("general", "play.order")
             model = self.__treeview.get_model()
@@ -1599,10 +1605,10 @@ class BlaPlaylist(gtk.Notebook):
 
             identifier = None
 
-            # this happens when the user presses play and we should play the
-            # last active track
-            if (choice == blaconst.TRACK_PLAY and
-                    isinstance(self.__current, int)):
+            # play the last active track (applies to ORDER_REPEAT, too)
+            if ((choice == blaconst.TRACK_PLAY or
+                    (order == blaconst.ORDER_REPEAT and not force_advance)) and
+                    self.__current is not None):
                 identifier = self.__current
 
             # play, but we didn't play a track from this playlist yet
@@ -1612,11 +1618,6 @@ class BlaPlaylist(gtk.Notebook):
                     self.__history.add(identifier, choice)
                 else: identifier = model[0][0]
 
-            # are we in repeat and did not ask to advance to the next track
-            elif (order == blaconst.ORDER_REPEAT and not force_advance and
-                    isinstance(self.__current, int)):
-                identifier = self.__current
-
             elif choice == blaconst.TRACK_RANDOM:
                 identifier = get_random()
                 self.__history.add(identifier, blaconst.TRACK_NEXT)
@@ -1625,7 +1626,7 @@ class BlaPlaylist(gtk.Notebook):
             elif order == blaconst.ORDER_SHUFFLE:
                 identifier = self.__history.get(choice)
                 if identifier is None:
-                    identifier = get_random()
+                    identifier = get_random(self.__current)
                     self.__history.add(identifier, choice)
 
             # this is either TRACK_NEXT or TRACK_PREVIOUS with ORDER_NORMAL
