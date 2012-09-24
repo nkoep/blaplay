@@ -108,7 +108,7 @@ class Mp3(BlaTrack):
                 text = unicode(text).strip().encode("latin1")
                 for enc in ["utf-8", "latin1"]:
                     try: text = text.decode(enc)
-                    except (UnicodeError, LookupError): pass
+                    except UnicodeError: pass
                     else: break
                 else: return None
             else: text = str(text).strip().decode("utf-8")

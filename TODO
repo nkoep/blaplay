@@ -1,20 +1,19 @@
-till 0.1:
-- improve internet radio support (cf. blaplay/blagui/blaradio.py)
-
 0.2:
+- improve lyrics fetcher (more robust search, more search engines)
 - add iPod support, possibly other players, too
 - support for CUE sheets
 - gapless playback
 - conform to the MPRIS specifications as defined by freedesktop.org and use
-  these exposed interfaces for respective CLI invocations
+  the exposed interfaces for respective CLI invocations
 - get covers from covertartarchive/musicbrainz if they're not on last.fm
 - implement shuffle albums/repeat album playback modes
 - implement peeking (tooltips for previous/next/random buttons showing which
   track would be played if button was clicked)
-- add waveform, spectrogram (+ 3D spectrogram) visualization(s) if feasible
+- write up base class for visualization elements which exposes generic methods
+  for calculating fft, channel mean, etc.
+- add spectrogram (+ 3D spectrogram) visualization(s) if feasible
 - parse tags from filename/rename files from tags
 - write up some crude unit/regression tests
-- improve lyrics fetcher (more robust search, more search engines)
 
 0.3+:
 - lower memory footprint

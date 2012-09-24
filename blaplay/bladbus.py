@@ -62,7 +62,7 @@ def query_bus(query, arg=None):
             }
 
             format = query[0]
-            for key in callbacks.keys():
+            for key in callbacks.iterkeys():
                 if key in format:
                     format = format.replace(key, callbacks[key]())
             print format.encode("utf-8")

@@ -163,7 +163,7 @@ class BlaPlayer(gobject.GObject):
         if not self.radio: return
         for key in tags.keys():
             value = tags[key]
-            try: value = value.encode("utf-8")
+            try: value = unicode(value.decode("utf-8", "replace"))
             except AttributeError: pass
             if key in ["organization", "location", "title"]:
                 self.__station[MAPPING[key]] = value
@@ -225,11 +225,11 @@ class BlaPlayer(gobject.GObject):
         else: self.stop()
 
     def play(self):
-        # TODO: if we quit with a radio station playing emit a get_station
-        #       signal instead
         if not self.__uri:
-            self.emit("get_track", blaconst.TRACK_PLAY, True)
-            return
+            if blacfg.getint("general", "view") == blaconst.VIEW_RADIO:
+                args = ("get_station", blaconst.TRACK_PLAY)
+            else: args = ("get_track", blaconst.TRACK_PLAY, True)
+            return self.emit(*args)
 
         # check if the resource is available. if it's not it's best to stop
         # trying and inform the user about the situation. if we'd just ask
@@ -240,8 +240,8 @@ class BlaPlayer(gobject.GObject):
             from blaplay.blagui import blaguiutils
             uri = self.__uri
             self.stop()
-            blaguiutils.error_dialog("Playback error",
-                    "Resource \"%s\" unavailable." % uri)
+            blaguiutils.error_dialog("Playback error", "Resource \"%s\" "
+                    "unavailable." % uri)
             return
 
         # if update returns None it means the track needed updating, but
@@ -311,7 +311,9 @@ class BlaPlayer(gobject.GObject):
 
     def random(self):
         if self.__bin: self.__bin.set_state(gst.STATE_NULL)
-        self.emit("get_track", blaconst.TRACK_RANDOM, True)
+        if self.radio: args = ("get_station", blaconst.TRACK_RANDOM)
+        else: args = ("get_track", blaconst.TRACK_RANDOM, True)
+        self.emit(*args)
 
     def play_pause(self):
         if self.__state == blaconst.STATE_STOPPED: self.play()

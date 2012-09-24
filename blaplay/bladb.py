@@ -282,8 +282,7 @@ class BlaLibraryMonitor(gobject.GObject):
     @blautils.thread
     def remove_directories(self, md):
         with self.__lock:
-            directories = sorted(self.__monitors.keys())
-            for directory in directories:
+            for directory in sorted(self.__monitors.keys()):
                 if directory.startswith(md):
                     self.__monitors.pop(directory).cancel()
 
@@ -504,7 +503,8 @@ class BlaLibrary(gobject.GObject):
         # update __tracks_ool dict first
         exists = os.path.exists
         update_track = self.update_track
-        for idx, uri in enumerate(filter(exists, self.__tracks_ool.keys())):
+        for idx, uri in enumerate(
+                filter(exists, self.__tracks_ool.iterkeys())):
             update_track(uri)
             if idx % yield_interval == 0: yield True
 
@@ -535,7 +535,7 @@ class BlaLibrary(gobject.GObject):
         # metadata to use)
         remove_track = self.remove_track
         missing = 0
-        for idx, f in enumerate(self.__tracks.keys()):
+        for idx, f in enumerate(self.__tracks.iterkeys()):
             if not exists(f):
                 missing += 1
                 remove_track(f)

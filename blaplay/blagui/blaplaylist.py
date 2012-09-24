@@ -684,25 +684,26 @@ class BlaQueue(blaguiutils.BlaScrolledWindow):
     def __drag_data_recv(self, treeview, drag_context, x, y, selection_data,
             info, time):
         drop_info = treeview.get_dest_row_at_pos(x, y)
+        model = type(self).__queue
 
         if drop_info:
             path, pos = drop_info
-            iterator = type(self).__queue.get_iter(path)
+            iterator = model.get_iter(path)
 
             if (pos == gtk.TREE_VIEW_DROP_BEFORE or
                         pos == gtk.TREE_VIEW_DROP_INTO_OR_BEFORE):
-                move_before = type(self).__queue.move_before
+                move_before = model.move_before
                 f = lambda it: move_before(it, iterator)
             else:
-                move_after = type(self).__queue.move_after
+                move_after = model.move_after
                 f = lambda it: move_after(it, iterator)
                 self.__paths.reverse()
         else:
             iterator = None
-            move_before = type(self).__queue.move_before
+            move_before = model.move_before
             f = lambda it: move_before(it, iterator)
 
-        get_iter = type(self).__queue.get_iter
+        get_iter = model.get_iter
         iterators = map(get_iter, self.__paths)
         map(f, iterators)
         self.__paths = []
@@ -1937,7 +1938,6 @@ class BlaPlaylist(gtk.Notebook):
         def __drag_data_recv(self, treeview, drag_context, x, y,
                 selection_data, info, time):
             treeview.grab_focus()
-
             drop_info = treeview.get_dest_row_at_pos(x, y)
 
             # DND from the library browser
