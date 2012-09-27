@@ -1566,6 +1566,7 @@ class BlaPlaylist(gtk.Notebook):
                 path = self.get_path_from_id(
                         self.__current, unfiltered=True)[0]
             except TypeError: path = None
+
             # since we sort on startup anyway, just get the __all_tracks list
             uris = [BlaPlaylist.uris[identifier]
                     for identifier in self.__all_tracks]
@@ -2282,6 +2283,9 @@ class BlaPlaylist(gtk.Notebook):
         return playlists
 
     def restore(self):
+        # TODO: if there are errors while restoring (namely uncaught KeyError
+        #       exceptions) skip the playlist, and fire up a warning dialog at
+        #       the end of this method informing the user about a possible bug
         print_i("Restoring playlists")
 
         playlists, queue = library.get_playlists()
@@ -2298,7 +2302,9 @@ class BlaPlaylist(gtk.Notebook):
             BlaQueue.restore_queue(queue)
         else: self.add_playlist()
 
-        try: action, uris = blaplay.cli_queue
+        try:
+            action, uris = blaplay.cli_queue
+            blaplay.cli_queue = None
         except TypeError: pass
         else:
             if action == "append": f = BlaPlaylist.add_to_current_playlist
