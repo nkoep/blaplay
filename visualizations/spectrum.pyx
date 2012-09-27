@@ -88,7 +88,8 @@ lib.fftwf_export_wisdom_to_file.restype = None
 try:
     with open(blaconst.WISDOM_PATH, "r") as f:
         lib.fftwf_import_wisdom_from_file(PyFile_AsFile(f))
-except IOError: pass
+except IOError:
+    print_i("Optimizing visualization settings. This may take a moment...")
 
 
 cdef np.ndarray[f32_t, ndim=1] gauss_window(int n):

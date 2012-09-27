@@ -23,14 +23,17 @@ modules = {}
 
 
 def init():
-    # pretty much the same deal as with audio formats except constants in
-    # blaconst are used to look up visualization elements
-
-    def f(s): return not (s.endswith("pyc") or s.startswith("_"))
+    f = lambda s: not (s.endswith("pyc") or s.startswith("_"))
     _modules = filter(f, os.listdir(os.path.dirname(__file__)))
-    for module in map(blautils.toss_extension, _modules):
-        vis = module.capitalize()
-        module = __import__("blaplay.visualizations.%s" % module, {}, {}, vis)
+    for module in _modules:
+        basename = blautils.toss_extension(module)
+        vis = basename.capitalize()
+        try:
+            module = __import__(
+                    "blaplay.visualizations.%s" % basename, {}, {}, vis)
+        except Exception as e:
+            print_i("Failed to import module \"%s\": %r" % (module, e))
+            continue
         vis = getattr(module, vis)
         modules[vis.identifier] = vis
 
