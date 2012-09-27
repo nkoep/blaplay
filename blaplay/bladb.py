@@ -136,26 +136,8 @@ class BlaLibraryMonitor(gobject.GObject):
 
     @blautils.thread
     def __process_events(self):
-        # FIXME: scanning a lot of files from here slows the application down
-        #        quite a bit as python threads aren't suited for heavy
-        #        computation. implementing a similar approach as when adding a
-        #        new directory to the library fails because calling
-        #        main_iteration from a thread seems to deadlock the
-        #        application, not to mention the fact that this isn't the
-        #        fastest approach either
-
-        # FIXME: creating a new folder in nautilus (which is first known as
-        #        `unknown folder', and then removed when it's properly named)
-        #        seems to cause the removal of the library monitor for the
-        #        parent directory. no events will be triggered in it anymore
-        #        from then on, i.e.:
-        #        *** DEBUG (bladb.py:162): New event of type `EVENT_CREATED'
-        #               for file /media/Eigene/Musik/untitled folder (None)
-        #        *** DEBUG (bladb.py:162): New event of type `EVENT_DELETED'
-        #               for file /media/Eigene/Musik/untitled folder (None)
-        #        apart from that, no EVENT_CHANGED or EVENT_MOVED is triggered
-        #        meaning we don't know the actual name of the folder after it
-        #        was renamed. do we have to abandon gio for pyinotify again?
+        # TODO: give this another shot with a controlled driven loop that is
+        #       triggered by a queue
 
         EVENTS = {
             EVENT_CREATED: "EVENT_CREATED",
@@ -315,7 +297,9 @@ class BlaLibraryModel(object):
     # FIXME: for a library of 9000~ tracks creating an instance of the model
     #        increases the interpreter's memory use by roughly 4 MB every time.
     #        would this be better with a "lazy" model, i.e. synthesizing nodes
-    #        on row expansion?
+    #        on row expansion? this could suffer from performance issues. one
+    #        way to fix it might be pushing the tree creation to cpython using
+    #        cython
 
     __layout = [
         gobject.TYPE_STRING,    # uri
@@ -535,7 +519,7 @@ class BlaLibrary(gobject.GObject):
         # metadata to use)
         remove_track = self.remove_track
         missing = 0
-        for idx, f in enumerate(self.__tracks.iterkeys()):
+        for idx, f in enumerate(self.__tracks.keys()):
             if not exists(f):
                 missing += 1
                 remove_track(f)
