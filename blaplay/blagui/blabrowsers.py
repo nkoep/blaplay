@@ -678,11 +678,11 @@ class BlaFileBrowser(gtk.VBox):
                 icon_name, gtk.ICON_SIZE_MENU, gtk.ICON_LOOKUP_USE_BUILTIN)
         if not icon_info: return None
         pb = icon_info.get_filename()
-        if pb: pb = gtk.gdk.pixbuf_new_from_file(pb)
-        else: pb = icon_info.get_builtin_pixbuf()
-        w, h = gtk.icon_size_lookup(gtk.ICON_SIZE_MENU)
-        pb = pb.scale_simple(w, h, gtk.gdk.INTERP_HYPER)
-
+        try: pb = gtk.gdk.pixbuf_new_from_file(pb)
+        except gobject.GError: pb = icon_info.get_builtin_pixbuf()
+        if pb:
+            w, h = gtk.icon_size_lookup(gtk.ICON_SIZE_MENU)
+            pb = pb.scale_simple(w, h, gtk.gdk.INTERP_HYPER)
         return pb
 
     def __visible_func(self, model, iterator):
