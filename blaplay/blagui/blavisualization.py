@@ -19,7 +19,8 @@ import gobject
 import gtk
 
 import blaplay
-from blaplay import blaconst, blacfg, blautils, blaplayer, visualizations
+from blaplay import (blaconst, blacfg, blautils, blaplayer, blagui,
+        visualizations)
 from blaplay.blagui import blaguiutils
 player = blaplayer.player
 visualizations.init()
@@ -43,7 +44,8 @@ class BlaVisualization(gtk.DrawingArea):
             try: self.__module.set_width(allocation.width)
             except AttributeError: pass
         self.connect("size_allocate", size_allocate)
-        self.set_visibility(blacfg.getboolean("general", "show.visualization"))
+        self.set_visibility(blacfg.getboolean("general", "show.visualization"),
+                quiet=True)
         self.show_all()
 
     def __disable(self):
@@ -52,9 +54,13 @@ class BlaVisualization(gtk.DrawingArea):
         except AttributeError: pass
         self.__module = None
         self.__viewport.set_visible(False)
-        blacfg.setboolean("general", "show.visualization", False)
+        # set the menu item to inactive. this will not create circular calls as
+        # the callback for the CheckMenuItem's activate signal only fires if
+        # the value actually changes
+        blagui.uimanager.get_widget(
+                "/Menu/View/Visualization").set_active(False)
 
-    def __initialize_module(self, identifier):
+    def __initialize_module(self, identifier, quiet=False):
         try:
             # get module class and check if necessary attributes are present
             module = visualizations.modules[identifier]
@@ -63,8 +69,10 @@ class BlaVisualization(gtk.DrawingArea):
                 if not callable(method): raise AttributeError
             if not hasattr(module, "height"): raise AttributeError
         except (KeyError, AttributeError):
-            blaguiutils.error_dialog("Failed to initialize \"%s\" "
-                    "visualization." % identifier)
+            if not visualizations.modules: msg = "No visualizations available."
+            else:
+                msg = "Failed to initialize \"%s\" visualization." % identifier
+            if not quiet: blaguiutils.error_dialog(msg)
             self.__disable()
         else:
             self.__module = module()
@@ -120,7 +128,7 @@ class BlaVisualization(gtk.DrawingArea):
         except AttributeError: pass
 
     @classmethod
-    def set_visibility(cls, state):
+    def set_visibility(cls, state, quiet=False):
         blacfg.setboolean("general", "show.visualization", state)
         if not state: return cls.__instance.__disable()
 
@@ -131,5 +139,5 @@ class BlaVisualization(gtk.DrawingArea):
                         visualizations.modules.keys(), key=str.lower)[0]
                 blacfg.set("general", "visualization", identifier)
             except IndexError: pass
-        cls.__instance.__initialize_module(identifier)
+        cls.__instance.__initialize_module(identifier, quiet=quiet)
 
