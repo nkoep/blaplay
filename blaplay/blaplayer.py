@@ -67,7 +67,7 @@ class BlaPlayer(gobject.GObject):
         super(BlaPlayer, self).__init__()
 
     def __init_pipeline(self):
-        bin = gst.Bin()
+        bin_ = gst.Bin()
 
         filt = gst.element_factory_make("capsfilter")
         filt.set_property("caps", gst.caps_from_string(
@@ -88,18 +88,20 @@ class BlaPlayer(gobject.GObject):
 
         sink = gst.element_factory_make("autoaudiosink")
 
-        elements = [filt, self.__equalizer, tee, queue, appsink, sink]
-        map(bin.add, elements)
+        self.__volume = gst.element_factory_make("volume")
+        elements = [self.__volume, filt, self.__equalizer, tee, queue, appsink,
+                sink]
+        map(bin_.add, elements)
 
         pad = elements[0].get_static_pad("sink")
-        bin.add_pad(gst.GhostPad("sink", pad))
+        bin_.add_pad(gst.GhostPad("sink", pad))
 
-        gst.element_link_many(filt, self.__equalizer, tee)
+        gst.element_link_many(self.__volume, filt, self.__equalizer, tee)
         gst.element_link_many(tee, sink)
         gst.element_link_many(tee, queue, appsink)
 
         self.__bin = gst.element_factory_make("playbin2")
-        self.__bin.set_property("audio_sink", bin)
+        self.__bin.set_property("audio_sink", bin_)
         self.__bin.set_property("buffer_duration", 500 * gst.MSECOND)
         self.__bin.set_property("video_sink", None)
         GST_PLAY_FLAG_VIDEO = 1 << 0
@@ -199,7 +201,7 @@ class BlaPlayer(gobject.GObject):
             if volume > 1.0: volume = 1.0
             elif volume < 0.0: volume = 0.0
 
-            self.__bin.set_property("volume", volume)
+            self.__volume.set_property("volume", volume)
 
     def seek(self, pos):
         self.__bin.seek_simple(gst.FORMAT_TIME, gst.SEEK_FLAG_FLUSH, pos)
