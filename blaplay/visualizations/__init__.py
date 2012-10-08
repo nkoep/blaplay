@@ -23,7 +23,7 @@ modules = {}
 
 
 def init():
-    f = lambda s: not (s.endswith("pyc") or s.startswith("_"))
+    def f(s): return not (s.endswith("pyc") or s.startswith("_"))
     _modules = filter(f, os.listdir(os.path.dirname(__file__)))
     for module in _modules:
         basename = blautils.toss_extension(module)

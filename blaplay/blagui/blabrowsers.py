@@ -248,6 +248,10 @@ class BlaTreeView(blaguiutils.BlaTreeViewBase):
         return False
 
     def __popup_menu(self, event):
+        # FIXME: when organize_by is blaconst.ORGANIZE_BY_DIRECTORY the
+        #        selected row might not be a track, but a directory. get the
+        #        proper directory path to open in that case
+
         model = self.get_model()
         path = self.get_path_at_pos(*map(int, [event.x, event.y]))[0]
         name = model[path][2]
@@ -673,6 +677,8 @@ class BlaFileBrowser(gtk.VBox):
         self.pack_start(vbox)
 
     def __get_pixbuf(self, icon_name):
+        # FIXME: partially wrong icons on arch linux with highcontrast icon set
+
         icon_theme = gtk.icon_theme_get_default()
         icon_info = icon_theme.lookup_icon(
                 icon_name, gtk.ICON_SIZE_MENU, gtk.ICON_LOOKUP_USE_BUILTIN)
@@ -746,6 +752,7 @@ class BlaFileBrowser(gtk.VBox):
                             if pb_new:
                                 self.__pixbufs[mimetype] = pb_new
                                 pb = pb_new
+                                # FIXME: why is there no break here?
                 model.append([path, pb, f])
             break
 

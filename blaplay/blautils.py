@@ -28,6 +28,7 @@ import subprocess
 import functools
 from threading import Thread, ThreadError, Lock
 import collections
+import ctypes
 
 import gtk
 
@@ -35,9 +36,11 @@ KEY, PREV, NEXT = xrange(3)
 
 
 def get_thread_id():
-    import ctypes
-    lib = ctypes.CDLL("libc.so.6")
-    return lib.syscall(186) # SYS_gettid
+    try:
+        soname = ctypes.util.find_library("c")
+        # 15 == PR_SET_NAME
+        return ctypes.CDLL(soname).syscall(186) # SYS_gettid
+    except AttributeError: return -1
 
 def thread(f):
     @functools.wraps(f)

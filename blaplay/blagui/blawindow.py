@@ -310,6 +310,9 @@ class BlaWindow(gtk.Window):
             blacfg.setboolean("general", "maximized", True)
         elif not (event.new_window_state & gtk.gdk.WINDOW_STATE_MAXIMIZED):
             blacfg.setboolean("general", "maximized", False)
+            # FIXME: this is called when the window is minimized by clicking on the
+            #        the taskbar icon. for some reason the position gets shifted in
+            #        these cases
             self.__set_geometry()
         return True
 
@@ -404,3 +407,4 @@ class BlaWindow(gtk.Window):
             BlaPlaylist.save(path, type_)
 
         diag.destroy()
+

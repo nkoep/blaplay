@@ -47,7 +47,7 @@ it, simply issue
   $ ./setup.py install
   $ blaplay
 
-Note that the first line of script executables now read:
+Note that the first line of script executables now reads:
 #!/usr/bin/env python2
 This conforms to the way Arch Linux treats different Python versions nowaydays:
 python2 is symlinked to either python2.6 or python2.7, whereas python

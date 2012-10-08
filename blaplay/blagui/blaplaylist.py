@@ -417,7 +417,8 @@ class BlaCellRenderer(blaguiutils.BlaCellRendererBase):
         # check if a state icon should be rendered
         stock = self.get_property("stock-id")
         if stock:
-            pixbuf = widget.render_icon(stock, gtk.ICON_SIZE_SMALL_TOOLBAR)
+            # ICON_SIZE_MENU is the default size specified in the gtk sources
+            pixbuf = widget.render_icon(stock, gtk.ICON_SIZE_MENU)
             width, height = pixbuf.get_width(), pixbuf.get_height()
             cr.set_source_pixbuf(pixbuf,
                     expose_area.x +

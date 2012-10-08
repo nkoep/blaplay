@@ -416,7 +416,7 @@ class BlaEventBrowser(blaguiutils.BlaScrolledWindow):
 
     def __filter_changed(self, radiobutton, filt, hbox):
         # the signal of the new active radiobutton arrives last so only change
-        # the config then
+        # the config when that happens
         if radiobutton.get_active():
             blacfg.set("general", "events.filter", filt)
             self.__treeview.set_model(self.__models[filt])

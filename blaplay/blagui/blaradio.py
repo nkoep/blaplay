@@ -139,6 +139,7 @@ class BlaRadio(gtk.VBox):
         r = gtk.CellRendererPixbuf()
         self.__treeview.insert_column_with_attributes(
                 -1, "Playing", r, stock_id=0)
+        r.set_property("stock-size", gtk.ICON_SIZE_BUTTON)
         r.set_property("xalign", 0.5)
         self.__treeview.get_columns()[-1].set_alignment(0.5)
 
