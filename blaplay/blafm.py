@@ -366,7 +366,7 @@ class BlaScrobbler(object):
 
     def __init__(self):
         super(BlaScrobbler, self).__init__()
-        gtk.quit_add(0, self.__submit_track, True)
+        gtk.quit_add(0, self.__submit_last_track, True)
         self.__queue = BlaScrobbler.SubmissionQueue()
 
     @classmethod
@@ -381,8 +381,8 @@ class BlaScrobbler(object):
         return False
 
     def __passes_ignore(self, track):
-        tokens = map(str.strip, blacfg.getstring(
-                "lastfm", "ignore.pattern").split(","))
+        tokens = map(str.strip, filter(None, blacfg.getstring(
+                "lastfm", "ignore.pattern").split(",")))
         res = [re.compile(t.decode("utf-8"), re.UNICODE | re.IGNORECASE)
                 for t in tokens]
         for r in res:
@@ -426,7 +426,8 @@ class BlaScrobbler(object):
     def __query_status(self):
         state = player.get_state()
         self.__iterations += 1
-        # wait 10~ seconds in between POSTs
+        # wait 10~ seconds in between POSTs. before actually posting an update
+        # kill any remaining thread that might be running
         if self.__iterations % 10 == 0:
             try: self.__t.kill()
             except AttributeError: pass
@@ -436,7 +437,7 @@ class BlaScrobbler(object):
         if state == blaconst.STATE_PLAYING: self.__elapsed += 1
         return state != blaconst.STATE_STOPPED
 
-    def __submit_track(self, shutdown=False):
+    def __submit_last_track(self, shutdown=False):
         if self.__uri:
             try: track = library[self.__uri]
             except KeyError: return
@@ -451,6 +452,7 @@ class BlaScrobbler(object):
                 print_d("Submitting track to scrobbler queue")
                 self.__queue.put([(self.__uri, self.__start_time)])
 
+        self.__uri = None
         if shutdown:
             self.__queue.save()
             return 0
@@ -502,7 +504,10 @@ class BlaScrobbler(object):
             return
         gobject.source_remove(self.__tid)
 
-        self.__submit_track()
+        # we request track submission on track changes. we don't have to check
+        # here if a track passes the ignore settings as this is done when the
+        # __uri attribute of the instance is set below
+        self.__submit_last_track()
 
         self.__elapsed = 0
         self.__iterations = 0
@@ -521,5 +526,6 @@ class BlaScrobbler(object):
             self.__tid = gobject.timeout_add(1000, self.__query_status)
         else:
             self.__uri = None
-            print_d("Not submitting track \"%s - %s\" to the scrobbler"
+            print_d("Not submitting track \"%s - %s\" to the scrobbler queue"
                     % (track[ARTIST], track[TITLE]))
+
