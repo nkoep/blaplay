@@ -5,5 +5,6 @@ include BUGS
 include blaplay.desktop
 include visualizations/*.pyx
 recursive-include blaplay/images *.svg *.png *.theme
+exclude blaplay/*.so
 exclude blaplay/visualizations/*.so
 

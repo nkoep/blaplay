@@ -1,5 +1,5 @@
 *.pyc
-*.c
+visualizations/*.c
 *.so
 *.html
 *.cache

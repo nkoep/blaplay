@@ -16,7 +16,7 @@
 # Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
 try: import mmkeys
-except ImportError: pass
+except ImportError: from blaplay import _mmkeys as mmkeys
 
 from blaplay import blaplayer
 player = blaplayer.player

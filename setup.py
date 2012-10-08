@@ -4,6 +4,9 @@
 import os
 import sys
 import shutil
+import subprocess
+try: import numpy as np
+except ImportError: pass
 from distutils.core import setup, Command, Distribution
 from distutils.command.clean import clean as d_clean
 from distutils.dep_util import newer
@@ -17,6 +20,12 @@ from Cython.Distutils import build_ext
 from blaplay import blaconst, blautils
 
 
+def exec_(args, split=True, cwd="."):
+    p = subprocess.Popen(args, stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=cwd)
+    p = p.communicate()[0]
+    return p.split() if split else p
+
 class clean(d_clean):
     def run(self):
         d_clean.run(self)
@@ -24,9 +33,11 @@ class clean(d_clean):
         base = os.path.dirname(__file__)
 
         for mod in self.distribution.ext_modules:
-            source = "%s.c" % blautils.toss_extension(mod.sources[0])
-            path = os.path.join(base, "%s.so" % mod.name.replace(".", "/"))
-            for f in [source, path]:
+            paths = ["%s.c" % blautils.toss_extension(src)
+                    for src in mod.sources if "mmkeys" not in src]
+            paths.append(
+                os.path.join(base, "%s.so" % mod.name.replace(".", "/")))
+            for f in paths:
                 try:
                     print "removing '%s'" % f
                     os.unlink(f)
@@ -212,15 +223,39 @@ class BlaDistribution(Distribution):
 if __name__ == "__main__":
     description = "Minimalistic audio player for GNU/Linux written in Python"
 
+    # visualizations
     visualizations = [f for f in os.listdir("visualizations") if
             blautils.get_extension(f) == "pyx"]
-    libraries=["fftw3f"]
-    extra_compile_args=["-std=gnu99"]
+    extra_compile_args = ["-std=gnu99"]
+    try: extra_compile_args.append("-I%s" % np.get_include())
+    except NameError: pass
     ext_modules = [Extension("blaplay.visualizations.%s"
             % blautils.toss_extension(f), ["visualizations/%s" % f],
-            libraries=libraries, extra_compile_args=extra_compile_args)
+            libraries=["fftw3f"], extra_compile_args=extra_compile_args)
             for f in visualizations
     ]
+
+    # mmkeys
+    defs = exec_(
+        "pkg-config --variable=defsdir pygtk-2.0".split())
+    defs = " ".join(map(str.strip, defs))
+    name = "_mmkeys"
+    mmkeyspy = exec_((
+        """pygobject-codegen-2.0 --prefix %s
+        --register %s/gdk-types.defs
+        --register %s/gtk-types.defs
+        --override mmkeys.override
+        mmkeys.defs""" % (name, defs, defs)).split(), split=False, cwd="mmkeys"
+    )
+    with open("mmkeys/mmkeyspy.c", "w") as f:
+        f.write(mmkeyspy)
+    ext_modules.append(Extension("blaplay.%s" % name, ["mmkeys/%s" % f
+            for f in ("mmkeyspy.c", "mmkeys.c", "mmkeysmodule.c")],
+            extra_compile_args=exec_(
+            "pkg-config --cflags gtk+-2.0 pygtk-2.0".split()),
+            extra_link_args=exec_(
+            "pkg-config --libs gtk+-2.0 pygtk-2.0".split()))
+    )
 
     src_base = "blaplay/images"
     images_comps = []
