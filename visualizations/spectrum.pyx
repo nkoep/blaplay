@@ -89,7 +89,11 @@ try:
     with open(blaconst.WISDOM_PATH, "r") as f:
         lib.fftwf_import_wisdom_from_file(PyFile_AsFile(f))
 except IOError:
-    print_i("Optimizing visualization settings. This may take a moment...")
+    # cython doesn't react well to a modified __builtin__, so we have to call
+    # any messaging functions by manually looking them up in the module's dict
+    import __builtin__
+    __builtin__.__dict__["print_i"]("Optimizing visualization settings. "
+            "This may take a moment...")
 
 
 cdef np.ndarray[f32_t, ndim=1] gauss_window(int n):
@@ -174,6 +178,9 @@ cdef class Spectrum(object):
         self.__in = <float*> fftwf_malloc(NFFT * sizeof(float))
         self.__out = <fftwf_complex*> fftwf_malloc((NFFT/2 + 1) *
                 sizeof(fftwf_complex))
+        # FIXME: creating the exhaustive plan needs to be moved somewhere else
+        #        as it freezes up the GUI when it's already shown when the
+        #        plugin is first selected
         self.__plan = fftwf_plan_dft_r2c_1d(NFFT, self.__in, self.__out,
                 FFTW_EXHAUSTIVE)
         with open(blaconst.WISDOM_PATH, "w") as f:
