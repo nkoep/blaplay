@@ -45,14 +45,14 @@ class BlaFetcher(gobject.GObject):
     def __init__(self):
         super(BlaFetcher, self).__init__()
 
-    def __parse_buffer(self, buf, locator, format):
+    def __parse_buffer(self, buf, locator, format_):
         lyrics = ""
 
         # parse lyrics
-        if format == FORMAT_XML:
+        if format_ == FORMAT_XML:
             f = libxml2.readMemory
             flags = libxml2.XML_PARSE_NOERROR | libxml2.XML_PARSE_NOWARNING
-        elif format == FORMAT_HTML:
+        elif format_ == FORMAT_HTML:
             f = libxml2.htmlReadMemory
             flags = libxml2.HTML_PARSE_NOERROR | libxml2.HTML_PARSE_NOWARNING
         else: return lyrics
@@ -126,7 +126,7 @@ class BlaFetcher(gobject.GObject):
 
         # FIXME: line feeds in results from megalyrics are somehow removed
 
-        for url, artist, title, separator, locator, format in resources:
+        for url, artist, title, separator, locator, format_ in resources:
             # TODO: add safestrings for the different lyrics sources (namely
             #       the separators)
             if url.find("wikia") != -1:
@@ -150,13 +150,13 @@ class BlaFetcher(gobject.GObject):
 
             buf = self.__download_lyrics(url, artist, title, separator)
             if not buf: continue
-            lyrics = self.__parse_buffer(buf, locator, format)
+            lyrics = self.__parse_buffer(buf, locator, format_)
 
             if (lyrics and lyrics[0] == "#" and lyrics.lower().find("redirect")
                     != -1):
                 artist, title = lyrics.split("[")[-1].split("]")[0].split(":")
                 buf = self.__download_lyrics(url, artist, title, separator)
-                lyrics = self.__parse_buffer(buf, locator, format)
+                lyrics = self.__parse_buffer(buf, locator, format_)
 
             # results from wikia need to be parsed again
             if lyrics and url.find("wikia") != -1:
