@@ -98,18 +98,18 @@ def open_url(url):
     os.close(1)
     os.open(os.devnull, os.O_RDWR)
     try: webbrowser.open(url, new=2)
+    except OSError: pass
     finally: os.dup2(stdout, 1)
 
 def open_directory(directory):
     open_with_filehandler(
             directory, "Failed to open directory \"%s\"" % directory)
 
-def open_with_filehandler(f, errmsg):
+def open_with_filehandler(f, msg):
     try: subprocess.Popen(["gnome-open", f])
     except (OSError, ValueError):
         try: subprocess.Popen(["xdg-open", f])
-        except (OSError, ValueError):
-            error_dialog(errmsg)
+        except (OSError, ValueError): error_dialog(msg)
 
 def discover(d, directories_only=False):
     checked_directories = []
