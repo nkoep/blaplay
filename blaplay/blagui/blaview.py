@@ -102,7 +102,7 @@ class BlaSidePane(gtk.VBox):
                 menu = gtk.Menu()
                 sensitive = self.__cover != blaconst.COVER
                 items = [
-                    ("Open cover", open_cover, sensitive),
+                    ("Open in image viewer", open_cover, sensitive),
                     ("Open directory", lambda *x: blautils.open_directory(
                             os.path.dirname(self.__cover)), sensitive), None,
                     ("Fetch cover", fetch_cover, True),

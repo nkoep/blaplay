@@ -92,8 +92,7 @@ class PositionSlider(gtk.HScale):
 
     def __update_position(self):
         state = player.get_state()
-        if state == blaconst.STATE_STOPPED:
-            self.set_value(0)
+        if state == blaconst.STATE_STOPPED: self.set_value(0)
         elif (not state == blaconst.STATE_PAUSED and
                 not state == blaconst.STATE_STOPPED and
                 not self.__seeking):

@@ -46,22 +46,20 @@ cli_queue = None
 def signal(n_args):
     return (gobject.SIGNAL_RUN_LAST, gobject.TYPE_NONE, (object,) * n_args)
 
-def force_singleton(filepath):
-    global lock_file, cli_queue
-
-    # set up logger and messaging functions
+def init(filepath):
+    # set up logging and messaging functions
     def critical(msg):
         logging.critical(msg)
         sys.exit()
 
-    format = "*** %%(levelname)s%s: %%(message)s"
+    format_ = "*** %%(levelname)s%s: %%(message)s"
     if debug:
-        format %= " (%(filename)s:%(lineno)d)"
+        format_ %= " (%(filename)s:%(lineno)d)"
         level = logging.DEBUG
     else:
-        format %= ""
+        format_ %= ""
         level = logging.INFO
-    logging.basicConfig(format=format, level=level)
+    logging.basicConfig(format=format_, level=level)
 
     colors = [
         (logging.INFO, "34"), (logging.DEBUG, "35"),
@@ -75,6 +73,14 @@ def force_singleton(filepath):
     __builtin__.__dict__["print_i"] = logging.info
     __builtin__.__dict__["print_w"] = logging.warning
     __builtin__.__dict__["print_c"] = critical
+
+    # parse command-line arguments and make sure only one instance of blaplay
+    # will be run
+    parse_args()
+    force_singleton(filepath)
+
+def force_singleton(filepath):
+    global lock_file, cli_queue
 
     # set up user directories
     directories = [blaconst.CACHEDIR, blaconst.USERDIR, blaconst.COVERS,
@@ -162,7 +168,7 @@ def parse_args():
     elif args["next"]: bladbus.query_bus("next")
     elif args["previous"]: bladbus.query_bus("previous")
 
-def init():
+def finalize():
     import ctypes
     import ctypes.util
     import gtk

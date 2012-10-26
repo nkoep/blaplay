@@ -21,6 +21,7 @@
 #         http://en.wikipedia.org/wiki/Least-squares_spectral_analysis
 #       - test LPSD:
 #         https://github.com/tobin/lpsd/blob/master/lpsd_demo.m
+#       - http://docs.cython.org/src/userguide/parallelism.html
 
 cimport cython
 cimport numpy as np

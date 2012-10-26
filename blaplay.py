@@ -19,8 +19,7 @@
 import blaplay
 
 
-blaplay.parse_args()
-blaplay.force_singleton(__file__)
+blaplay.init(__file__)
 
 if __name__ == "__main__":
     from blaplay import blacfg, bladb, blaplayer, blagui
@@ -37,6 +36,6 @@ if __name__ == "__main__":
     # initialize the GUI
     blagui.init()
 
-    # init blaplay and start the event loop
-    blaplay.init()
+    # finalize blaplay start-up and start the event loop
+    blaplay.finalize()
 
