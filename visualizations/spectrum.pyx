@@ -206,7 +206,7 @@ cdef class Spectrum(object):
                     f, ["text", "highlight", "background"])
         else:
             color_text = style.text[gtk.STATE_NORMAL]
-            color_highlight = style.base[gtk.STATE_ACTIVE]
+            color_highlight = style.base[gtk.STATE_SELECTED]
             color_bg = style.bg[gtk.STATE_NORMAL]
 
         if (color_text != self.__color_text or
@@ -274,8 +274,8 @@ cdef class Spectrum(object):
             # means buffers are never flushed. therefore we make sure here that
             # we never store more than 500 ms worth of samples (two channels,
             # four bytes per sample, 22050 samples every 500 ms:
-            # 44100 * 4 bytes)
-            l = self.__adapter.available() - 44100 * 4
+            # 44100 * 4 bytes = 176400 bytes)
+            l = self.__adapter.available() - 176400
             if l > 0: self.__adapter.flush(l)
 
     @cython.boundscheck(False)

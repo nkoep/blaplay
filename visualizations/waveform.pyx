@@ -77,7 +77,7 @@ cdef class Waveform(object):
                     f, ["text", "highlight", "background"])
         else:
             color_text = style.text[gtk.STATE_NORMAL]
-            color_highlight = style.base[gtk.STATE_ACTIVE]
+            color_highlight = style.base[gtk.STATE_SELECTED]
             color_bg = style.bg[gtk.STATE_NORMAL]
 
         if (color_text != self.__color_text or
@@ -161,7 +161,7 @@ cdef class Waveform(object):
         stroke()
 
         # vertical grid
-        cdef float f = floorf((w - 2*p) / 5.0)
+        cdef float f = floorf((w - 2 * p) / 5.0)
         for i in xrange(4):
             x = (i+1) * f + 0.5
             move_to(x, p)
