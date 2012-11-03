@@ -395,7 +395,8 @@ class BlaScrobbler(object):
     def __update_now_playing(self, delay=False):
         if delay: time.sleep(1)
 
-        track = library[self.__uri]
+        try: track = library[self.__uri]
+        except KeyError: return
         if (not track[ARTIST] or not track[TITLE] or track[LENGTH] < 30 or
                 not blacfg.getboolean("lastfm", "scrobble") or
                 not blacfg.getboolean("lastfm", "nowplaying")):
