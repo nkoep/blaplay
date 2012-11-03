@@ -137,7 +137,7 @@ class BlaLibraryMonitor(gobject.GObject):
     @blautils.thread
     def __process_events(self):
         # TODO: give this another shot with a controlled driven loop that is
-        #       triggered by a queue
+        #       triggered by a queue event
 
         EVENTS = {
             EVENT_CREATED: "EVENT_CREATED",
@@ -377,11 +377,11 @@ class BlaLibraryModel(object):
             raise ValueError("Trying to include track in the library browser "
                     "that has no monitored directory")
         directory = os.path.dirname(
-                track.path)[len(track[MONITORED_DIRECTORY])+1:]
+                track.uri)[len(track[MONITORED_DIRECTORY])+1:]
         comps = directory.split("/")
         if comps == [""]: comps = ["bla"]
         else: comps.insert(0, "bla")
-        return comps, os.path.basename(track.path)
+        return comps, os.path.basename(track.uri)
 
     @classmethod
     def __organize_by_artist(cls, uri, track):
@@ -591,8 +591,8 @@ class BlaLibrary(gobject.GObject):
         return track if return_track else updated
 
     def add(self, track):
-        self.__tracks[track.path] = track
-        try: del self.__tracks_ool[track.path]
+        self.__tracks[track.uri] = track
+        try: del self.__tracks_ool[track.uri]
         except KeyError: pass
 
     def move_track(self, path_from, path_to, md=""):

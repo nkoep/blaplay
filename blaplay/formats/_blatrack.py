@@ -131,10 +131,9 @@ class BlaTrack(dict):
         h, x = divmod(m, 60)
         return "%d:%02d:%02d" % (h, m, s) if h else "%d:%02d" % (m, s)
 
-    # TODO: in the light of radio stations it'd be better to call this uri
-    path = property(lambda self: self[PATH])
+    uri = property(lambda self: self[URI])
     basename = property(lambda self: os.path.basename(
-            blautils.toss_extension(self.path)))
+            blautils.toss_extension(self.uri)))
     bitrate = property(lambda self: "%d kbps" % (self[BITRATE] / 1000)
             if self[BITRATE] else "")
     sampling_rate = property(lambda self: "%d Hz" % self[SAMPLING_RATE]

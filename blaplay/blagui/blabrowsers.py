@@ -308,7 +308,6 @@ class BlaTreeView(blaguiutils.BlaTreeViewBase):
 
 class BlaQuery(object):
     def __init__(self, tokens):
-        # TODO: test filename as well when ORGANIZE_BY_DIRECTORY is used
         if tokens:
             self.__res = [re.compile(t.decode("utf-8"),
                     re.UNICODE | re.IGNORECASE) for t in tokens]
@@ -316,10 +315,16 @@ class BlaQuery(object):
         else: self.query = lambda *x: True
 
     def __query(self, track):
+        strings = [track[identifier] for identifier in [ARTIST, TITLE, ALBUM]]
+
+        if (blacfg.getint("library", "organize.by") ==
+                blaconst.ORGANIZE_BY_DIRECTORY):
+            strings.append(track.basename)
+
         for r in self.__res:
             search = r.search
-            for identifier in [ARTIST, TITLE, ALBUM]:
-                if search(track[identifier]): break
+            for string in strings:
+                if search(string): break
             else: return False
         return True
 

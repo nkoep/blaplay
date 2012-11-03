@@ -514,11 +514,11 @@ class BlaScrobbler(object):
         track = player.get_track()
         try:
             if player.radio: raise KeyError
-            library[track.path]
+            library[track.uri]
         except (AttributeError, KeyError): return
 
         if self.__passes_ignore(track):
-            self.__uri = track.path
+            self.__uri = track.uri
             try: self.__t.kill()
             except AttributeError: pass
             self.__t = self.__update_now_playing(delay=True)

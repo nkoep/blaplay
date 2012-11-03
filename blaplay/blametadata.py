@@ -192,7 +192,7 @@ class BlaFetcher(gobject.GObject):
                     "cover", blaconst.COVER, force_download))
             cover = blafm.get_cover(track, image_base)
             if not cover and not force_download:
-                base = os.path.dirname(track.path)
+                base = os.path.dirname(track.uri)
                 images = [f for f in os.listdir(base)
                         if blautils.get_extension(f) in ["jpg", "png"]]
                 for image in images:

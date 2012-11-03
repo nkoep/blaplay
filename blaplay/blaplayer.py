@@ -92,7 +92,7 @@ class BlaPlayer(gobject.GObject):
             self.stop()
             from blaplay.blagui import blaguiutils
             blaguiutils.error_dialog("Error", "Failed to construct GStreamer "
-                    "pipeline. Make sure GStreamer 0.10, its Python bindings,
+                    "pipeline. Make sure GStreamer 0.10, its Python bindings, "
                     "and gst-plugins-base and gst-plugins-good are installed.")
             return False
 

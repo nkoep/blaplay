@@ -564,16 +564,16 @@ class BlaEval(object):
         return track.bitrate
 
     def __filename_cb(track):
-        return os.path.basename(track.path)
+        return os.path.basename(track.uri)
 
     def __extension_cb(track):
-        return blautils.get_extension(track.path)
+        return blautils.get_extension(track.uri)
 
     def __directory_cb(track):
-        return os.path.dirname(track.path)
+        return os.path.dirname(track.uri)
 
     def __path_cb(track):
-        return track.path
+        return track.uri
 
     def __filesize_cb(track):
         return track.get_filesize(short=True)
@@ -1758,7 +1758,7 @@ class BlaPlaylist(gtk.Notebook):
             try:
                 if self.__current is None: raise KeyError
                 track = BlaPlaylist.uris[self.__current]
-                if track != player.get_track().path: raise KeyError
+                if track != player.get_track().uri: raise KeyError
             except KeyError: return
             self.set_row(self.get_path_from_id(self.__current))
 
