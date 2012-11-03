@@ -163,8 +163,7 @@ class BlaTreeView(blaguiutils.BlaTreeViewBase):
             return children
 
         selections = []
-        model = self.get_model()
-        paths = self.get_selection().get_selected_rows()[-1]
+        model, paths = self.get_selection().get_selected_rows()
 
         for p in paths:
             iterator = model.get_iter(p)
@@ -248,45 +247,52 @@ class BlaTreeView(blaguiutils.BlaTreeViewBase):
         return False
 
     def __popup_menu(self, event):
-        # FIXME: when organize_by is blaconst.ORGANIZE_BY_DIRECTORY the
-        #        selected row might not be a track, but a directory. get the
-        #        proper directory path to open in that case
-
         model = self.get_model()
-        path = self.get_path_at_pos(*map(int, [event.x, event.y]))[0]
+        try: path = self.get_path_at_pos(*map(int, [event.x, event.y]))[0]
+        except TypeError: return
+
+        if self.__browser_id == blaconst.BROWSER_FILESYSTEM:
+            dirname = lambda s: s
+            resolve = True
+        else:
+            dirname = os.path.dirname
+            resolve = False
+
         name = model[path][2]
         tracks = self.get_tracks()
-        if self.__browser_id == blaconst.BROWSER_FILESYSTEM: resolve = True
-        else: resolve = False
-        menu = gtk.Menu()
+        directory = list(set(map(dirname, tracks)))
+        if len(directory) == 1 and os.path.isdir(directory[0]):
+            directory = directory[0]
+        else: directory = None
 
         items = [
             ("Send to current playlist", None,
-                    BlaPlaylist.send_to_current_playlist),
+                    BlaPlaylist.send_to_current_playlist, True),
             ("Add to current playlist", None,
-                    BlaPlaylist.add_to_current_playlist),
-            ("Send to new playlist", None, BlaPlaylist.send_to_new_playlist),
+                    BlaPlaylist.add_to_current_playlist, True),
+            ("Send to new playlist", None, BlaPlaylist.send_to_new_playlist,
+                    True),
             None
         ]
-
         if self.__browser_id == blaconst.BROWSER_LIBRARY:
             items.extend([
                 ("Add to playback queue", "Q", lambda *x:
-                        self.__send_to_queue()),
+                        self.__send_to_queue(), True),
                 ("Open containing directory", None, lambda *x:
-                        blautils.open_directory(os.path.dirname(tracks[0]))),
+                        blautils.open_directory(directory), bool(directory)),
                 None,
                 ("Properties", "<Alt>Return", lambda *x:
-                        BlaTagedit(tracks) if tracks else True)
+                        BlaTagedit(tracks) if tracks else True, True)
             ])
         else:
             items.extend([("Open containing directory", None, lambda *x:
-                    blautils.open_directory(os.path.dirname(tracks[0])))])
+                    blautils.open_directory(directory), bool(directory))])
 
+        menu = gtk.Menu()
         for item in items:
             if item is None: m = gtk.SeparatorMenuItem()
             else:
-                label, accel, callback = item
+                label, accel, callback, sensitive = item
                 m = gtk.MenuItem(label)
                 if accel is not None:
                     mod, key = gtk.accelerator_parse(accel)
@@ -294,6 +300,7 @@ class BlaTreeView(blaguiutils.BlaTreeViewBase):
                             blagui.accelgroup, mod, key, gtk.ACCEL_VISIBLE)
                 m.connect("activate",
                         lambda x, c=callback: c(name, tracks, resolve))
+                m.set_sensitive(sensitive)
             menu.append(m)
 
         menu.show_all()
