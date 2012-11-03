@@ -1,4 +1,5 @@
 0.2:
+- add acoustid support
 - improve lyrics fetcher (more robust search, more search engines)
 - add iPod support, possibly other players, too
 - support for CUE sheets

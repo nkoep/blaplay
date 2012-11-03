@@ -236,8 +236,7 @@ if __name__ == "__main__":
     ]
 
     # mmkeys
-    defs = exec_(
-        "pkg-config --variable=defsdir pygtk-2.0".split())
+    defs = exec_("pkg-config --variable=defsdir pygtk-2.0".split())
     defs = " ".join(map(str.strip, defs))
     name = "_mmkeys"
     mmkeyspy = exec_((
@@ -247,8 +246,7 @@ if __name__ == "__main__":
         --override mmkeys.override
         mmkeys.defs""" % (name, defs, defs)).split(), split=False, cwd="mmkeys"
     )
-    with open("mmkeys/mmkeyspy.c", "w") as f:
-        f.write(mmkeyspy)
+    with open("mmkeys/mmkeyspy.c", "w") as f: f.write(mmkeyspy)
     ext_modules.append(Extension("blaplay.%s" % name, ["mmkeys/%s" % f
             for f in ("mmkeyspy.c", "mmkeys.c", "mmkeysmodule.c")],
             extra_compile_args=exec_(

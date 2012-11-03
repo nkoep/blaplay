@@ -19,24 +19,45 @@ import os
 from math import log10
 
 import gobject
-import pygst
-pygst.require("0.10")
-import gst
+try:
+    import pygst
+    try: pygst.require("0.10")
+    except pygst.RequiredVersionError: raise ImportError
+    import gst
+except ImportError:
+    class gst(object):
+        class ElementNotFoundError(Exception): pass
+        @classmethod
+        def element_factory_find(cls, element): return None
+        @classmethod
+        def element_factory_make(cls, element): raise gst.ElementNotFoundError
 
 import blaplay
 from blaplay import blaconst, blacfg, blautils
 from blaplay.formats._identifiers import TITLE
 
+gstreamer_is_working = None
 library = None
 player = None
 
 
 def init():
+    def test_gstreamer_setup():
+        try: gst.Bin()
+        except AttributeError: return False
+        for element in "capsfilter tee appsink autoaudiosink".split():
+            try: gst.element_factory_make(element)
+            except gst.ElementNotFoundError: return False
+        return True
+
     print_i("Initializing the playback device")
 
     from blaplay import bladb
-    global library, player
+    global gstreamer_is_working, library, player
+    gstreamer_is_working = test_gstreamer_setup()
 
+    # make sure mad is used for decoding mp3s if both the mad and fluendo
+    # decoder are available on the system as mad should be faster
     fluendo, mad = map(gst.element_factory_find, ["flump3dec", "mad"])
     if fluendo and mad:
         fluendo.set_rank(min(fluendo.get_rank(), max(mad.get_rank() - 1, 0)))
@@ -67,6 +88,14 @@ class BlaPlayer(gobject.GObject):
         super(BlaPlayer, self).__init__()
 
     def __init_pipeline(self):
+        if not gstreamer_is_working:
+            self.stop()
+            from blaplay.blagui import blaguiutils
+            blaguiutils.error_dialog("Error", "Failed to construct GStreamer "
+                    "pipeline. Make sure GStreamer 0.10, its Python bindings,
+                    "and gst-plugins-base and gst-plugins-good are installed.")
+            return False
+
         bin_ = gst.Bin()
 
         filt = gst.element_factory_make("capsfilter")
@@ -122,6 +151,8 @@ class BlaPlayer(gobject.GObject):
 
         self.enable_equalizer(blacfg.getboolean("player", "use.equalizer"))
 
+        return True
+
     def __about_to_finish(self, player):
         # TODO: implement gapless playback
         pass
@@ -172,36 +203,37 @@ class BlaPlayer(gobject.GObject):
         gobject.idle_add(self.emit, "state_changed")
 
     def set_equalizer_value(self, band, value):
-        if self.__bin:
-            if blacfg.getboolean("player", "use.equalizer"):
-                self.__equalizer.set_property("band%d" % band, value)
+        if blacfg.getboolean("player", "use.equalizer"):
+            try: self.__equalizer.set_property("band%d" % band, value)
+            except AttributeError: pass
 
     def enable_equalizer(self, state):
-        if self.__bin:
-            values = None
-            if state:
-                try:
-                    values = blacfg.getlistfloat("equalizer.profiles",
-                            blacfg.getstring("player", "equalizer.profile"))
-                except: pass
+        values = None
+        if state:
+            try:
+                values = blacfg.getlistfloat("equalizer.profiles",
+                        blacfg.getstring("player", "equalizer.profile"))
+            except: pass
 
-            if not values: values = [0.0] * blaconst.EQUALIZER_BANDS
+        if not values: values = [0.0] * blaconst.EQUALIZER_BANDS
+        try:
             for band, value in enumerate(values):
                 self.__equalizer.set_property("band%d" % band, value)
+        except AttributeError: pass
 
     def set_volume(self, volume):
-        if self.__bin:
-            volume /= 100.
+        volume /= 100.
 
-            if blacfg.getboolean("player", "logarithmic.volume.scale"):
-                volume_db = 50 * (volume - 1.0)
-                if volume_db == -50: volume = 0
-                else: volume = pow(10, volume_db / 20.0)
+        if blacfg.getboolean("player", "logarithmic.volume.scale"):
+            volume_db = 50 * (volume - 1.0)
+            if volume_db == -50: volume = 0
+            else: volume = pow(10, volume_db / 20.0)
 
-            if volume > 1.0: volume = 1.0
-            elif volume < 0.0: volume = 0.0
+        if volume > 1.0: volume = 1.0
+        elif volume < 0.0: volume = 0.0
 
-            self.__volume.set_property("volume", volume)
+        try: self.__volume.set_property("volume", volume)
+        except AttributeError: pass
 
     def seek(self, pos):
         self.__bin.seek_simple(gst.FORMAT_TIME, gst.SEEK_FLAG_FLUSH, pos)
@@ -251,7 +283,9 @@ class BlaPlayer(gobject.GObject):
         if not library.update_track(self.__uri, return_track=True):
             self.emit("get_track", blaconst.TRACK_PLAY, True)
 
-        if self.__state == blaconst.STATE_STOPPED: self.__init_pipeline()
+        if (self.__state == blaconst.STATE_STOPPED and
+                not self.__init_pipeline()):
+            return
         self.__bin.set_state(gst.STATE_NULL)
         self.__bin.set_property("uri", "file://%s" % self.__uri)
         self.__bin.set_state(gst.STATE_PLAYING)
@@ -263,7 +297,9 @@ class BlaPlayer(gobject.GObject):
 
     def play_station(self, station):
         if not station: return self.stop()
-        if self.__state == blaconst.STATE_STOPPED: self.__init_pipeline()
+        if (self.__state == blaconst.STATE_STOPPED and
+                not self.__init_pipeline()):
+            return
         self.__station = station
         self.__uri = None
         self.__bin.set_state(gst.STATE_NULL)
@@ -290,10 +326,11 @@ class BlaPlayer(gobject.GObject):
             bus = self.__bin.get_bus()
             bus.disconnect(self.__busid)
             bus.remove_signal_watch()
-            self.__bin = None
-            self.__equalizer = None
-            self.__uri = None
-            self.__station = None
+
+        self.__bin = None
+        self.__equalizer = None
+        self.__uri = None
+        self.__station = None
 
         self.__state = blaconst.STATE_STOPPED
         self.emit("state_changed")
