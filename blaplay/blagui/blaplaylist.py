@@ -21,6 +21,7 @@ from random import randint
 import urllib
 import re
 import xml.etree.cElementTree as ETree
+from xml.sax.saxutils import escape as xml_escape
 
 import gobject
 import gtk
@@ -2093,7 +2094,7 @@ class BlaPlaylist(gtk.Notebook):
         menu.popup(None, None, None, button, time)
 
     @classmethod
-    def __save_m3u(cls, uris, path):
+    def __save_m3u(cls, uris, path, relative):
         with open(path, "w") as f:
             f.write("#EXTM3U\n")
             for uri in uris:
@@ -2103,16 +2104,21 @@ class BlaPlaylist(gtk.Notebook):
                 title = track[TITLE]
                 if artist: header = "%s - %s" % (artist, title)
                 else: header = title
+                if relative: uri = os.path.basename(uri)
                 f.write("#EXTINF:%d, %s\n%s\n" % (length, header, uri))
 
     @classmethod
     def __parse_m3u(cls, path):
+        directory = os.path.dirname(path)
         uris = []
         try:
             with open(path, "r") as f:
                 for line in f:
                     line = line.strip()
-                    if not line.startswith("#"): uris.append(line)
+                    if not line.startswith("#"):
+                        if not os.path.isabs(line):
+                            line = os.path.join(directory, line)
+                        uris.append(line)
         except IOError:
             blaguiutils.error_dialog("Failed to parse playlist \"%s\"" % path)
             return None
@@ -2120,13 +2126,14 @@ class BlaPlaylist(gtk.Notebook):
         return uris
 
     @classmethod
-    def __save_pls(cls, uris, path):
+    def __save_pls(cls, uris, path, relative):
         try:
             with open(path, "w") as f:
                 f.write("[playlist]\n")
                 for idx, uri in enumerate(uris):
                     track = library[uri]
                     idx += 1
+                    if relative: uri = os.path.basename(uri)
                     text = "File%d=%s\nTitle%d=%s\nLength%d=%s\n" % (idx, uri,
                             idx, track[TITLE], idx, track[LENGTH])
                     f.write(text)
@@ -2137,6 +2144,7 @@ class BlaPlaylist(gtk.Notebook):
 
     @classmethod
     def __parse_pls(cls, path):
+        directory = os.path.dirname(path)
         uris = []
         try:
             with open(path, "r") as f:
@@ -2145,7 +2153,10 @@ class BlaPlaylist(gtk.Notebook):
                     if line.lower().startswith("file"):
                         try: line = line[line.index("=")+1:].strip()
                         except ValueError: pass
-                        else: uris.append(line)
+                        else:
+                            if not os.path.isabs(line):
+                                line = os.path.join(directory, line)
+                            uris.append(line)
         except IOError:
             blaguiutils.error_dialog("Failed to parse playlist \"%s\"" % path)
             return None
@@ -2173,11 +2184,11 @@ class BlaPlaylist(gtk.Notebook):
                     track = library[uri]
                     f.write("    <track>\n")
                     for element, identifier in tags.iteritems():
-                        value = track[identifier].replace("&", "&amp;amp;")
+                        value = xml_escape(track[identifier])
                         if not value: continue
                         f.write("      <%s>%s</%s>\n"
                                 % (element, value, element))
-                    f.write("      <location>%s</location>\n"
+                    f.write("      <location>file://%s</location>\n"
                             % urllib.quote(uri))
                     f.write("    </track>\n")
                 f.write("  </trackList>\n")
@@ -2249,7 +2260,7 @@ class BlaPlaylist(gtk.Notebook):
         return True
 
     @classmethod
-    def save(cls, path=None, type_="m3u"):
+    def save(cls, path=None, type_="m3u", relative=False):
         @blautils.thread
         def save(path, type_):
             name = cls.__instance.get_tab_label_text(
@@ -2259,9 +2270,9 @@ class BlaPlaylist(gtk.Notebook):
             ext = blautils.get_extension(path)
             if ext.lower() != type_: path = "%s.%s" % (path, type_)
 
-            if type_.lower() == "pls": cls.__save_pls(uris, path)
+            if type_.lower() == "pls": cls.__save_pls(uris, path, relative)
             elif type_.lower() == "xspf": cls.__save_xspf(uris, path, name)
-            else: cls.__save_m3u(uris, path)
+            else: cls.__save_m3u(uris, path, relative)
 
         if path is None:
             playlists = cls.__instance.get_playlists()

@@ -15,6 +15,8 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
+import os
+
 import gobject
 import gtk
 
@@ -310,9 +312,6 @@ class BlaWindow(gtk.Window):
             blacfg.setboolean("general", "maximized", True)
         elif not (event.new_window_state & gtk.gdk.WINDOW_STATE_MAXIMIZED):
             blacfg.setboolean("general", "maximized", False)
-            # FIXME: this is called when the window is minimized by clicking on the
-            #        the taskbar icon. for some reason the position gets shifted in
-            #        these cases
             self.__set_geometry()
         return True
 
@@ -340,19 +339,30 @@ class BlaWindow(gtk.Window):
             blacfg.set("general", "size", "%d, %d" % size)
             blacfg.set("general", "position", "%d, %d" % position)
 
+    def __set_file_chooser_directory(self, diag):
+        directory = blacfg.getstring("general", "filechooser.directory")
+        if not directory or not os.path.isdir:
+            directory = os.path.expanduser("~")
+        diag.set_current_folder(directory)
+
     def __open_playlist(self, window):
         diag = gtk.FileChooserDialog("Select playlist",
                 buttons=(gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL,
                 gtk.STOCK_OPEN, gtk.RESPONSE_OK)
         )
         diag.set_local_only(True)
+        self.__set_file_chooser_directory(diag)
+
         response = diag.run()
         path = diag.get_filename()
         diag.destroy()
 
         if response == gtk.RESPONSE_OK and path:
-            if BlaPlaylist.open_playlist(path.strip()):
+            path = path.strip()
+            if BlaPlaylist.open_playlist(path):
                 BlaView.update_view(blaconst.VIEW_PLAYLISTS)
+                blacfg.set("general", "filechooser.directory",
+                        os.path.dirname(path))
 
     def __add_tracks(self, files=True):
         if files: action = gtk.FILE_CHOOSER_ACTION_OPEN
@@ -363,38 +373,56 @@ class BlaWindow(gtk.Window):
         )
         diag.set_select_multiple(True)
         diag.set_local_only(True)
+        self.__set_file_chooser_directory(diag)
+
         response = diag.run()
         filenames = diag.get_filenames()
         diag.destroy()
 
         if response == gtk.RESPONSE_OK and filenames:
-             filenames = map(str.strip, filenames)
-             BlaPlaylist.add_to_current_playlist("", filenames, resolve=True)
+            filenames = map(str.strip, filenames)
+            BlaPlaylist.add_to_current_playlist("", filenames, resolve=True)
+            blacfg.set("general", "filechooser.directory",
+                    os.path.dirname(filenames[0]))
 
     def __save_playlist(self, window):
-        def filter_func(filter_info, extension):
-            if extension is None: return True
-            path, uri, filename, mimetype = filter_info
-            if blautils.get_extension(filename).strip().lower() == extension:
-                return True
-            return False
-
         diag = gtk.FileChooserDialog("Save playlist",
                 action=gtk.FILE_CHOOSER_ACTION_SAVE, buttons=(gtk.STOCK_CANCEL,
                 gtk.RESPONSE_CANCEL, gtk.STOCK_SAVE, gtk.RESPONSE_OK)
         )
         diag.set_do_overwrite_confirmation(True)
+        self.__set_file_chooser_directory(diag)
 
         items = [
-            ("M3U", "m3u"), ("PlS", "pls"), ("XSPF", "xspf"),
-            ("By extension", None)
+            ("M3U", "audio/x-mpegurl", "m3u"),
+            ("PlS", "audio/x-scpls", "pls", ),
+            ("XSPF", "application/xspf+xml", "xspf"),
+            ("Decide by extension", None, None)
         ]
-        for label, extension in items:
+        for label, mime_type, extension in items:
             filt = gtk.FileFilter()
             filt.set_name(label)
-            filt.add_custom(
-                    gtk.FILE_FILTER_DISPLAY_NAME, filter_func, extension)
+            filt.add_pattern("*.%s" % extension)
+            if mime_type: filt.add_mime_type(mime_type)
             diag.add_filter(filt)
+
+        # add combobox to the dialog to decide whether to save relative or
+        # absolute paths in the playlist
+        box = diag.child
+        hbox = gtk.HBox()
+        cb = gtk.combo_box_new_text()
+        hbox.pack_end(cb, expand=False, fill=False)
+        box.pack_start(hbox, expand=False, fill=False)
+        box.show_all()
+        map(cb.append_text, ["Relative paths", "Absolute paths"])
+        cb.set_active(0)
+
+        def filter_changed(diag, filt):
+            filt = diag.get_filter()
+            if diag.list_filters().index(filt) == 2: sensitive = False
+            else: sensitive = True
+            cb.set_sensitive(sensitive)
+        diag.connect("notify::filter", filter_changed)
 
         response = diag.run()
         path = diag.get_filename()
@@ -404,7 +432,9 @@ class BlaWindow(gtk.Window):
             type_ = items[diag.list_filters().index(filt)][-1]
             path = path.strip()
             if type_ is None: type_ = blautils.get_extension(path)
-            BlaPlaylist.save(path, type_)
+            BlaPlaylist.save(path, type_, cb.get_active() == 0)
+            blacfg.set("general", "filechooser.directory",
+                    os.path.dirname(path))
 
         diag.destroy()
 

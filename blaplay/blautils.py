@@ -22,6 +22,7 @@ import cPickle as pickle
 import re
 import shutil
 import urllib
+import urlparse
 import hashlib
 import webbrowser
 import subprocess
@@ -76,10 +77,9 @@ def get_extension(filepath):
     return filepath.split(".")[-1]
 
 def resolve_uri(uri):
-    if uri.startswith("file://"): uri = uri[7:]
-    elif uri.startswith("file:"): uri = uri[5:]
-    uri = urllib.url2pathname(uri)
-    return uri.strip("\n\r\x00")
+    uri = urlparse.urlparse(uri).path
+    uri = os.path.abspath(urllib.url2pathname(uri))
+    return uri
 
 def md5(string):
     m = hashlib.md5()

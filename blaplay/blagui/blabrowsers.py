@@ -473,7 +473,6 @@ class BlaLibraryBrowser(gtk.VBox):
         filt = self.__model.get_model()
         model = filt.get_model()
         iterator = model.get_iter_first()
-        # FIXME: query isn't GC'ed
         query = BlaQuery(self.__filter_parameters).query
         check_children(model, iterator, query)
 
@@ -689,8 +688,6 @@ class BlaFileBrowser(gtk.VBox):
         self.pack_start(vbox)
 
     def __get_pixbuf(self, icon_name):
-        # FIXME: partially wrong icons on arch linux with highcontrast icon set
-
         icon_theme = gtk.icon_theme_get_default()
         icon_info = icon_theme.lookup_icon(
                 icon_name, gtk.ICON_SIZE_MENU, gtk.ICON_LOOKUP_USE_BUILTIN)
@@ -764,7 +761,6 @@ class BlaFileBrowser(gtk.VBox):
                             if pb_new:
                                 self.__pixbufs[mimetype] = pb_new
                                 pb = pb_new
-                                # FIXME: why is there no break here?
                 model.append([path, pb, f])
             break
 
