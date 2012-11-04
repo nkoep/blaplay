@@ -44,7 +44,7 @@ class Mp4(BlaTrack):
             zip(__tag_to_literal.values(), __tag_to_literal.keys()))
 
     def _read_tags(self):
-        audio = _MP4(self.path)
+        audio = _MP4(self.uri)
 
         for key, values in (audio.tags or {}).iteritems():
             if key in ["disk", "trkn"]: value = ["%d/%d" % values[0]]
@@ -62,7 +62,7 @@ class Mp4(BlaTrack):
         self[ENCODING] = "lossy" if self[BITRATE] else "lossless"
 
     def _save(self):
-        try: audio = _MP4(self.path)
+        try: audio = _MP4(self.uri)
         except IOError: return False
 
         try:

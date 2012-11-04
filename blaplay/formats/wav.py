@@ -33,7 +33,7 @@ class Wav(BlaTrack):
         # `lossless' as encoding type; it's not like these are common
         # use-cases anyway
 
-        try: audio = _wave.open(self.path, "r")
+        try: audio = _wave.open(self.uri, "r")
         except _wave.Error: raise TagParseError
 
         self[SAMPLING_RATE] = audio.getframerate()

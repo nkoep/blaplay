@@ -57,10 +57,10 @@ class Xiph(BlaTrack):
     }
 
     def _read_tags(self):
-        path = self.path
+        uri = self.uri
         baseclass, format, encoding = self.__ext_to_format[
-                blautils.get_extension(path)]
-        audio = baseclass(path)
+                blautils.get_extension(uri)]
+        audio = baseclass(uri)
 
         for key, values in (audio.tags or {}).iteritems():
             try: identifier = self.__tag_to_literal[key]
@@ -81,10 +81,10 @@ class Xiph(BlaTrack):
         self[ENCODING] = encoding
 
     def _save(self):
-        path = self.path
+        uri = self.uri
         baseclass, format, encoding = self.__ext_to_format[
-                blautils.get_extension(path)]
-        try: audio = baseclass(path)
+                blautils.get_extension(uri)]
+        try: audio = baseclass(uri)
         except IOError: return False
         tags = audio.tags
         if tags is None:

@@ -29,7 +29,7 @@ class BlaTrack(dict):
     def __init__(self, path):
         self[MTIME] = os.path.getmtime(path)
         self[FILESIZE] = os.path.getsize(path)
-        self[PATH] = path
+        self[URI] = path
 
         self._read_tags()
 
@@ -90,9 +90,9 @@ class BlaTrack(dict):
     def save(self):
         # this makes sure the next EVENT_CHANGED event for this file is ignored
         # by the library monitor as otherwise we'd update everything twice
-        ignore.add(self[PATH])
+        ignore.add(self[URI])
         status = self._save()
-        self[MTIME] = os.path.getmtime(self[PATH])
+        self[MTIME] = os.path.getmtime(self[URI])
         return status
 
     def keys_tags(self):

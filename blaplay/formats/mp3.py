@@ -114,7 +114,7 @@ class Mp3(BlaTrack):
             else: text = str(text).strip().decode("utf-8")
             return text
 
-        try: audio = _MP3(self.path)
+        try: audio = _MP3(self.uri)
         except HeaderNotFoundError: raise TagParseError
         tags = audio.tags or id3.ID3()
         tags_id3v1 = None
@@ -135,7 +135,7 @@ class Mp3(BlaTrack):
             except IndexError:
                 if tag not in self.__id3v1: continue
                 elif tags_id3v1 is None:
-                    with open(self.path, "rb") as f:
+                    with open(self.uri, "rb") as f:
                         f.seek(-128, os.SEEK_END)
                         tags_id3v1 = self.__parse_id3v1(f.read(128))
                 try:
@@ -162,7 +162,7 @@ class Mp3(BlaTrack):
 
     def _save(self):
         try:
-            audio = _MP3(self.path)
+            audio = _MP3(self.uri)
             tags = audio.tags
             if tags is None:
                 audio.add_tags()
@@ -202,7 +202,7 @@ class Mp3(BlaTrack):
 
         try: audio.save()
         except NameError:
-            tags.save(self.path)
+            tags.save(self.uri)
             return False
         return True
 

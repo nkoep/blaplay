@@ -45,7 +45,7 @@ class Asf(BlaTrack):
             zip(__tag_to_literal.values(), __tag_to_literal.keys()))
 
     def _read_tags(self):
-        audio = _ASF(self.path)
+        audio = _ASF(self.uri)
 
         for key, values in (audio.tags or {}).iteritems():
             try:
@@ -60,7 +60,7 @@ class Asf(BlaTrack):
 
     def _save(self):
         try:
-            audio = _ASF(self.path)
+            audio = _ASF(self.uri)
             tags = audio.tags
         except IOError: return False
 
