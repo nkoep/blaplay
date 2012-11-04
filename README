@@ -9,8 +9,10 @@ release recommendations based on the user's last.fm library, as well as support
 for internet radio streams.
 
 Refer to the TODO file for more details on planned features/enhancements, and
-the BUGS file for a description of currently known issues and proposed possible
-solutions.
+the BUGS file for a description of currently known issues and possible
+solutions. Below is a list of dependencies and recommended packages.
+Considering the heterogeneity of Linux distributions and package naming
+conventions we only list Debian package names.
 
 Build dependencies:
     * python-dev (>= 2.6)
@@ -42,8 +44,8 @@ run blaplay locally, issue
   $ ./setup.py build_ext --inplace
   $ ./blaplay.py
 
-after satisfying all build-dependencies. To install blaplay system-wide and run
-it, simply issue
+after having satisfied all build-dependencies. To install blaplay system-wide
+and run it, simply issue
   $ ./setup.py install
   $ blaplay
 

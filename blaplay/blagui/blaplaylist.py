@@ -1588,12 +1588,10 @@ class BlaPlaylist(gtk.Notebook):
             def get_random(old=None):
                 idx_max = model.iter_n_children(None)-1
                 if idx_max < 0: return None
-                path = randint(0, idx_max)
-                identifier = model[path][0]
+                identifier = model[randint(0, idx_max)][0]
                 if old is not None and idx_max > 0:
-                    old = self.get_path_from_id(old)[0]
-                    while path == old: path = randint(0, idx_max)
-                    else: identifier = model[path][0]
+                    while identifier == old:
+                        identifier = model[randint(0, idx_max)][0]
                 return identifier
 
             order = blacfg.getint("general", "play.order")
