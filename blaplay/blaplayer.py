@@ -118,15 +118,15 @@ class BlaPlayer(gobject.GObject):
         sink = gst.element_factory_make("autoaudiosink")
 
         self.__volume = gst.element_factory_make("volume")
-        elements = [self.__volume, filt, self.__equalizer, tee, queue, appsink,
-                sink]
+        elements = [filt, self.__equalizer, tee, queue, appsink,
+                self.__volume, sink]
         map(bin_.add, elements)
 
         pad = elements[0].get_static_pad("sink")
         bin_.add_pad(gst.GhostPad("sink", pad))
 
-        gst.element_link_many(self.__volume, filt, self.__equalizer, tee)
-        gst.element_link_many(tee, sink)
+        gst.element_link_many(filt, self.__equalizer, tee)
+        gst.element_link_many(tee, self.__volume, sink)
         gst.element_link_many(tee, queue, appsink)
 
         self.__bin = gst.element_factory_make("playbin2")
