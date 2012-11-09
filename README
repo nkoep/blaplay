@@ -44,7 +44,7 @@ run blaplay locally, issue
   $ ./setup.py build_ext --inplace
   $ ./blaplay.py
 
-after having satisfied all build-dependencies. To install blaplay system-wide
+after having satisfied all build dependencies. To install blaplay system-wide
 and run it, simply issue
   $ ./setup.py install
   $ blaplay

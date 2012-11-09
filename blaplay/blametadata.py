@@ -97,8 +97,8 @@ class BlaFetcher(gobject.GObject):
 
         if not track or not track.get_lyrics_key():
             print track.get_lyrics_key()
-            self.emit("lyrics", lyrics)
-            return lyrics
+            gobject.idle_add(self.emit, "lyrics", lyrics)
+            return
 
         artist = track[ARTIST]
         title = track[TITLE]
@@ -107,7 +107,7 @@ class BlaFetcher(gobject.GObject):
         # try locally stored lyrics first
         lyrics = blaplay.get_metadata("lyrics", lyrics_key)
         if lyrics:
-            self.emit("lyrics", lyrics)
+            gobject.idle_add(self.emit, "lyrics", lyrics)
             return
 
         # try to download lyrics
@@ -171,7 +171,7 @@ class BlaFetcher(gobject.GObject):
             except (AttributeError, UnicodeDecodeError): pass
             blaplay.add_metadata("lyrics", lyrics_key, lyrics)
 
-        self.emit("lyrics", lyrics)
+        gobject.idle_add(self.emit, "lyrics", lyrics)
 
     @blautils.thread
     def __fetch_cover(self, force_download=False):
@@ -186,10 +186,13 @@ class BlaFetcher(gobject.GObject):
             elif os.path.isfile("%s.png" % image_base):
                 cover = "%s.png" % image_base
 
-        if cover: self.emit("cover", cover, force_download)
+        if cover: gobject.idle_add(self.emit, "cover", cover, force_download)
         else:
-            self.__tid = gobject.timeout_add(2000, lambda *x: self.emit(
-                    "cover", blaconst.COVER, force_download))
+            def f():
+                gobject.idle_add(
+                        self.emit, "cover", blaconst.COVER, force_download)
+                return False
+            self.__tid = gobject.timeout_add(2000, f)
             cover = blafm.get_cover(track, image_base)
             if not cover and not force_download:
                 base = os.path.dirname(track.uri)
@@ -215,7 +218,7 @@ class BlaFetcher(gobject.GObject):
 
             if cover:
                 gobject.source_remove(self.__tid)
-                self.emit("cover", cover, force_download)
+                gobject.idle_add(self.emit, "cover", cover, force_download)
 
     @blautils.thread
     def __fetch_biography(self):
@@ -238,7 +241,7 @@ class BlaFetcher(gobject.GObject):
                 if biography:
                     blaplay.add_metadata("bio", track[ARTIST], biography)
 
-        self.emit("biography", image, biography)
+        gobject.idle_add(self.emit, "biography", image, biography)
 
     def start(self, track, cover_only=False):
         self.__track = track
@@ -278,5 +281,7 @@ class BlaFetcher(gobject.GObject):
             shutil.copy(path, cover)
         else: cover = blaconst.COVER
 
+        # this is called directly from the main thread so we can emit the
+        # signal without gobject.idle_add
         self.emit("cover", cover, False)
 

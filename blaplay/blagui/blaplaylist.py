@@ -2246,9 +2246,7 @@ class BlaPlaylist(gtk.Notebook):
         elif ext == "xspf": name, uris = cls.__parse_xspf(path)
         else:
             blaguiutils.error_dialog("Failed to open playlist \"%s\"" % path,
-                    "Currently we only support are M3U and PLS playlists with "
-                    "absolute paths."
-            )
+                    "Only M3U, PLS, and XSPF playlists are supported.")
             return False
         if uris is None: return False
 
