@@ -32,12 +32,12 @@ tray = None
 
 
 def init():
-    from blawindow import BlaWindow
+    from blamainwindow import BlaMainWindow
     global bla, tray
 
     gtk.icon_theme_get_default().append_search_path(blaconst.IMAGES_PATH)
 
-    bla = BlaWindow()
+    bla = BlaMainWindow()
     tray = BlaTray()
 
 def update_menu(view):
