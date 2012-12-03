@@ -29,11 +29,14 @@ except ImportError:
     # if the dbus module isn't available we just define a class which acts on
     # behalf of the module, issuing warnings whenever it's used
     class bladbus:
+        @classmethod
         def __warning(cls, force):
             print_w("Failed to import dbus module. Install dbus-python.",
                     force=force)
             sys.exit()
+        @classmethod
         def setup_bus(cls, *args): cls.__warning(False)
+        @classmethod
         def query_bus(cls, *args): cls.__warning(True)
 
 lock_file = None
