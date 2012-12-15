@@ -55,6 +55,8 @@ def init(filepath):
         logging.critical(msg)
         sys.exit()
 
+    args = parse_args()
+
     format_ = "*** %%(levelname)s%s: %%(message)s"
     if debug:
         format_ %= " (%(filename)s:%(lineno)d)"
@@ -79,7 +81,7 @@ def init(filepath):
 
     # parse command-line arguments and make sure only one instance of blaplay
     # will be run
-    parse_args()
+    process_args(args)
     force_singleton(filepath)
 
 def force_singleton(filepath):
@@ -155,6 +157,9 @@ def parse_args():
     if args["quiet"]: quiet = True
     if args["debug"]: debug = True
 
+    return args
+
+def process_args(args):
     # player info formatting
     if args["format"]: bladbus.query_bus(args["format"][0])
 
