@@ -38,6 +38,7 @@ from blaplay.formats._identifiers import *
 EVENT_CREATED, EVENT_DELETED, EVENT_MOVED, EVENT_CHANGED = xrange(4)
 
 library = None
+pending_save = False
 extensions = None
 BlaPlaylist = None
 
@@ -47,7 +48,9 @@ def init():
     library = BlaLibrary()
 
 def update_library():
+    global pending_save
     library.update_library()
+    pending_save = False
     BlaPlaylist.update_contents()
     return False
 
@@ -224,7 +227,10 @@ class BlaLibraryMonitor(gobject.GObject):
             # schedule an update for the library browser, etc. if there are
             # more items in the queue the timeout will be removed in the next
             # loop iteration
-            if update: tid = gobject.timeout_add(3000, update_library)
+            if update:
+                global pending_save
+                pending_save = True
+                tid = gobject.timeout_add(3000, update_library)
 
     def __get_subdirectories(self, directories):
         # the heavy lifting here is actually just getting a list of all the
@@ -461,6 +467,13 @@ class BlaLibrary(gobject.GObject):
             cid = self.__library_monitor.connect("initialized", initialized)
         self.__library_monitor.update_directories()
 
+        def save_library():
+            if pending_save:
+                print_i("Saving pending library changes")
+                self.__save_library()
+            return 0
+        gtk.quit_add(0, save_library)
+
     def __getitem__(self, key):
         try: return self.__tracks[key]
         except KeyError: return self.__tracks_ool[key]
@@ -558,6 +571,16 @@ class BlaLibrary(gobject.GObject):
         else: filt = restrict_re.match
         return filt
 
+    @blautils.thread
+    def __save_library(self):
+        # this thread spawns a new process which then writes the library to
+        # disk. we start it in a thread so we can join the process to avoid
+        # hat it turns into a zombie process after it finishes execution
+        p = multiprocessing.Process(target=blautils.serialize_to_file,
+                args=(self.__tracks, blaconst.LIBRARY_PATH))
+        p.start()
+        p.join()
+
     def add_tracks(self, uris):
         count = 0
         filt = self.__extension_filter
@@ -653,22 +676,11 @@ class BlaLibrary(gobject.GObject):
                 self.__tracks, self.__get_filter())
         self.emit("update_library_browser", model)
 
-        @blautils.thread
-        def update_library():
-            # this thread spawns a new process which then writes the library to
-            # disk. we start it in a thread so we can join the process to avoid
-            # hat it turns into a zombie process after it finishes execution
-            p = multiprocessing.Process(target=blautils.serialize_to_file,
-                    args=(self.__tracks, blaconst.LIBRARY_PATH))
-            p.daemon = True
-            p.start()
-            p.join()
-
         # pickling a large dict causes quite an increase in memory use as the
         # module basically creates an exact copy of the object in RAM. to
         # combat the problem we offload the serialization of the library to
         # another process
-        update_library()
+        self.__save_library()
         self.__monitored_directories = map(os.path.realpath,
                 blacfg.getdotliststr("library", "directories"))
         return False
@@ -686,7 +698,7 @@ class BlaLibrary(gobject.GObject):
     def save_playlists(self, playlists, queue):
         def remove_track_ool(uri): self.__tracks_ool.pop(uri, None)
 
-        # create a set of all OOL uris. then we build the difference between
+        # create a set of all OOL uris. then we take the difference between
         # this set and the set of URIs for each playlist. the remainder will be
         # a set of URIs that weren't referenced in any playlist so we just
         # remove them
