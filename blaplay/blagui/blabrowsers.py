@@ -403,8 +403,6 @@ class BlaLibraryBrowser(gtk.VBox):
                 "update_library_browser", self.__update_library_contents)
         library.request_model(blacfg.getint("library", "organize.by"))
 
-        gtk.quit_add(0, library.save_library)
-
     def __update_filter_parameters(self, entry):
         self.__filter_parameters = entry.get_text().strip().split()
         if (blacfg.getboolean("playlist", "search.after.timeout") or

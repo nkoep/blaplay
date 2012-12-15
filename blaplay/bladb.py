@@ -189,6 +189,8 @@ class BlaLibraryMonitor(gobject.GObject):
                 # match so we can stop iterating
                 l = len(path_from)
                 try:
+                    # iterating over a BlaLibrary instance uses a generator so
+                    # we have to make a list of tracks to remove first
                     for uri in library:
                         if uri.startswith(path_from) and uri[l] == "/":
                             library.remove_track(uri)
@@ -474,10 +476,10 @@ class BlaLibrary(gobject.GObject):
         return self.next()
 
     def next(self):
-        for uri in self.__tracks.iterkeys(): yield uri
+        for uri in self.__tracks.keys(): yield uri
 
     def __detect_changes(self, directories):
-        # this function does not perform any write operations on files. it
+        # this method does not perform any write operations on files. it
         # merely updates our metadata of tracks in directories we're monitoring
         yield_interval = 25
 
@@ -525,7 +527,7 @@ class BlaLibrary(gobject.GObject):
                 remove_track(f)
             if idx % yield_interval == 0: yield True
 
-        print_i("%d files missing, %d possibly new ones, %d updated"
+        print_i("%d files missing, %d new ones, %d updated"
                 % (missing, new_files, updated))
 
         # finally update the model for the library browser and playlists. the
@@ -624,7 +626,7 @@ class BlaLibrary(gobject.GObject):
 
         if path_from in self.__tracks and path_from != path_to:
             self.__tracks_ool[path_from] = self.__tracks.pop(path_from)
-        track[PATH] = path_to
+        track[URI] = path_to
         track[MONITORED_DIRECTORY] = md
         if md: self.__tracks[path_to] = track
         else: self.__tracks_ool[path_to] = track
@@ -650,20 +652,26 @@ class BlaLibrary(gobject.GObject):
         model = BlaLibraryModel(blacfg.getint("library", "organize.by"),
                 self.__tracks, self.__get_filter())
         self.emit("update_library_browser", model)
+
+        @blautils.thread
+        def update_library():
+            # this thread spawns a new process which then writes the library to
+            # disk. we start it in a thread so we can join the process to avoid
+            # hat it turns into a zombie process after it finishes execution
+            p = multiprocessing.Process(target=blautils.serialize_to_file,
+                    args=(self.__tracks, blaconst.LIBRARY_PATH))
+            p.daemon = True
+            p.start()
+            p.join()
+
         # pickling a large dict causes quite an increase in memory use as the
         # module basically creates an exact copy of the object in RAM. to
-        # combat the problem we hold off on any serialization until blaplay
-        # shuts down, at the risk of losing metadata during a crash
-        self.__pending_save = True
+        # combat the problem we offload the serialization of the library to
+        # another process
+        update_library()
         self.__monitored_directories = map(os.path.realpath,
                 blacfg.getdotliststr("library", "directories"))
         return False
-
-    def save_library(self):
-        if self.__pending_save:
-            print_i("Updating library on disk")
-            blautils.serialize_to_file(self.__tracks, blaconst.LIBRARY_PATH)
-        return 0
 
     def get_playlists(self):
         # we need BlaPlaylist throughout this module, but we can't import it on
