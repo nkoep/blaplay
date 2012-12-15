@@ -95,8 +95,7 @@ def open_url(url):
     # redirect output of stdout to /dev/null for this thread to hide the status
     # message of the webbrowser module
     stdout = os.dup(1)
-    os.close(1)
-    os.open(os.devnull, os.O_RDWR)
+    os.dup2(os.open(os.devnull, os.O_RDWR), 1)
     try: webbrowser.open(url, new=2)
     except OSError: pass
     finally: os.dup2(stdout, 1)
@@ -106,10 +105,15 @@ def open_directory(directory):
             directory, "Failed to open directory \"%s\"" % directory)
 
 def open_with_filehandler(f, msg):
-    try: subprocess.Popen(["gnome-open", f])
-    except (OSError, ValueError):
-        try: subprocess.Popen(["xdg-open", f])
-        except (OSError, ValueError): error_dialog(msg)
+    with open(os.devnull, "w") as devnull:
+        try:
+            subprocess.Popen(
+                    ["gnome-open", f], stdout=devnull, stderr=devnull)
+        except (OSError, ValueError):
+            try:
+                subprocess.Popen(
+                        ["xdg-open", f], stdout=devnull, stderr=devnull)
+            except (OSError, ValueError): error_dialog(msg)
 
 def discover(d, directories_only=False):
     checked_directories = []
