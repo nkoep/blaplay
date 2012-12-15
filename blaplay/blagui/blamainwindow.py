@@ -319,8 +319,12 @@ class BlaMainWindow(gtk.Window):
         size = blacfg.getlistint("general", "size")
         position = blacfg.getlistint("general", "position")
 
-        if size is None:
-            screen = self.get_screen()
+        screen = self.get_screen()
+        w, h = screen.get_width(), screen.get_height()
+
+        if (size is None or position[0] + size[0] < 0 or
+                position[-1] + size[-1] < 0 or position[0] > w or
+                position[-1] > h):
             x, y, w, h = screen.get_monitor_geometry(0)
             size = map(int, [w / 2.0, h / 2.0])
             self.resize(*size)
