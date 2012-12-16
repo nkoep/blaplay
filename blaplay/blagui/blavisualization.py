@@ -49,6 +49,8 @@ class BlaVisualization(gtk.DrawingArea):
         self.show_all()
 
     def __disable(self):
+        try: player.disconnect(self.__cid)
+        except AttributeError: pass
         gobject.source_remove(self.__tid)
         try: del self.__module
         except AttributeError: pass
@@ -115,6 +117,12 @@ class BlaVisualization(gtk.DrawingArea):
         menu.popup(None, None, None, event.button, event.time)
 
     def __expose(self, drawingarea, event):
+        # FIXME: we need to make sure that buffers are only extracted from the
+        #        adapter when the "expose_event" callback actually fired due to
+        #        the queue_draw call in our timer callback. otherwise we'll
+        #        prematurely consume buffers when we deiconify the mainwindow,
+        #        etc.
+
         # this callback does not fire if the main window is hidden which means
         # that nothing is actually calculated in a visualization element which
         # saves some CPU time. this is not the case if the window is just
