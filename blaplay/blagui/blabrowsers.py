@@ -252,7 +252,7 @@ class BlaTreeView(blaguiutils.BlaTreeViewBase):
         except TypeError: return
 
         if self.__browser_id == blaconst.BROWSER_FILESYSTEM:
-            dirname = lambda s: s
+            dirname = lambda s: s if os.path.isdir(s) else os.path.dirname(s)
             resolve = True
         else:
             dirname = os.path.dirname
@@ -332,6 +332,7 @@ class BlaLibraryBrowser(gtk.VBox):
     __fid = -1
     __filter_parameters = []
     __expanded_rows = []
+    __model = None
 
     def __init__(self, parent):
         super(BlaLibraryBrowser, self).__init__()
@@ -398,7 +399,6 @@ class BlaLibraryBrowser(gtk.VBox):
 
         self.update_colors()
 
-        self.__model = None
         library.connect(
                 "update_library_browser", self.__update_library_contents)
         library.request_model(blacfg.getint("library", "organize.by"))
