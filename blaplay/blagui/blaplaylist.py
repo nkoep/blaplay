@@ -396,7 +396,7 @@ class BlaQuery(object):
                     self.__column_to_tag_ids(column_id))
 
         self.__res = [re.compile(t.decode("utf-8"), re.UNICODE | re.IGNORECASE)
-                for t in tokens]
+                for t in map(re.escape, tokens)]
         self.query = self.__query
 
     def __column_to_tag_ids(self, column_id):
@@ -1832,6 +1832,7 @@ class BlaPlaylist(gtk.Notebook):
                 def f():
                     select_path = selection.select_path
                     map(select_path, selected_rows)
+                    return False
                 gobject.idle_add(f)
 
         def show_properties(self):
@@ -2489,7 +2490,6 @@ class BlaPlaylist(gtk.Notebook):
         cls.get_current_playlist().remove_invalid_tracks()
 
     @classmethod
-    @blautils.gtk_thread
     def send_to_current_playlist(cls, name, uris, resolve=False):
         playlist = cls.get_current_playlist()
         if resolve: uris = library.parse_ool_uris(uris)
@@ -2501,7 +2501,6 @@ class BlaPlaylist(gtk.Notebook):
         force_view()
 
     @classmethod
-    @blautils.gtk_thread
     def add_to_current_playlist(cls, name, uris, resolve=False):
         playlist = cls.get_current_playlist()
         if resolve: uris = library.parse_ool_uris(uris)
@@ -2511,7 +2510,6 @@ class BlaPlaylist(gtk.Notebook):
         force_view()
 
     @classmethod
-    @blautils.gtk_thread
     def send_to_new_playlist(cls, name, uris, resolve=False):
         if resolve: uris = library.parse_ool_uris(uris)
         if not uris: return
@@ -2526,8 +2524,7 @@ class BlaPlaylist(gtk.Notebook):
         # wrapper update the statusbar
 
         if playlist is None: playlist = cls.get_current_playlist()
-        try:
-            count, size, length_seconds = playlist.get_playlist_info()
+        try: count, size, length_seconds = playlist.get_playlist_info()
         except AttributeError: return
 
         if count == 0: info = ""

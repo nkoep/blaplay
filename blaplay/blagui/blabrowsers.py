@@ -310,7 +310,7 @@ class BlaQuery(object):
     def __init__(self, tokens):
         if tokens:
             self.__res = [re.compile(t.decode("utf-8"),
-                    re.UNICODE | re.IGNORECASE) for t in tokens]
+                    re.UNICODE | re.IGNORECASE) for t in map(re.escape, tokens)]
             self.query = self.__query
         else: self.query = lambda *x: True
 
