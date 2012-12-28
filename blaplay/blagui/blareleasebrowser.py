@@ -210,6 +210,7 @@ class BlaReleaseBrowser(blaguiutils.BlaScrolledWindow):
             radiobutton.connect("toggled", self.__filter_changed, filt)
             self.__hbox.pack_start(radiobutton, expand=False)
         button = gtk.Button("Refresh")
+        button.set_focus_on_click(False)
         button.connect_object(
                 "clicked", BlaReleaseBrowser.__update_models, self)
         self.__hbox.pack_start(button, expand=False, padding=5)
@@ -262,11 +263,8 @@ class BlaReleaseBrowser(blaguiutils.BlaScrolledWindow):
         blautils.serialize_to_file(releases, blaconst.RELEASES_PATH)
         return 0
 
-    @blautils.gtk_thread
     @blautils.thread
     def __update_models(self):
-        if self.__lock.locked(): return True
-        self.__lock.acquire()
         def set_sensitive(state):
             self.__hbox.set_sensitive(state)
             self.__treeview.set_sensitive(state)
@@ -279,66 +277,65 @@ class BlaReleaseBrowser(blaguiutils.BlaScrolledWindow):
                 path = release.get_cover()
                 if path: images.add(path)
                 queue.task_done()
-        images = set()
-        queue = Queue.Queue()
-        threads = []
-        for x in xrange(3):
-            t = blautils.BlaThread(target=worker)
-            t.daemon = True
-            threads.append(t)
-            t.start()
 
-        releases = (blafm.get_new_releases(),
-                blafm.get_new_releases(recommended=True))
-        active = blacfg.getint("general", "releases.filter")
-        if releases[0]: self.__count_library = len(releases[0])
-        if releases[1]: self.__count_recommended = len(releases[1])
-        items = [
-            (blaconst.NEW_RELEASES_FROM_LIBRARY, releases[0] or []),
-            (blaconst.NEW_RELEASES_RECOMMENDED, releases[1] or [])
-        ]
-        current_week = datetime.date.today().isocalendar()[:2]
-        for filt, releases in items:
-            model = gtk.ListStore(gobject.TYPE_PYOBJECT)
-            previous_week = None
-            for release in releases:
-                release = BlaRelease(release)
-                week = release.calender_week
-                if previous_week != week:
-                    previous_week = week
-                    date = self.__cw_to_start_end_day(*week)
-                    date = "%s - %s" % (date[0].strftime("%a %d %b"),
-                            date[1].strftime("%a %d %b"))
-                    datestring = "\n<span size=\"larger\"><b>%s\n"
-                    if week == current_week:
-                        datestring %= "This week</b></span> (%s)" % date
-                    else: datestring %= "Week of %s</b></span>" % date
-                    model.append([datestring])
-                model.append([release])
-                queue.put(release)
-            self.__models[filt] = model
+        with self.__lock:
+            images = set()
+            queue = Queue.Queue()
+            threads = []
+            for x in xrange(3):
+                t = blautils.BlaThread(target=worker)
+                t.daemon = True
+                threads.append(t)
+                t.start()
 
-        # wait until all items are processed and kill the worker threads
-        queue.join()
-        map(blautils.BlaThread.kill, threads)
+            releases = (blafm.get_new_releases(),
+                    blafm.get_new_releases(recommended=True))
+            active = blacfg.getint("general", "releases.filter")
+            if releases[0]: self.__count_library = len(releases[0])
+            if releases[1]: self.__count_recommended = len(releases[1])
+            items = [
+                (blaconst.NEW_RELEASES_FROM_LIBRARY, releases[0] or []),
+                (blaconst.NEW_RELEASES_RECOMMENDED, releases[1] or [])
+            ]
+            current_week = datetime.date.today().isocalendar()[:2]
+            for filt, releases in items:
+                model = gtk.ListStore(gobject.TYPE_PYOBJECT)
+                previous_week = None
+                for release in releases:
+                    release = BlaRelease(release)
+                    week = release.calender_week
+                    if previous_week != week:
+                        previous_week = week
+                        date = self.__cw_to_start_end_day(*week)
+                        date = "%s - %s" % (date[0].strftime("%a %d %b"),
+                                date[1].strftime("%a %d %b"))
+                        datestring = "\n<span size=\"larger\"><b>%s\n"
+                        if week == current_week:
+                            datestring %= "This week</b></span> (%s)" % date
+                        else: datestring %= "Week of %s</b></span>" % date
+                        model.append([datestring])
+                    model.append([release])
+                    queue.put(release)
+                self.__models[filt] = model
 
-        # get rid of covers for releases that don't show up in the list anymore
-        for f in set(blautils.discover(blaconst.RELEASES)).difference(images):
-            try: os.unlink(f)
-            except OSError: pass
+            # wait until all items are processed and kill the worker threads
+            queue.join()
+            map(blautils.BlaThread.kill, threads)
 
-        # changes to any gtk elements should be done in the main thread so wrap
-        # the respective calls in idle_add's
-        gobject.idle_add(set_sensitive, True)
-        gobject.idle_add(self.__treeview.set_model, self.__models[active])
+            # get rid of covers for releases that don't show up anymore
+            for image in set(blautils.discover(blaconst.RELEASES)).difference(
+                    images):
+                try: os.unlink(image)
+                except OSError: pass
 
-        if active == blaconst.NEW_RELEASES_FROM_LIBRARY:
-            count = self.__count_library
-        else: count = self.__count_recommended
-        self.emit("count_changed", blaconst.VIEW_RELEASES, count)
+            gobject.idle_add(set_sensitive, True)
+            gobject.idle_add(self.__treeview.set_model, self.__models[active])
 
-        self.__lock.release()
-        return True
+            if active == blaconst.NEW_RELEASES_FROM_LIBRARY:
+                count = self.__count_library
+            else: count = self.__count_recommended
+            self.emit("count_changed", blaconst.VIEW_RELEASES, count)
+            return True
 
     def __filter_changed(self, radiobutton, filt):
         # the signal of the new active radiobutton arrives last so only change

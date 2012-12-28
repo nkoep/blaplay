@@ -154,6 +154,7 @@ class BlaEventBrowser(blaguiutils.BlaScrolledWindow):
                     ", ".join([city, country] if country else [city]))
 
         button = gtk.Button("Change location")
+        button.set_focus_on_click(False)
         button.connect(
                 "clicked", self.__change_location, location)
 
@@ -179,10 +180,10 @@ class BlaEventBrowser(blaguiutils.BlaScrolledWindow):
                     "toggled", self.__filter_changed, filt, hbox_location)
             self.__hbox.pack_start(radiobutton, expand=False)
 
-        self.__refresh_button = gtk.Button("Refresh")
-        self.__refresh_button.connect_object(
-                "clicked", BlaEventBrowser.__update_models, self)
-        self.__hbox.pack_start(self.__refresh_button, expand=False)
+        button = gtk.Button("Refresh")
+        button.set_focus_on_click(False)
+        button.connect_object("clicked", BlaEventBrowser.__update_models, self)
+        self.__hbox.pack_start(button, expand=False)
         vbox.pack_start(self.__hbox, expand=False)
 
         hbox = gtk.HBox(spacing=5)
@@ -329,13 +330,9 @@ class BlaEventBrowser(blaguiutils.BlaScrolledWindow):
         blacfg.set("general", "events.country", country)
         blacfg.set("general", "events.city", city)
 
-    @blautils.gtk_thread
     @blautils.thread
     def __update_models(self):
-        if self.__lock.locked(): return True
-        self.__lock.acquire()
         def set_sensitive(state):
-            self.__refresh_button.set_sensitive(state)
             self.__hbox.set_sensitive(state)
             self.__treeview.set_sensitive(state)
             return False
@@ -347,72 +344,69 @@ class BlaEventBrowser(blaguiutils.BlaScrolledWindow):
                 path = event.get_image()
                 if path: images.add(path)
                 queue.task_done()
-        images = set()
-        queue = Queue.Queue()
-        threads = []
-        for x in xrange(3):
-            t = blautils.BlaThread(target=worker)
-            t.daemon = True
-            threads.append(t)
-            t.start()
 
-        active = blacfg.getint("general", "events.filter")
-        limit = blacfg.getint("general", "events.limit")
-        country = blacfg.getstring("general", "events.country")
-        city = blacfg.getstring("general", "events.city")
+        with self.__lock:
+            images = set()
+            queue = Queue.Queue()
+            threads = []
+            for x in xrange(3):
+                t = blautils.BlaThread(target=worker)
+                t.daemon = True
+                threads.append(t)
+                t.start()
 
-        # FIXME: an exception is raised in this thread if the interpreter shuts
-        #        down immediately after startup when we're fetching events
-        events = (
-            blafm.get_events(limit=limit, recommended=True),
-            blafm.get_events(limit=limit, recommended=False, country=country,
-                    city=city)
-        )
-        if events[0]: self.__count_recommended = len(events[0])
-        if events[1]: self.__count_all = len(events[1])
-        items = [
-            (blaconst.EVENTS_RECOMMENDED, events[0] or []),
-            (blaconst.EVENTS_ALL, events[1] or [])
-        ]
-        for filt, events in items:
-            model = gtk.ListStore(gobject.TYPE_PYOBJECT)
-            previous_date = None
-            for event in events:
-                event = BlaEvent(event)
-                date = event.date
-                if previous_date != date:
-                    previous_date = date
-                    model.append(["\n<span size=\"larger\"><b>%s</b></span>\n"
-                            % date])
-                model.append([event])
-                queue.put(event)
-            self.__models[filt] = model
+            active = blacfg.getint("general", "events.filter")
+            limit = blacfg.getint("general", "events.limit")
+            country = blacfg.getstring("general", "events.country")
+            city = blacfg.getstring("general", "events.city")
 
-        # wait until all items are processed and kill the worker threads
-        queue.join()
-        map(blautils.BlaThread.kill, threads)
+            events = (
+                blafm.get_events(limit=limit, recommended=True),
+                blafm.get_events(limit=limit, recommended=False,
+                        country=country, city=city)
+            )
+            if events[0]: self.__count_recommended = len(events[0])
+            if events[1]: self.__count_all = len(events[1])
+            items = [
+                (blaconst.EVENTS_RECOMMENDED, events[0] or []),
+                (blaconst.EVENTS_ALL, events[1] or [])
+            ]
+            for filt, events in items:
+                model = gtk.ListStore(gobject.TYPE_PYOBJECT)
+                previous_date = None
+                for event in events:
+                    event = BlaEvent(event)
+                    date = event.date
+                    if previous_date != date:
+                        previous_date = date
+                        model.append(["\n<span "
+                                "size=\"larger\"><b>%s</b></span>\n" % date])
+                    model.append([event])
+                    queue.put(event)
+                self.__models[filt] = model
 
-        # get rid of images for event that don't show up in the list anymore
-        for f in set(blautils.discover(blaconst.EVENTS)).difference(images):
-            try: os.unlink(f)
-            except OSError: pass
+            # wait until all items are processed and kill the worker threads
+            queue.join()
+            map(blautils.BlaThread.kill, threads)
 
-        # changes to any gtk elements should be done in the main thread so wrap
-        # the respective calls in idle_add's
-        gobject.idle_add(set_sensitive, True)
-        # TODO: only set the model when we verified that we successfully
-        #       retrieved event information. this avoids that we delete a
-        #       restored model
-        gobject.idle_add(self.__treeview.set_model, self.__models[active])
+            # get rid of images for events that don't show up anymore
+            for image in set(blautils.discover(blaconst.EVENTS)).difference(
+                    images):
+                try: os.unlink(image)
+                except OSError: pass
 
-        if active == blaconst.EVENTS_RECOMMENDED:
-            count = self.__count_recommended
-        else: count = self.__count_all
-        gobject.idle_add(
-                self.emit, "count_changed", blaconst.VIEW_EVENTS, count)
+            gobject.idle_add(set_sensitive, True)
+            # TODO: only set the model when we verified that we successfully
+            #       retrieved event information. this avoids that we delete a
+            #       restored model
+            gobject.idle_add(self.__treeview.set_model, self.__models[active])
 
-        self.__lock.release()
-        return True
+            if active == blaconst.EVENTS_RECOMMENDED:
+                count = self.__count_recommended
+            else: count = self.__count_all
+            gobject.idle_add(
+                    self.emit, "count_changed", blaconst.VIEW_EVENTS, count)
+            return True
 
     def __filter_changed(self, radiobutton, filt, hbox):
         # the signal of the new active radiobutton arrives last so only change

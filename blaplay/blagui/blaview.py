@@ -265,6 +265,20 @@ class BlaSidePane(gtk.VBox):
         notebook.append_page(sw, gtk.Label("Lyrics"))
         notebook.append_page(sw2, gtk.Label("Biography"))
 
+        # modify lyrics button
+        button = gtk.Button()
+        button.set_tooltip_text("Edit metadata")
+        button.set_relief(gtk.RELIEF_NONE)
+        button.set_focus_on_click(False)
+        button.add(
+                gtk.image_new_from_stock(gtk.STOCK_EDIT, gtk.ICON_SIZE_MENU))
+        style = gtk.RcStyle()
+        style.xthickness = style.ythickness = 0
+        button.modify_style(style)
+        button.connect("clicked", lambda *x: print_w("TODO"))
+        button.show_all()
+        notebook.set_action_widget(button, gtk.PACK_END)
+
         self.pack_start(notebook, expand=True)
         self.pack_start(hbox, expand=False)
 
@@ -302,7 +316,7 @@ class BlaSidePane(gtk.VBox):
             action = blagui.uimanager.get_widget(view)
             action.set_active(states[idx])
 
-    @blautils.gtk_thread
+    @blautils.idle
     @blautils.lock(__lock)
     def __update_track(self, track):
         iterator = self.__tb.get_iter_at_mark(self.__tb.get_insert())
@@ -322,14 +336,14 @@ class BlaSidePane(gtk.VBox):
             self.__tb2.insert_with_tags_by_name(
                     iterator, "\n%s" % artist, "bold", "large", "color")
 
-    @blautils.gtk_thread
+    @blautils.idle
     @blautils.lock(__lock)
     def __update_lyrics(self, lyrics):
         if lyrics:
             self.__tb.insert_with_tags_by_name(self.__tb.get_iter_at_mark(
                     self.__tb.get_insert()), "\n\n%s\n" % lyrics, "color")
 
-    @blautils.gtk_thread
+    @blautils.idle
     @blautils.lock(__lock)
     def __update_biography(self, image, biography):
         iterator = self.__tb2.get_iter_at_mark(self.__tb2.get_insert())
@@ -353,7 +367,7 @@ class BlaSidePane(gtk.VBox):
             self.__tb2.insert_with_tags_by_name(iterator,
                     "\n\n%s\n" % biography, "color")
 
-    @blautils.gtk_thread
+    @blautils.idle
     @blautils.lock(__lock)
     def __clear(self):
         self.__tb.delete(

@@ -241,9 +241,15 @@ class BlaLibraryMonitor(gobject.GObject):
         # to the method which scans for changed files so it doesn't have to
         # walk the entire directory tree again
         def get_subdirectories(conn, directories):
-            discover = blautils.discover
-            directories = list(discover(directories, directories_only=True))
-            conn.send(directories)
+            # KeyboardInterrupt exceptions need to be handled in child
+            # processes. since this is no crucial operation we can just return
+            # from the function (terminate the process)
+            try:
+                discover = blautils.discover
+                directories = list(
+                        discover(directories, directories_only=True))
+                conn.send(directories)
+            except KeyboardInterrupt: pass
 
         conn1, conn2 = multiprocessing.Pipe(duplex=False)
         p = multiprocessing.Process(
@@ -571,11 +577,11 @@ class BlaLibrary(gobject.GObject):
         else: filt = restrict_re.match
         return filt
 
-    @blautils.thread
+    @blautils.thread_nondaemonic
     def __save_library(self):
         # this thread spawns a new process which then writes the library to
         # disk. we start it in a thread so we can join the process to avoid
-        # hat it turns into a zombie process after it finishes execution
+        # that it turns into a zombie process after it finishes execution
         p = multiprocessing.Process(target=blautils.serialize_to_file,
                 args=(self.__tracks, blaconst.LIBRARY_PATH))
         p.start()
@@ -663,13 +669,13 @@ class BlaLibrary(gobject.GObject):
             del self.__tracks[uri]
 
     def request_model(self, view):
-        def f():
+        def create_model():
             model = BlaLibraryModel(view, self.__tracks, self.__get_filter())
             self.emit("update_library_browser", model)
             return False
         try: gobject.source_remove(self.__cid)
         except AttributeError: pass
-        self.__cid = gobject.idle_add(f)
+        self.__cid = gobject.idle_add(create_model)
 
     def update_library(self):
         model = BlaLibraryModel(blacfg.getint("library", "organize.by"),

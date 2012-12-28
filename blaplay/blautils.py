@@ -31,7 +31,9 @@ from threading import Thread, ThreadError, Lock
 import collections
 import ctypes
 
+import gobject
 import gtk
+gtk.gdk.threads_init()
 
 KEY, PREV, NEXT = xrange(3)
 
@@ -52,13 +54,19 @@ def thread(f):
         return t
     return wrapper
 
-def gtk_thread(f):
+def thread_nondaemonic(f):
     @functools.wraps(f)
     def wrapper(*args, **kwargs):
-        gtk.gdk.threads_init()
-        gtk.gdk.threads_enter()
-        f(*args, **kwargs)
-        gtk.gdk.threads_leave()
+        t = BlaThread(
+                target=f, args=args, kwargs=kwargs, register_for_cleanup=False)
+        t.start()
+        return t
+    return wrapper
+
+def idle(f):
+    @functools.wraps(f)
+    def wrapper(*args, **kwargs):
+        gobject.idle_add(f, *args, **kwargs)
     return wrapper
 
 # there's nothing complicated about this decorator at all...
@@ -213,7 +221,7 @@ class BlaThread(Thread):
 
     threads = []
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, register_for_cleanup=True, *args, **kwargs):
         super(BlaThread, self).__init__(*args, **kwargs)
 
         # clean up when there's more than 100 threads in the reference list
@@ -222,7 +230,7 @@ class BlaThread(Thread):
             map(remove, [t for t in BlaThread.threads if not t.is_alive()])
 
         self.__killed = False
-        BlaThread.threads.append(self)
+        if register_for_cleanup: BlaThread.threads.append(self)
 
     def start(self):
         self.__run_ = self.run

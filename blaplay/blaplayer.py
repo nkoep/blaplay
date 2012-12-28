@@ -157,7 +157,7 @@ class BlaPlayer(gobject.GObject):
         # TODO: implement gapless playback
         pass
 
-    @blautils.gtk_thread
+    @blautils.idle
     def __on_message(self, bus, message):
         if message.type == gst.MESSAGE_EOS:
             self.next(force_advance=False)

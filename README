@@ -22,7 +22,7 @@ Build dependencies:
 
 Runtime dependencies:
     * python (>= 2.6)
-    * python-gtk2 (>= 2.21)
+    * python-gtk2 (>= 2.22)
     * python-gst0.10
     * python-mutagen (>= 1.19)
     * python-gobject (>= 2.21)
