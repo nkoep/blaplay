@@ -400,9 +400,7 @@ class BlaQuery(object):
         self.query = self.__query
 
     def __column_to_tag_ids(self, column_id):
-        if column_id == COLUMN_TRACK:
-            return [DISC, TRACK]
-        elif column_id == COLUMN_ALBUM_ARTIST:
+        if column_id == COLUMN_ALBUM_ARTIST:
             return [ALBUM_ARTIST, COMPOSER, PERFORMER]
         elif column_id == COLUMN_YEAR:
             return [YEAR]
@@ -567,7 +565,7 @@ class BlaEval(object):
         try: self.eval = self.__callbacks[column_id]
         except IndexError: self.eval = lambda *x: ""
 
-    # these methods are static despite absent staticmethod decorators
+    # these methods are static despite the absent staticmethod decorators
     def __track_cb(track):
         try: value = "%d." % int(track[DISC].split("/")[0])
         except ValueError: value = ""
