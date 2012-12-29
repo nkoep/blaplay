@@ -15,24 +15,3 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-try: import mmkeys
-except ImportError:
-    try: import mmkeys_ as mmkeys
-    except ImportError: raise #pass
-
-import blaplay
-player = blaplay.bla.player
-
-
-class BlaKeys(object):
-    def __init__(self):
-        try: self.__keys = mmkeys.MmKeys()
-        except NameError: pass
-        else:
-            [self.__keys.connect(key, action) for key, action in [
-                ("mm_playpause", lambda *x: player.play_pause()),
-                ("mm_stop", lambda *x: player.stop()),
-                ("mm_prev", lambda *x: player.previous()),
-                ("mm_next", lambda *x: player.next())
-            ]]
-

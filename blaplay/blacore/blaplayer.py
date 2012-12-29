@@ -33,12 +33,12 @@ except ImportError:
         def element_factory_make(cls, element): raise gst.ElementNotFoundError
 
 import blaplay
-from blaplay import blaconst, blacfg, blautils
+library = blaplay.bla.library
+from blaplay.blacore import blaconst, blacfg
+from blaplay import blautil
 from blaplay.formats._identifiers import TITLE
 
 gstreamer_is_working = None
-library = None
-player = None
 
 
 def init():
@@ -52,8 +52,7 @@ def init():
 
     print_i("Initializing the playback device")
 
-    from blaplay import bladb
-    global gstreamer_is_working, library, player
+    global gstreamer_is_working
     gstreamer_is_working = test_gstreamer_setup()
 
     # make sure mad is used for decoding mp3s if both the mad and fluendo
@@ -62,19 +61,19 @@ def init():
     if fluendo and mad:
         fluendo.set_rank(min(fluendo.get_rank(), max(mad.get_rank() - 1, 0)))
 
-    library = bladb.library
     player = BlaPlayer()
+    return player
 
 
 class BlaPlayer(gobject.GObject):
     __gsignals__ = {
-        "get_track": blaplay.signal(2),
-        "get_station": blaplay.signal(1),
-        "state_changed": blaplay.signal(0),
-        "track_changed": blaplay.signal(0),
-        "track_stopped": blaplay.signal(0),
-        "new_buffer": blaplay.signal(1),
-        "seek": blaplay.signal(0)
+        "get_track": blautil.signal(2),
+        "get_station": blautil.signal(1),
+        "state_changed": blautil.signal(0),
+        "track_changed": blautil.signal(0),
+        "track_stopped": blautil.signal(0),
+        "new_buffer": blautil.signal(1),
+        "seek": blautil.signal(0)
     }
 
     __bin = None
@@ -157,7 +156,7 @@ class BlaPlayer(gobject.GObject):
         # TODO: implement gapless playback
         pass
 
-    @blautils.idle
+    @blautil.idle
     def __on_message(self, bus, message):
         if message.type == gst.MESSAGE_EOS:
             self.next(force_advance=False)
@@ -245,7 +244,7 @@ class BlaPlayer(gobject.GObject):
         except gst.QueryError: return 0
 
     def get_track(self):
-        try: return self.__station or library[self.__uri]
+        try: return self.__station or blaplay.bla.library[self.__uri]
         except KeyError: pass
         return None
 
@@ -280,7 +279,7 @@ class BlaPlayer(gobject.GObject):
 
         # if update returns None it means the track needed updating, but
         # failed to be parsed properly so request another song
-        if not library.update_track(self.__uri, return_track=True):
+        if not blaplay.bla.library.update_track(self.__uri, return_track=True):
             self.emit("get_track", blaconst.TRACK_PLAY, True)
 
         if (self.__state == blaconst.STATE_STOPPED and

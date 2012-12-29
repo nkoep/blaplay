@@ -36,8 +36,8 @@ import cairo
 import pango
 import numpy as np
 
-import blaplay
-from blaplay import blacfg, blaconst, blautils
+from blaplay.blacore import blacfg, blaconst
+from blaplay import blautil
 
 cdef extern from "math.h":
     float fmaxf(float, float)
@@ -154,7 +154,7 @@ cdef class Spectrum(object):
         self.__log_freq = NULL
 
     def __init__(self):
-        self.__lock = blautils.BlaLock(strict=True)
+        self.__lock = blautil.BlaLock(strict=True)
 
         # basically we want a 65 dB dynamic range to cover the entire height.
         # we draw seven levels so we choose a height which is divisible by it,
@@ -259,28 +259,24 @@ cdef class Spectrum(object):
         cdef float step
         f[0] = 50.0
         step = powf(2.0, logf(FS / 2 / f[0]) / logf(2) / self.__bands)
-        for i in xrange(1, self.__bands+1): f[i] = f[i-1] * step
+        for i in xrange(1, self.__bands + 1): f[i] = f[i-1] * step
         self.__bin_width = <int> fmaxf((self.__width - 4 - (self.__bands-1)) /
                 (<float> self.__bands), 1)
 
     @cython.boundscheck(False)
     cpdef new_buffer(self, object buf):
         # buffers are added and consumed in different threads so we need to
-        # lock the GstAdapter as it's not thread-safe
+        # protect modifications of the GstAdapter as it's not thread-safe
         cdef int l
         with self.__lock:
+#            self.__adapter.flush(self.__adapter.available())
+#            l = self.__adapter.available() - 1260 * 2 * 4
+#            if l > 0: self.__adapter.flush(l)
             self.__adapter.push(buf)
-            # when the main window is hidden the draw method isn't called which
-            # means buffers are never flushed. therefore we make sure here that
-            # we never store more than 500 ms worth of samples (two channels,
-            # four bytes per sample, 22050 samples every 500 ms:
-            # 44100 * 4 bytes = 176400 bytes)
-            l = self.__adapter.available() - 176400
-            if l > 0: self.__adapter.flush(l)
 
     @cython.boundscheck(False)
     cpdef flush_buffers(self):
-        self.__adapter.flush(self.__adapter.available())
+        with self.__lock: self.__adapter.flush(self.__adapter.available())
 
     @cython.cdivision(True)
     @cython.boundscheck(False)
@@ -301,14 +297,15 @@ cdef class Spectrum(object):
         cdef np.ndarray[f32_t, ndim=1] np_buf
         with self.__lock:
             if self.__adapter.available() > 0:
+                # 44100 / 35 = 1260
                 np_buf = np.frombuffer(self.__adapter.take_buffer(min(
-                        self.__adapter.available(), 2 * 4 * 1260)), dtype=f32)
+                        self.__adapter.available(), 1260 * 2 * 4)), dtype=f32)
             else: np_buf = np.zeros(NFFT * 2, f32)
 
         _buf = <float*> np_buf.data
         l = min(len(np_buf), NFFT * 2)
         for i in xrange(l, NFFT * 2): buf[i-l] = buf[i]
-        for i in xrange(l): buf[NFFT * 2-l+i] = _buf[i]
+        for i in xrange(l): buf[NFFT * 2 - l + i] = _buf[i]
 
         # take the channel mean and calculate the forward transform
         for i in xrange(NFFT): in_[i] = window[i] * (buf[2*i] + buf[2*i+1])
@@ -322,7 +319,7 @@ cdef class Spectrum(object):
         # reuse the input array of the FFT to store the energy coefficients.
         # note that energy gets transformed into power later when we subtract
         # 20 * log10(NFFT) from the log-energy
-        l = NFFT/2 + 1
+        l = NFFT / 2 + 1
         in_[0] = out_[0][0] * out_[0][0] + out_[0][1] * out_[0][1]
         in_[l-1] = out_[l-1][0] * out_[l-1][0] + out_[l-1][1] * out_[l-1][1]
         for i in xrange(1, l-1):
@@ -339,6 +336,8 @@ cdef class Spectrum(object):
             bin_width = bin1 - bin0
             value = 0.0
 
+            # for low frequencies we need to interpolate as we have too few
+            # frequency coefficients
             if bin_width < 1.0:
                 binmid = (bin0 + bin1) / 2.0
                 ibin = <int> binmid - 1
@@ -352,6 +351,7 @@ cdef class Spectrum(object):
                 if bin1 > bin0:
                     value += in_[<int> bin0] * ((<int> bin0) + 1 - bin0)
                 bin0 = <int> bin0 + 1
+
                 while bin0 < <int> bin1:
                     value += in_[<int> bin0]
                     bin0 += 1.0
@@ -359,7 +359,8 @@ cdef class Spectrum(object):
                 value /= bin_width
 
             # store the value to draw in the real part of our output array
-            value = fminf(fmaxf(10 * (log10f(value + eps) - offset), -65.0), 0)
+            value = fminf(
+                    fmaxf(10 * (log10f(value + eps) - offset), -65.0), 0)
             out_[i][0] = (value + old_[i]) / 2.0
             old_[i] = value
 
@@ -404,7 +405,10 @@ cdef class Spectrum(object):
 
         # draw the frequency bins
         bin_width = self.__bin_width
-        cr.set_source(self.__gradient)
+        # FIXME: using fglrx drawing the bins with a linear gradient causes
+        #        performance to take a huge nosedive...
+#        cr.set_source(self.__gradient)
+        cr.set_source_color(self.__color_text)
         x = 7 * p - m
         rectangle = cr.rectangle
         for i in xrange(bands):

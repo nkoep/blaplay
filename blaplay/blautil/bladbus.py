@@ -16,15 +16,11 @@
 # Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
 import os
-import sys
 
 import dbus
 import dbus.service
 import dbus.mainloop.glib
 dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
-
-from blaplay import blaconst
-from blaplay.formats._identifiers import *
 
 SERVICE = "blub.bla.blaplayService"
 INTERFACE = "blub.bla.blaplayInterface"
@@ -38,10 +34,14 @@ def setup_bus():
     BlaDBus(object_path="/BlaDBus", bus_name=bus_name)
 
 def query_bus(query, arg=None):
+    # FIXME: do this server-side. or better yet, see how this should be done
+    #        after complying to MPRIS 2.2
+    from blaplay.formats._identifiers import ARTIST, TITLE, ALBUM, DATE, GENRE
+
     try:
         bus = dbus.SessionBus()
         try: proxy = bus.get_object(SERVICE, "/BlaDBus")
-        except: sys.exit()
+        except: raise SystemExit
         interface = dbus.Interface(proxy, INTERFACE)
 
         if isinstance(query, list):
@@ -61,11 +61,11 @@ def query_bus(query, arg=None):
                 "%c": lambda: interface.get_cover()
             }
 
-            format = query[0]
+            format_ = query[0]
             for key in callbacks.iterkeys():
-                if key in format:
-                    format = format.replace(key, callbacks[key]())
-            print format.encode("utf-8")
+                if key in format_:
+                    format_ = format_.replace(key, callbacks[key]())
+            print format_.encode("utf-8")
 
         else:
             if query == "play_pause": interface.play_pause()
@@ -76,18 +76,20 @@ def query_bus(query, arg=None):
             elif query in ["append", "new", "replace"] and arg:
                 interface.parse_uris(query, arg)
     except: pass
-    sys.exit()
+    raise SystemExit
 
 
 class BlaDBus(dbus.service.Object):
     def __init__(self, **kwargs):
         dbus.service.Object.__init__(self, dbus.SessionBus(), **kwargs)
-        from blaplay import blaplayer
-        self.__player = blaplayer.player
+        import blaplay
+        self.__player = blaplay.bla.player
 
-    @dbus.service.method(dbus_interface=INTERFACE, in_signature="i",
+    @dbus.service.method(dbus_interface=INTERFACE, in_signature="s",
             out_signature="s")
     def get_tag(self, identifier):
+        from blaplay.formats._identifiers import ARTIST, TITLE
+
         track = self.__player.get_track()
         ret = track[identifier]
         if not ret:
@@ -131,12 +133,13 @@ class BlaDBus(dbus.service.Object):
     @dbus.service.method(dbus_interface=INTERFACE, in_signature="",
             out_signature="")
     def raise_window(self):
-        from blaplay import blagui
-        blagui.bla.raise_window()
+        import blaplay
+        blaplay.bla.raise_window()
 
     @dbus.service.method(dbus_interface=INTERFACE, in_signature="sas",
             out_signature="")
     def parse_uris(self, action, uris):
+        # FIXME: do this via blaplay.bla
         from blaplay.blagui.blaplaylist import BlaPlaylist
         if action == "append": f = BlaPlaylist.add_to_current_playlist
         elif action == "new": f = BlaPlaylist.send_to_new_playlist

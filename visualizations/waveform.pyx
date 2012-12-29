@@ -26,8 +26,8 @@ import numpy as np
 import scipy.signal
 resample = scipy.signal.resample
 
-import blaplay
-from blaplay import blacfg, blaconst, blautils
+from blaplay.blacore import blacfg
+from blaplay import blautil
 
 cdef extern from "math.h":
     float floorf(float)
@@ -59,7 +59,7 @@ cdef class Waveform(object):
         self.__buf = NULL
 
     def __init__(self):
-        self.__lock = blautils.BlaLock(strict=True)
+        self.__lock = blautil.BlaLock(strict=True)
 
         cdef int i
         self.__adapter = gst.Adapter()

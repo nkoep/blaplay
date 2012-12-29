@@ -16,29 +16,30 @@
 # Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
 import gobject
-gobject.threads_init()
 import pygtk
 pygtk.require("2.0")
 import gtk
-gtk.gdk.threads_init()
 
-from blaplay import blaconst, blacfg, blaplayer, blafm
+from blaplay.blacore import blaconst, blacfg, blaplayer
+from blaplay.blautil import blafm
 from blaguiutils import BlaTreeViewBase
 
 uimanager = None
 accelgroup = None
-bla = None
 tray = None
 
 
 def init():
     from blamainwindow import BlaMainWindow
-    global bla, tray
+    global tray
 
+    gtk.gdk.threads_init()
     gtk.icon_theme_get_default().append_search_path(blaconst.IMAGES_PATH)
 
-    bla = BlaMainWindow()
-    tray = BlaTray()
+    window = BlaMainWindow()
+    tray = BlaTray(window)
+
+    return window
 
 def update_menu(view):
     from blaplaylist import BlaPlaylist, BlaQueue
@@ -60,7 +61,7 @@ def update_menu(view):
         uimanager.get_widget(entry).set_visible(state)
 
 def update_colors():
-    if blacfg.getboolean("colors", "overwrite"): name = blaconst.STYLE_NAME
+    if blacfg.getboolean("colors", "overwrite"): name = blaconst.APPNAME
     else: name = ""
     map(lambda treeview: treeview.set_name(name), BlaTreeViewBase.instances)
 
@@ -102,7 +103,7 @@ def update_colors():
 
         widget "*.GtkVBox.*.%s" style : highest "%s"
         """ % (
-            blaconst.STYLE_NAME,
+            blaconst.APPNAME,
 
             # text colors
             blacfg.getstring("colors", "text"),
@@ -122,7 +123,7 @@ def update_colors():
             blacfg.getstring("colors", "background"),
             blacfg.getstring("colors", "alternate.rows"),
 
-            blaconst.STYLE_NAME, blaconst.STYLE_NAME
+            blaconst.APPNAME, blaconst.APPNAME
         )
     )
 
@@ -157,7 +158,7 @@ def is_accel(event, accel):
 
 
 class BlaTray(gtk.StatusIcon):
-    def __init__(self):
+    def __init__(self, window):
         super(BlaTray, self).__init__()
         self.set_from_icon_name(blaconst.APPNAME)
         self.set_visible(
@@ -165,17 +166,20 @@ class BlaTray(gtk.StatusIcon):
         self.set_tooltip_text("Stopped")
         self.set_has_tooltip(
                 blacfg.getboolean("general", "tray.tooltip"))
-        self.connect("activate", bla.toggle_hide)
+        self.connect("activate", window.toggle_hide)
         self.connect("popup_menu", self.__tray_menu)
 
     def __tray_menu(self, icon, button, activation_time):
         menu = gtk.Menu()
-        player = blaplayer.player
+
+        import blaplay
+        player = blaplay.bla.player
+        window = blaplay.bla.window
 
         items = [
             ("Play/Pause", player.play_pause), ("Stop", player.stop),
             ("Next", player.next), ("Previous", player.previous), (None, None),
-            ("last.fm", None), ("Quit", bla.quit)
+            ("last.fm", None), ("Quit", window.quit)
         ]
 
         for label, callback in items:

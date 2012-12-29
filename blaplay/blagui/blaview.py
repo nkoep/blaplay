@@ -23,10 +23,11 @@ import cairo
 import pango
 
 import blaplay
-from blaplay import (blaconst, blacfg, bladb, blaplayer, blametadata, blautils,
-        blagui)
-player = blaplayer.player
-library = bladb.library
+player = blaplay.bla.player
+library = blaplay.bla.library
+from blaplay.blacore import blaconst, blacfg
+from blaplay import blautil, blagui
+from blaplay.blautil import blametadata
 from blaplay.blagui import blaguiutils
 from blaplaylist import BlaPlaylist, BlaQueue
 from blastatusbar import BlaStatusbar
@@ -43,7 +44,7 @@ class BlaSidePane(gtk.VBox):
     __MIN_WIDTH = 175
     __delay = 100
     __tid = -1
-    __lock = blautils.BlaLock(strict=True)
+    __lock = blautil.BlaLock(strict=True)
 
     class BlaCoverDisplay(gtk.Viewport):
         __alpha = 1.0
@@ -72,7 +73,7 @@ class BlaSidePane(gtk.VBox):
 
         def __button_press_event(self, event):
             def open_cover(*args):
-                blautils.open_with_filehandler(self.__cover,
+                blautil.open_with_filehandler(self.__cover,
                         "Failed to open image '%s'" % self.__cover)
 
             def fetch_cover(*args):
@@ -103,7 +104,7 @@ class BlaSidePane(gtk.VBox):
                 sensitive = self.__cover != blaconst.COVER
                 items = [
                     ("Open in image viewer", open_cover, sensitive),
-                    ("Open directory", lambda *x: blautils.open_directory(
+                    ("Open directory", lambda *x: blautil.open_directory(
                             os.path.dirname(self.__cover)), sensitive), None,
                     ("Fetch cover", fetch_cover, True),
                     ("Set cover...", set_cover, True),
@@ -316,8 +317,8 @@ class BlaSidePane(gtk.VBox):
             action = blagui.uimanager.get_widget(view)
             action.set_active(states[idx])
 
-    @blautils.idle
-    @blautils.lock(__lock)
+    @blautil.idle
+    @blautil.lock(__lock)
     def __update_track(self, track):
         iterator = self.__tb.get_iter_at_mark(self.__tb.get_insert())
 
@@ -336,15 +337,15 @@ class BlaSidePane(gtk.VBox):
             self.__tb2.insert_with_tags_by_name(
                     iterator, "\n%s" % artist, "bold", "large", "color")
 
-    @blautils.idle
-    @blautils.lock(__lock)
+    @blautil.idle
+    @blautil.lock(__lock)
     def __update_lyrics(self, lyrics):
         if lyrics:
             self.__tb.insert_with_tags_by_name(self.__tb.get_iter_at_mark(
                     self.__tb.get_insert()), "\n\n%s\n" % lyrics, "color")
 
-    @blautils.idle
-    @blautils.lock(__lock)
+    @blautil.idle
+    @blautil.lock(__lock)
     def __update_biography(self, image, biography):
         iterator = self.__tb2.get_iter_at_mark(self.__tb2.get_insert())
 
@@ -367,8 +368,8 @@ class BlaSidePane(gtk.VBox):
             self.__tb2.insert_with_tags_by_name(iterator,
                     "\n\n%s\n" % biography, "color")
 
-    @blautils.idle
-    @blautils.lock(__lock)
+    @blautil.idle
+    @blautil.lock(__lock)
     def __clear(self):
         self.__tb.delete(
                 self.__tb.get_start_iter(), self.__tb.get_end_iter())

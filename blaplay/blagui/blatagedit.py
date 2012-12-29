@@ -25,8 +25,8 @@ import gtk
 import pango
 
 import blaplay
-from blaplay import blautils, blagui, bladb
-library = bladb.library
+library = blaplay.bla.library
+from blaplay import blautil, blagui
 from blaplay.blagui import blaguiutils
 from blaplay.formats._blatrack import BlaTrack
 from blaplay.formats._identifiers import *
@@ -34,9 +34,9 @@ from blaplay.formats._identifiers import *
 
 class BlaTreeView(gtk.TreeView):
     __gsignals__ = {
-        "popup": blaplay.signal(1),
-        "set_value": blaplay.signal(2),
-        "delete_tags": blaplay.signal(1)
+        "popup": blautil.signal(1),
+        "set_value": blautil.signal(2),
+        "delete_tags": blautil.signal(1)
     }
 
     def __init__(self, *args, **kwargs):

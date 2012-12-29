@@ -19,10 +19,11 @@ import gobject
 import gtk
 
 import blaplay
-from blaplay import (blaconst, blacfg, blautils, blaplayer, blagui,
-        visualizations)
+player = blaplay.bla.player
+from blaplay.blacore import blaconst, blacfg
+from blaplay import blautil, blagui, visualizations
 from blaplay.blagui import blaguiutils
-player = blaplayer.player
+
 visualizations.init()
 
 

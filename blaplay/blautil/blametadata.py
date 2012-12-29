@@ -29,17 +29,22 @@ from HTMLParser import HTMLParser as HTMLParser_
 import gobject
 
 import blaplay
-from blaplay import blaconst, blautils, blafm
+from blaplay import blaconst
+from blaplay import blautil
+from blaplay.blautil import blafm
 from blaplay.formats._identifiers import *
 
 TIMEOUT = 10
 
 
+class BlaMetadata(object):
+    pass
+
 class BlaFetcher(gobject.GObject):
     __gsignals__ = {
-        "cover": blaplay.signal(2),
-        "lyrics": blaplay.signal(1),
-        "biography": blaplay.signal(2)
+        "cover": blautil.signal(2),
+        "lyrics": blautil.signal(1),
+        "biography": blautil.signal(2)
     }
 
     __track = None
@@ -150,7 +155,7 @@ class BlaFetcher(gobject.GObject):
         conn.close()
         return feed
 
-    @blautils.thread
+    @blautil.thread
     def __fetch_lyrics(self):
         track = self.__track
         lyrics = None
@@ -213,7 +218,7 @@ class BlaFetcher(gobject.GObject):
 
         # if lyrics were found, store them locally
         if lyrics:
-            lyrics = blautils.remove_html_tags(lyrics).strip()
+            lyrics = blautil.remove_html_tags(lyrics).strip()
             try: lyrics = lyrics.decode("utf-8", "replace")
             except (AttributeError, UnicodeDecodeError):
                 print_d("Failed to store lyrics")
@@ -221,7 +226,7 @@ class BlaFetcher(gobject.GObject):
 
         gobject.idle_add(self.emit, "lyrics", lyrics)
 
-    @blautils.thread
+    @blautil.thread
     def __fetch_cover(self, force_download=False):
         gobject.source_remove(self.__tid)
         track = self.__track
@@ -245,7 +250,7 @@ class BlaFetcher(gobject.GObject):
             if not cover and not force_download:
                 base = os.path.dirname(track.uri)
                 images = [f for f in os.listdir(base)
-                        if blautils.get_extension(f) in ["jpg", "png"]]
+                        if blautil.get_extension(f) in ["jpg", "png"]]
                 for image in images:
                     name = image.lower()
                     if ("front" in name or "cover" in name or
@@ -260,7 +265,7 @@ class BlaFetcher(gobject.GObject):
                                 for f in images]
                         map(os.unlink, images)
                         cover = "%s.%s" % (
-                                image_base, blautils.get_extension(path))
+                                image_base, blautil.get_extension(path))
                         shutil.copy(path, cover)
                         break
 
@@ -268,7 +273,7 @@ class BlaFetcher(gobject.GObject):
                 gobject.source_remove(self.__tid)
                 gobject.idle_add(self.emit, "cover", cover, force_download)
 
-    @blautils.thread
+    @blautil.thread
     def __fetch_biography(self):
         track = self.__track
         image, biography = None, None
@@ -302,7 +307,7 @@ class BlaFetcher(gobject.GObject):
             except AttributeError: pass
         else:
             try:
-                map(blautils.BlaThread.kill, [self.__thread_lyrics,
+                map(blautil.BlaThread.kill, [self.__thread_lyrics,
                         self.__thread_cover, self.__thread_biography])
             except AttributeError: pass
 
@@ -325,7 +330,7 @@ class BlaFetcher(gobject.GObject):
             map(os.unlink, images)
 
         if path:
-            cover = "%s.%s" % (image_base, blautils.get_extension(path))
+            cover = "%s.%s" % (image_base, blautil.get_extension(path))
             shutil.copy(path, cover)
         else: cover = blaconst.COVER
 

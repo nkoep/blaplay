@@ -24,8 +24,9 @@ from ConfigParser import ConfigParser
 import xml.etree.cElementTree as ETree
 
 import blaplay
-from blaplay import blacfg, blaconst, blautils, blaplayer, blagui
-player = blaplayer.player
+player = blaplay.bla.player
+from blaplay.blacore import blacfg, blaconst
+from blaplay import blautil, blagui
 from blaplay.formats._blatrack import BlaTrack
 from blaplay.formats._identifiers import LENGTH, TITLE
 from blaplay.blagui import blaguiutils
@@ -34,7 +35,7 @@ from blaplay.blagui import blaguiutils
 def parse_uri(uri):
     stations = []
     if isinstance(uri, unicode): uri = uri.encode("utf-8")
-    ext = blautils.get_extension(uri).lower()
+    ext = blautil.get_extension(uri).lower()
     if ext in ["m3u", "pls", "asx"]:
         f = urllib.urlopen(uri)
 
@@ -86,7 +87,7 @@ class BlaRadioStation(BlaTrack):
 
 class BlaRadio(gtk.VBox):
     __gsignals__ = {
-        "count_changed": blaplay.signal(2)
+        "count_changed": blautil.signal(2)
     }
     __current = None
 
@@ -191,8 +192,11 @@ class BlaRadio(gtk.VBox):
         player.connect_object("get_station", BlaRadio.__get_station, self)
         player.connect_object("state_changed", BlaRadio.__update_rows, self)
 
-        gtk.quit_add(0, self.__save_stations)
+        blaplay.bla.register_for_cleanup(self)
         self.show_all()
+
+    def __call__(self):
+        self.__save_stations()
 
     def __drag_data_get(self, treeview, drag_context, selection_data, info,
             time):
@@ -233,7 +237,7 @@ class BlaRadio(gtk.VBox):
         # DND from an external location
         else:
             uris = selection_data.data.strip("\n\r\x00")
-            resolve_uri = blautils.resolve_uri
+            resolve_uri = blautil.resolve_uri
             uris = map(resolve_uri, uris.replace("\r", "").split("\n"))
             map(self.__add_station, uris)
 
@@ -285,9 +289,8 @@ class BlaRadio(gtk.VBox):
 
     def __save_stations(self):
         stations = [row[1] for row in self.__treeview.get_model()]
-        blautils.serialize_to_file(
+        blautil.serialize_to_file(
                 [self.__current, stations], blaconst.STATIONS_PATH)
-        return 0
 
     def __popup_menu(self, treeview, event):
         try: path = treeview.get_path_at_pos(*map(int, [event.x, event.y]))
@@ -351,7 +354,7 @@ class BlaRadio(gtk.VBox):
 
     def restore(self):
         try:
-            self.__current, stations = blautils.deserialize_from_file(
+            self.__current, stations = blautil.deserialize_from_file(
                   blaconst.STATIONS_PATH)
         except TypeError: return
         model = self.__treeview.get_model()

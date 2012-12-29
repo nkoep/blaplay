@@ -30,10 +30,11 @@ import pango
 import pangocairo
 
 import blaplay
-from blaplay import (blaconst, blacfg, blautils, blaplayer, bladb, blafm,
-        blagui)
-player = blaplayer.player
-library = bladb.library
+player = blaplay.bla.player
+library = blaplay.bla.library
+from blaplay import blaconst, blacfg
+from blaplay import blautil, blagui
+from blaplay.blautil import blafm
 from blastatusbar import BlaStatusbar
 from blatagedit import BlaTagedit
 from blaplay.blagui import blaguiutils
@@ -318,7 +319,7 @@ def popup(treeview, event, view_id, catcher):
 
     m = gtk.MenuItem("Open containing directory")
     m.connect("activate",
-            lambda *x: blautils.open_directory(os.path.dirname(uri)))
+            lambda *x: blautil.open_directory(os.path.dirname(uri)))
     menu.append(m)
 
     menu.append(gtk.SeparatorMenuItem())
@@ -502,7 +503,7 @@ gobject.type_register(BlaCellRenderer)
 
 class BlaTreeView(blaguiutils.BlaTreeViewBase):
     __gsignals__ = {
-        "sort_column": blaplay.signal(2)
+        "sort_column": blautil.signal(2)
     }
 
     playlist_instances = []
@@ -605,7 +606,7 @@ class BlaEval(object):
         return os.path.basename(track.uri)
 
     def __extension_cb(track):
-        return blautils.get_extension(track.uri)
+        return blautil.get_extension(track.uri)
 
     def __directory_cb(track):
         return os.path.dirname(track.uri)
@@ -665,7 +666,7 @@ class BlaColumn(gtk.TreeViewColumn):
 
 class BlaQueue(blaguiutils.BlaScrolledWindow):
     __gsignals__ = {
-        "count_changed": blaplay.signal(2)
+        "count_changed": blautil.signal(2)
     }
 
     __layout = [
@@ -1005,8 +1006,8 @@ class BlaQueue(blaguiutils.BlaScrolledWindow):
 
 class BlaPlaylist(gtk.Notebook):
     __gsignals__ = {
-        "play_track": blaplay.signal(1),
-        "count_changed": blaplay.signal(2)
+        "play_track": blautil.signal(1),
+        "count_changed": blautil.signal(2)
     }
 
     pages = []          # list of playlists (needed for the queue)
@@ -1462,8 +1463,8 @@ class BlaPlaylist(gtk.Notebook):
                     if self.__mode & MODE_SORTED: ids = self.__all_sorted
                     else: ids = self.__all_tracks
 
-                unique_ids = blautils.BlaOrderedSet()
-                unique_uris = blautils.BlaOrderedSet()
+                unique_ids = blautil.BlaOrderedSet()
+                unique_uris = blautil.BlaOrderedSet()
                 uris = BlaPlaylist.uris
 
                 paths = self.__treeview.get_selection().get_selected_rows()[-1]
@@ -1825,7 +1826,9 @@ class BlaPlaylist(gtk.Notebook):
                 self.__treeview.scroll_to_cell(
                         path, use_align=True, row_align=row_align)
 
-            if set_cursor: gobject.idle_add(self.__treeview.set_cursor, path)
+            if set_cursor:
+                gobject.idle_add(self.__treeview.set_cursor, path,
+                        priority=gobject.PRIORITY_HIGH)
             if selected_rows:
                 def f():
                     select_path = selection.select_path
@@ -2013,7 +2016,7 @@ class BlaPlaylist(gtk.Notebook):
             # DND from an external location or the filesystem browser
             elif info in [1, 3]:
                 uris = selection_data.data.strip("\n\r\x00")
-                resolve_uri = blautils.resolve_uri
+                resolve_uri = blautil.resolve_uri
                 uris = map(resolve_uri, uris.split())
                 data = library.parse_ool_uris(uris)
 
@@ -2070,7 +2073,10 @@ class BlaPlaylist(gtk.Notebook):
         self.show_all()
         self.show_tabs(blacfg.getboolean("general", "playlist.tabs"))
 
-        gtk.quit_add(0, self.save)
+        blaplay.bla.register_for_cleanup(self)
+
+    def __call__(self):
+        self.save()
 
     def __drag_data_recv(self, drag_context, x, y, selection_data, info, time):
         # TODO: accept DND from other playlists as well
@@ -2079,7 +2085,7 @@ class BlaPlaylist(gtk.Notebook):
             resolve = False
         elif info in [1, 3]:
             uris = selection_data.data.strip("\n\r\x00")
-            resolve_uri = blautils.resolve_uri
+            resolve_uri = blautil.resolve_uri
             uris = map(resolve_uri, uris.split())
             resolve = True
         self.send_to_new_playlist("", uris, resolve=resolve)
@@ -2291,8 +2297,8 @@ class BlaPlaylist(gtk.Notebook):
 
     @classmethod
     def open_playlist(cls, path):
-        name = os.path.basename(blautils.toss_extension(path))
-        ext = blautils.get_extension(path).lower()
+        name = os.path.basename(blautil.toss_extension(path))
+        ext = blautil.get_extension(path).lower()
 
         if ext == "m3u": uris = cls.__parse_m3u(path)
         elif ext == "pls": uris = cls.__parse_pls(path)
@@ -2303,7 +2309,7 @@ class BlaPlaylist(gtk.Notebook):
             return False
         if uris is None: return False
 
-        resolve_uri = blautils.resolve_uri
+        resolve_uri = blautil.resolve_uri
         uris = library.parse_ool_uris(map(resolve_uri, uris))
         if uris is None: return False
         playlist = cls.__instance.add_playlist(focus=True, name=name)
@@ -2312,13 +2318,13 @@ class BlaPlaylist(gtk.Notebook):
 
     @classmethod
     def save(cls, path=None, type_="m3u", relative=False):
-        @blautils.thread
+        @blautil.thread
         def save(path, type_):
             name = cls.__instance.get_tab_label_text(
                     cls.get_current_playlist())
             uris = cls.get_current_playlist().get_uris()
 
-            ext = blautils.get_extension(path)
+            ext = blautil.get_extension(path)
             if ext.lower() != type_: path = "%s.%s" % (path, type_)
 
             if type_.lower() == "pls": cls.__save_pls(uris, path, relative)
@@ -2326,14 +2332,12 @@ class BlaPlaylist(gtk.Notebook):
             else: cls.__save_m3u(uris, path, relative)
 
         if path is None:
+            print_i("Saving playlists")
             playlists = cls.__instance.get_playlists()
             library.save_playlists(playlists, BlaQueue.get_queued_tracks())
         else: save(path, type_)
-        return 0
 
     def get_playlists(self):
-        print_i("Saving playlists")
-
         playlists = []
         for playlist in self:
             if playlist == type(self).active: current_playlist = True
@@ -2474,6 +2478,10 @@ class BlaPlaylist(gtk.Notebook):
     def remove(cls, *args):
         playlist = cls.get_current_playlist()
         playlist.get_tracks(remove=True)
+
+    @classmethod
+    def clear(cls, *args):
+        cls.get_current_playlist().clear()
 
     @classmethod
     def new_playlist(cls, type_):

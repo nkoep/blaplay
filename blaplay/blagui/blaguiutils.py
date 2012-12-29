@@ -19,6 +19,7 @@ import gtk
 import gobject
 
 import blaplay
+from blaplay import blautil
 from blaplay import blaconst, blacfg
 
 # these are also needed in blabrowsers.py
@@ -183,7 +184,7 @@ class BlaUniqueWindow(BlaWindow):
 
 class BlaTreeViewBase(gtk.TreeView):
     __gsignals__ = {
-        "popup": blaplay.signal(1)
+        "popup": blautil.signal(1)
     }
 
     instances = []

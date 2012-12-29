@@ -17,7 +17,8 @@
 
 import os
 
-from blaplay import blacfg, blaconst, bladb, blautils
+from blaplay.blacore import blacfg, blaconst, bladb
+from blaplay import blautil
 ignore = bladb.BlaLibraryMonitor.ignore
 from blaplay.formats import TagParseError
 from _identifiers import *
@@ -133,7 +134,7 @@ class BlaTrack(dict):
 
     uri = property(lambda self: self[URI])
     basename = property(lambda self: os.path.basename(
-            blautils.toss_extension(self.uri)))
+            blautil.toss_extension(self.uri)))
     bitrate = property(lambda self: "%d kbps" % (self[BITRATE] / 1000)
             if self[BITRATE] else "")
     sampling_rate = property(lambda self: "%d Hz" % self[SAMPLING_RATE]

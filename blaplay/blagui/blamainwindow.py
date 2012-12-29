@@ -20,9 +20,11 @@ import os
 import gobject
 import gtk
 
-from blaplay import blaconst, blacfg, blautils, blaplayer, bladb, blagui
-player = blaplayer.player
-library = bladb.library
+import blaplay
+player = blaplay.bla.player
+library = blaplay.bla.library
+from blaplay.blacore import blaconst, blacfg
+from blaplay import blautil, blagui
 from blaplay.formats._identifiers import *
 from blaplay.blagui import blaguiutils, blapreferences
 from blakeys import BlaKeys
@@ -227,7 +229,7 @@ class BlaMainWindow(gtk.Window):
         self.__set_geometry()
         blagui.update_colors()
         self.child.show()
-        self.show()
+
         self.__keys = BlaKeys()
 
     def update_title(self, *args):
@@ -278,7 +280,7 @@ class BlaMainWindow(gtk.Window):
         self.hide()
         blaguiutils.set_visible(False)
         blagui.tray.set_visible(False)
-        gtk.main_quit()
+        self.destroy()
         return False
 
     def __toggle_browsers(self, event):
@@ -301,7 +303,7 @@ class BlaMainWindow(gtk.Window):
     def __delete_event(self, window, event):
         if blacfg.getboolean("general", "close.to.tray"):
             return self.toggle_hide(window, event)
-        return self.quit()
+        return self.destroy()
 
     def __window_state_event(self, window, event):
         if (event.changed_mask & gtk.gdk.WINDOW_STATE_ICONIFIED and
@@ -435,7 +437,7 @@ class BlaMainWindow(gtk.Window):
             filt = diag.get_filter()
             type_ = items[diag.list_filters().index(filt)][-1]
             path = path.strip()
-            if type_ is None: type_ = blautils.get_extension(path)
+            if type_ is None: type_ = blautil.get_extension(path)
             BlaPlaylist.save(path, type_, cb.get_active() == 0)
             blacfg.set("general", "filechooser.directory",
                     os.path.dirname(path))

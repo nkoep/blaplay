@@ -17,7 +17,7 @@
 
 import os
 
-from blaplay import blautils
+from blaplay import blautil
 
 formats = {}
 
@@ -30,14 +30,14 @@ def init():
 
     def f(s): return not (s.endswith("pyc") or s.startswith("_"))
     modules = filter(f, os.listdir(os.path.dirname(__file__)))
-    for module in map(blautils.toss_extension, modules):
+    for module in map(blautil.toss_extension, modules):
         format = module.capitalize()
         module = __import__("blaplay.formats.%s" % module, {}, {}, format)
         format = getattr(module, format)
         for ext in format.extensions: formats[ext] = format
 
 def get_track(path):
-    ext = blautils.get_extension(path).lower()
+    ext = blautil.get_extension(path).lower()
     try: track = formats[ext](path)
     except (KeyError, TagParseError): track = None
     return track

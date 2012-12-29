@@ -18,9 +18,12 @@
 import gtk
 import gobject
 
-from blaplay import blaconst, blacfg, blautils, bladb, blaplayer, blagui
-player = blaplayer.player
-library = bladb.library
+import blaplay
+player = blaplay.bla.player
+library = blaplay.bla.library
+from blaplay.blacore import blaconst, blacfg
+from blaplay import blautil, blagui
+
 from blaplay.formats._identifiers import *
 
 
@@ -37,7 +40,7 @@ class BlaStatusbar(gtk.Table):
     __duration = "0:00"
 
     __padding = 5
-    __lock = blautils.BlaLock()
+    __lock = blautil.BlaLock()
     __tid = None
 
     def __init__(self):

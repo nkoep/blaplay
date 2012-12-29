@@ -17,7 +17,7 @@
 
 import gtk
 
-from blaplay import blaconst
+from blaplay.blacore import blaconst
 
 
 class BlaAbout(gtk.AboutDialog):

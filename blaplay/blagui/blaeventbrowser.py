@@ -29,7 +29,9 @@ import gtk
 import pango
 
 import blaplay
-from blaplay import blacfg, blaconst, blautils, blafm
+from blaplay.blacore import blacfg, blaconst
+from blaplay import blautil
+from blaplay.blautil import blafm
 from blaplay.blagui import blaguiutils
 from blareleasebrowser import IMAGE_SIZE, BlaCellRendererPixbuf
 
@@ -74,7 +76,7 @@ class BlaEvent(object):
                 try:
                     image, message = urllib.urlretrieve(url)
                     path = "%s.%s" % (
-                            image_base, blautils.get_extension(image))
+                            image_base, blautil.get_extension(image))
                     shutil.move(image, path)
                     pixbuf = gtk.gdk.pixbuf_new_from_file(path)
                 except (IOError, gobject.GError): pass
@@ -106,11 +108,11 @@ class BlaEvent(object):
 
 class BlaEventBrowser(blaguiutils.BlaScrolledWindow):
     __gsignals__ = {
-        "count_changed": blaplay.signal(2)
+        "count_changed": blautil.signal(2)
     }
     __count_recommended = 0
     __count_all = 0
-    __lock = blautils.BlaLock(strict=True)
+    __lock = blautil.BlaLock(strict=True)
 
     def __init__(self):
         super(BlaEventBrowser, self).__init__()
@@ -278,12 +280,14 @@ class BlaEventBrowser(blaguiutils.BlaScrolledWindow):
         if active == blaconst.EVENTS_RECOMMENDED:
             hbox_location.set_visible(False)
 
-        gtk.quit_add(0, self.__save)
+        blaplay.bla.register_for_cleanup(self)
+
+    def __call__(self):
+        self.__save()
 
     def __save(self):
         events = [row[0] for row in self.__treeview.get_model()]
-        blautils.serialize_to_file(events, blaconst.EVENTS_PATH)
-        return 0
+        blautil.serialize_to_file(events, blaconst.EVENTS_PATH)
 
     def __change_location(self, button, location):
         diag = gtk.Dialog(title="Change location",
@@ -330,7 +334,7 @@ class BlaEventBrowser(blaguiutils.BlaScrolledWindow):
         blacfg.set("general", "events.country", country)
         blacfg.set("general", "events.city", city)
 
-    @blautils.thread
+    @blautil.thread
     def __update_models(self):
         def set_sensitive(state):
             self.__hbox.set_sensitive(state)
@@ -350,7 +354,7 @@ class BlaEventBrowser(blaguiutils.BlaScrolledWindow):
             queue = Queue.Queue()
             threads = []
             for x in xrange(3):
-                t = blautils.BlaThread(target=worker)
+                t = blautil.BlaThread(target=worker)
                 t.daemon = True
                 threads.append(t)
                 t.start()
@@ -387,10 +391,10 @@ class BlaEventBrowser(blaguiutils.BlaScrolledWindow):
 
             # wait until all items are processed and kill the worker threads
             queue.join()
-            map(blautils.BlaThread.kill, threads)
+            map(blautil.BlaThread.kill, threads)
 
             # get rid of images for events that don't show up anymore
-            for image in set(blautils.discover(blaconst.EVENTS)).difference(
+            for image in set(blautil.discover(blaconst.EVENTS)).difference(
                     images):
                 try: os.unlink(image)
                 except OSError: pass
@@ -422,7 +426,7 @@ class BlaEventBrowser(blaguiutils.BlaScrolledWindow):
             self.emit("count_changed", blaconst.VIEW_EVENTS, count)
 
     def __row_activated(self, treeview, path, column):
-        blautils.open_url(treeview.get_model()[path][0].event_url)
+        blautil.open_url(treeview.get_model()[path][0].event_url)
 
     def __button_press_event(self, treeview, event):
         try: path = treeview.get_path_at_pos(*map(int, [event.x, event.y]))[0]
@@ -440,7 +444,7 @@ class BlaEventBrowser(blaguiutils.BlaScrolledWindow):
         event_url = event_.event_url
         menu = gtk.Menu()
         m = gtk.MenuItem("View event page")
-        m.connect("activate", lambda *x: blautils.open_url(event_url))
+        m.connect("activate", lambda *x: blautil.open_url(event_url))
         menu.append(m)
         menu.show_all()
         menu.popup(None, None, None, event.button, event.time)
@@ -448,7 +452,7 @@ class BlaEventBrowser(blaguiutils.BlaScrolledWindow):
         return False
 
     def restore(self):
-        events = blautils.deserialize_from_file(blaconst.EVENTS_PATH)
+        events = blautil.deserialize_from_file(blaconst.EVENTS_PATH)
         if events:
             model = gtk.ListStore(gobject.TYPE_PYOBJECT)
             # pixbufs aren't initialized when they're unpickled so we need to

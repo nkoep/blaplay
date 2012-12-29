@@ -19,7 +19,7 @@ from mutagen.oggvorbis import OggVorbis
 from mutagen.oggflac import OggFLAC
 from mutagen.flac import FLAC
 
-from blaplay import blautils
+from blaplay import blautil
 from _blatrack import BlaTrack
 from _identifiers import *
 
@@ -59,7 +59,7 @@ class Xiph(BlaTrack):
     def _read_tags(self):
         uri = self.uri
         baseclass, format, encoding = self.__ext_to_format[
-                blautils.get_extension(uri)]
+                blautil.get_extension(uri)]
         audio = baseclass(uri)
 
         for key, values in (audio.tags or {}).iteritems():
@@ -83,7 +83,7 @@ class Xiph(BlaTrack):
     def _save(self):
         uri = self.uri
         baseclass, format, encoding = self.__ext_to_format[
-                blautils.get_extension(uri)]
+                blautil.get_extension(uri)]
         try: audio = baseclass(uri)
         except IOError: return False
         tags = audio.tags

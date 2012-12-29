@@ -20,9 +20,11 @@ import os
 import gobject
 import gtk
 
-from blaplay import blacfg, blaconst, blautils, blaplayer, bladb, blagui
-player = blaplayer.player
-library = bladb.library
+import blaplay
+player = blaplay.bla.player
+library = blaplay.bla.library
+from blaplay.blacore import blacfg, blaconst
+from blaplay import blagui
 from blaplay.blagui import blaguiutils
 from blaplay.blagui.blabrowsers import BlaBrowsers
 from blaplay.blagui.blavisualization import BlaVisualization

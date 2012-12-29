@@ -21,8 +21,9 @@ import gobject
 import gtk
 import cairo
 
-from blaplay import blaconst, blacfg, blaplayer
-player = blaplayer.player
+import blaplay
+player = blaplay.bla.player
+from blaplay.blacore import blaconst, blacfg
 from blastatusbar import BlaStatusbar
 from blaplay.formats._identifiers import *
 

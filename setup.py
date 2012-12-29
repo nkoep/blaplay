@@ -17,7 +17,8 @@ from distutils.command.install import install as d_install
 from distutils.extension import Extension
 from Cython.Distutils import build_ext
 
-from blaplay import blaconst, blautils
+from blaplay.blacore import blaconst
+from blaplay import blautil
 
 
 def exec_(args, split=True, cwd="."):
@@ -33,7 +34,7 @@ class clean(d_clean):
         base = os.path.dirname(__file__)
 
         for mod in self.distribution.ext_modules:
-            paths = ["%s.c" % blautils.toss_extension(src)
+            paths = ["%s.c" % blautil.toss_extension(src)
                     for src in mod.sources if "mmkeys" not in src]
             paths.append(
                 os.path.join(base, "%s.so" % mod.name.replace(".", "/")))
@@ -139,7 +140,7 @@ class build_scripts(d_build_scripts):
             newpath = os.path.join(
                     base, self.build_dir, os.path.basename(script))
             if newpath.lower().endswith(".py"):
-                newpath = blautils.toss_extension(newpath)
+                newpath = blautil.toss_extension(newpath)
             if newer(script, newpath) or self.force:
                 self.copy_file(script, newpath)
 
@@ -225,12 +226,12 @@ if __name__ == "__main__":
 
     # visualizations
     visualizations = [f for f in os.listdir("visualizations") if
-            blautils.get_extension(f) == "pyx"]
+            blautil.get_extension(f) == "pyx"]
     extra_compile_args = ["-std=gnu99"]
     try: extra_compile_args.append("-I%s" % np.get_include())
     except NameError: pass
     ext_modules = [Extension("blaplay.visualizations.%s"
-            % blautils.toss_extension(f), ["visualizations/%s" % f],
+            % blautil.toss_extension(f), ["visualizations/%s" % f],
             libraries=["fftw3f"], extra_compile_args=extra_compile_args)
             for f in visualizations
     ]
@@ -238,7 +239,7 @@ if __name__ == "__main__":
     # mmkeys
     defs = exec_("pkg-config --variable=defsdir pygtk-2.0".split())
     defs = " ".join(map(str.strip, defs))
-    name = "_mmkeys"
+    name = "mmkeys_"
     mmkeyspy = exec_((
         """pygobject-codegen-2.0 --prefix %s
         --register %s/gdk-types.defs
@@ -247,7 +248,7 @@ if __name__ == "__main__":
         mmkeys.defs""" % (name, defs, defs)).split(), split=False, cwd="mmkeys"
     )
     with open("mmkeys/mmkeyspy.c", "w") as f: f.write(mmkeyspy)
-    ext_modules.append(Extension("blaplay.%s" % name, ["mmkeys/%s" % f
+    ext_modules.append(Extension("blaplay.blagui.%s" % name, ["mmkeys/%s" % f
             for f in ("mmkeyspy.c", "mmkeys.c", "mmkeysmodule.c")],
             extra_compile_args=exec_(
             "pkg-config --cflags gtk+-2.0 pygtk-2.0".split()),
@@ -280,8 +281,8 @@ if __name__ == "__main__":
         "url": blaconst.WEB,
         "description": description,
         "license": "GNU GPL v2",
-        "packages": ["blaplay"] + ["blaplay.%s" % module
-                for module in ["blagui", "formats", "visualizations"]],
+        "packages": ["blaplay"] + ["blaplay.%s" % module for module in
+                ["blacore", "blagui", "formats", "util", "visualizations"]],
         "package_data": {
             "": ["ChangeLog", "TODO"],
             "blaplay": ["images/%s" % comp for comp in images_comps]

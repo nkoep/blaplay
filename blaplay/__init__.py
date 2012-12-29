@@ -15,178 +15,106 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-import __builtin__
 import sys
 import os
-import fcntl
-import logging
 
 import gobject
+import gtk
 
-import blaconst, blautils
-try: import bladbus
-except ImportError:
-    # if the dbus module isn't available we just define a class which acts on
-    # behalf of the module, issuing warnings whenever it's used
-    class bladbus:
-        @classmethod
-        def __warning(cls, force):
-            print_w("Failed to import dbus module. Install dbus-python.",
-                    force=force)
-            sys.exit()
-        @classmethod
-        def setup_bus(cls, *args): cls.__warning(False)
-        @classmethod
-        def query_bus(cls, *args): cls.__warning(True)
+from blaplay.blacore import blaconst
 
-lock_file = None
-debug = False
-quiet = False
+blacfg = None
+bladbus = None
 metadata = {"bio": {}, "lyrics": {}}
 cli_queue = None
 
 
-def signal(n_args):
-    return (gobject.SIGNAL_RUN_LAST, gobject.TYPE_NONE, (object,) * n_args)
+class Blaplay(object):
+    # class instances which need to shut down gracefully and preferable before
+    # the user interface has been destroyed can register themselves via the
+    # "register_for_cleanup" method. classes that do so need to implement
+    # __call__ as their cleanup routine
 
-def init(filepath):
-    # set up logging and messaging functions
-    def critical(msg):
-        logging.critical(msg)
-        sys.exit()
+    __cleanup = dict()
 
-    args = parse_args()
+    def __init__(self):
+        self.library = self.player = self.window = None
 
-    format_ = "*** %%(levelname)s%s: %%(message)s"
-    if debug:
-        format_ %= " (%(filename)s:%(lineno)d)"
-        level = logging.DEBUG
-    else:
-        format_ %= ""
-        level = logging.INFO
-    logging.basicConfig(format=format_, level=level)
+    def main(self):
+        gobject.idle_add(self.window.show)
+        gtk.main()
 
-    colors = [
-        (logging.INFO, "34"), (logging.DEBUG, "35"),
-        (logging.WARNING, "32"), (logging.CRITICAL, "31")
-    ]
-    for level, color in colors:
-        logging.addLevelName(level, "\033[1;%sm%s\033[1;m"
-                % (color, logging.getLevelName(level)))
+    def register_for_cleanup(self, instance):
+        self.__cleanup[instance.__class__.__name__] = instance
 
-    __builtin__.__dict__["print_d"] = logging.debug
-    __builtin__.__dict__["print_i"] = logging.info
-    __builtin__.__dict__["print_w"] = logging.warning
-    __builtin__.__dict__["print_c"] = critical
+    def shutdown(self):
+        for class_name, instance in self.__cleanup.items():
+            print_d("Calling shutdown routine for %s" % class_name)
+            instance()
 
-    # parse command-line arguments and make sure only one instance of blaplay
-    # will be run
-    process_args(args)
-    force_singleton(filepath)
+bla = Blaplay()
 
-def force_singleton(filepath):
-    global lock_file, cli_queue
-
-    # set up user directories
-    directories = [blaconst.CACHEDIR, blaconst.USERDIR, blaconst.COVERS,
-            blaconst.ARTISTS, blaconst.RELEASES, blaconst.EVENTS]
-
-    if not all(map(os.path.isdir, directories)):
-        print_i("Setting up user directories")
-        for directory in [blaconst.USERDIR, blaconst.COVERS, blaconst.ARTISTS,
-                blaconst.RELEASES, blaconst.EVENTS]:
-            try: os.makedirs(directory)
-            except OSError as (errno, strerror):
-                # inode exists, but it's a file. we can only bail in this case
-                if errno != 17: raise
-
-    pid = os.getpid()
-    lock_file = open(blaconst.PIDFILE, "w")
-    try: fcntl.lockf(lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
-    except IOError:
-        bladbus.query_bus(*cli_queue)
-        cli_queue = None
-        sys.exit()
-    lock_file.write(str(pid))
-
-def parse_args():
-    from argparse import ArgumentParser, RawTextHelpFormatter
-    global quiet, debug, cli_queue
-
-    def parse_cmdline(args=None):
-        parser = ArgumentParser(add_help=False,
-                description="%s - A bla that plays" % blaconst.APPNAME,
-                prog=blaconst.APPNAME, formatter_class=RawTextHelpFormatter
-        )
-        group = parser.add_mutually_exclusive_group()
-        group.add_argument("-c", "--append", action="store_true",
-                help="Append URIs to current playlist")
-        group.add_argument("-t", "--new", action="store_true",
-                help="Send URIs to new playlist")
-        parser.add_argument("URI", nargs="*", help="Input to be sent to the "
-                "current playlist unless\noption -c or -n is specified")
-        parser.add_argument("-a", "--play-pause", action="store_true",
-                help="play or pause playback")
-        parser.add_argument("-s", "--stop", action="store_true",
-                help="stop playback")
-        parser.add_argument("-n", "--next", action="store_true",
-                help="play next track in current playlist")
-        parser.add_argument("-p", "--previous", action="store_true",
-                help="play previous track in current playlist")
-        parser.add_argument("-f", "--format", nargs=1, help="print track "
-                "information and exit\n   %%a: artist\n   %%t: "
-                "title\n   %%b: album\n   %%y: year"
-                "\n   %%g: genre\n   %%c: cover", action="append"
-        )
-        parser.add_argument("-d", "--debug", action="store_true", help="print "
-                "debug messages")
-        parser.add_argument("-q", "--quiet", action="store_true", help="only "
-                "print fatal messages")
-        parser.add_argument("-h", "--help", action="help", help="display this "
-                "help and exit")
-        parser.add_argument("-v", "--version", action="version", help="output "
-                "version information and exit\n\n", version="%s %s"
-                % (blaconst.APPNAME, blaconst.VERSION)
-        )
-        return vars(parser.parse_args())
-
-    # process command-line arguments
-    args = parse_cmdline()
-
-    # flags
-    if args["quiet"]: quiet = True
-    if args["debug"]: debug = True
-
-    return args
-
-def process_args(args):
-    # player info formatting
-    if args["format"]: bladbus.query_bus(args["format"][0])
-
-    if args["URI"]:
-        if args["append"]: action = "append"
-        elif args["new"]: action = "new"
-        else: action = "replace"
-        n = lambda uri: os.path.normpath(os.path.abspath(uri))
-        cli_queue = (action, map(n, args["URI"]))
-
-    # player commands
-    if args["play_pause"]: bladbus.query_bus("play_pause")
-    elif args["stop"]: bladbus.query_bus("stop")
-    elif args["next"]: bladbus.query_bus("next")
-    elif args["previous"]: bladbus.query_bus("previous")
 
 def finalize():
+    gobject.threads_init()
+
+    global blacfg
+
+    from blaplay.blacore import blacfg, bladb
+
+    # initialize the config
+    blacfg.init()
+
+    # initialize the database
+    bla.library = bladb.init()
+
+    # create an instance of the playback device
+    from blaplay.blacore import blaplayer
+    bla.player = blaplayer.init()
+
+    # initialize the GUI
+    from blaplay import blagui
+    bla.window = blagui.init()
+    bla.window.connect("destroy", shutdown)
+
+    # set up the D-Bus interface and last.fm services
+    global bladbus
+    try: from blaplay.blautil import bladbus
+    except ImportError:
+        # if the dbus module isn't available we just define a class which acts
+        # on behalf of the module, issuing warnings whenever it's used
+        class bladbus:
+            @classmethod
+            def __warning(cls, exit):
+                print_w("Failed to import dbus module. Install dbus-python.")
+                if exit: raise SystemExit
+            @classmethod
+            def setup_bus(cls, *args): cls.__warning(False)
+            @classmethod
+            def query_bus(cls, *args): cls.__warning(True)
+    bladbus.setup_bus()
+
+    # initialize the scrobbler
+    from blaplay.blautil import blafm
+    blafm.init()
+
+
+
+
+    # TODO: move this to blametadata.py
+    # get cached metadata
+    from blaplay import blautil
+    global metadata
+    _metadata = blautil.deserialize_from_file(blaconst.METADATA_PATH)
+    if _metadata: metadata = _metadata
+
+
+
+
+
+    # set process name for programs like top or gnome-system-monitor
     import ctypes
     import ctypes.util
-    import gtk
-    import signal
-    from blaplay import blacfg, blafm
-    global metadata
-
-    def main_quit(*args): gtk.main_quit()
-    signal.signal(signal.SIGTERM, main_quit)
-    signal.signal(signal.SIGINT, main_quit)
 
     gobject.set_prgname(blaconst.APPNAME)
     try:
@@ -195,18 +123,35 @@ def finalize():
         ctypes.CDLL(soname).prctl(15, blaconst.APPNAME, 0, 0, 0)
     except AttributeError: pass
 
-    # set up the D-Bus interface and last.fm services
-    bladbus.setup_bus()
-    blafm.init()
-
-    # get cached metadata
-    _metadata = blautils.deserialize_from_file(blaconst.METADATA_PATH)
-    if _metadata: metadata = _metadata
-
-    gtk.quit_add(0, shutdown)
     # write config to disk every 10 minutes
     gobject.timeout_add(10 * 60 * 1000, blacfg.save, False)
-    gtk.main()
+
+    # start the main loop
+    bla.main()
+
+def shutdown(window):
+    print_d("Shutting down...")
+
+    bla.player.stop()
+    bla.shutdown()
+
+    # TODO: do we have to call gtk.Window.destroy(window) here?
+
+    from blaplay import blautil
+    blautil.BlaThread.clean_up()
+    save_metadata()
+    blacfg.save()
+
+    # process remaining events manually before calling gtk.main_quit
+    while False and gtk.events_pending():
+        if gtk.main_iteration(False): break
+    else: gtk.main_quit()
+
+
+
+
+
+
 
 def add_metadata(section, key, value):
     global metadata
@@ -217,22 +162,5 @@ def get_metadata(section, key):
     except KeyError: return None
 
 def save_metadata():
-    blautils.serialize_to_file(metadata, blaconst.METADATA_PATH)
-
-def shutdown():
-    print_i("Cleaning up")
-
-    from blaplay import blacfg, blaplayer
-    player = blaplayer.player
-
-    player.stop()
-    blautils.BlaThread.clean_up()
-    save_metadata()
-    blacfg.save()
-
-    fcntl.lockf(lock_file, fcntl.LOCK_UN)
-    try: os.unlink(blaconst.PIDFILE)
-    except OSError: pass
-
-    return 0
+    blautil.serialize_to_file(metadata, blaconst.METADATA_PATH)
 

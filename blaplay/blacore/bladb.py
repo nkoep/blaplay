@@ -30,22 +30,21 @@ import gio
 import pango
 
 import blaplay
-from blaplay import blacfg, blaconst, blautils, formats
-get_extension = blautils.get_extension
+from blaplay.blacore import blacfg, blaconst
+from blaplay import blautil, formats
 get_track = formats.get_track
 from blaplay.formats._identifiers import *
 
 EVENT_CREATED, EVENT_DELETED, EVENT_MOVED, EVENT_CHANGED = xrange(4)
 
-library = None
 pending_save = False
 extensions = None
 BlaPlaylist = None
 
+
 def init():
     print_i("Initializing the database")
-    global library
-    library = BlaLibrary()
+    return BlaLibrary()
 
 def update_library():
     global pending_save
@@ -105,11 +104,11 @@ class BlaProgress(gtk.Window):
 
 class BlaLibraryMonitor(gobject.GObject):
     __gsignals__ = {
-        "initialized": blaplay.signal(1)
+        "initialized": blautil.signal(1)
     }
 
     __monitors = {}
-    __lock = blautils.BlaLock()
+    __lock = blautil.BlaLock()
     __queue = Queue.Queue()
     __processing = False
     ignore = set()
@@ -137,7 +136,7 @@ class BlaLibraryMonitor(gobject.GObject):
             except AttributeError: pass
             self.__queue.put((event, path_from, path_to))
 
-    @blautils.thread
+    @blautil.thread
     def __process_events(self):
         # TODO: give this another shot with a controlled driven loop that is
         #       triggered by a queue event
@@ -171,7 +170,7 @@ class BlaLibraryMonitor(gobject.GObject):
                     # might not be removed again. unfortunately we have no
                     # choice but to let the event handlers do their job even if
                     # it means checking certain files multiple times
-                    library.add_tracks(blautils.discover(path_from))
+                    library.add_tracks(blautil.discover(path_from))
 
             elif event == EVENT_CHANGED:
                 if path_from in BlaLibraryMonitor.ignore:
@@ -245,7 +244,7 @@ class BlaLibraryMonitor(gobject.GObject):
             # processes. since this is no crucial operation we can just return
             # from the function (terminate the process)
             try:
-                discover = blautils.discover
+                discover = blautil.discover
                 directories = list(
                         discover(directories, directories_only=True))
                 conn.send(directories)
@@ -262,7 +261,7 @@ class BlaLibraryMonitor(gobject.GObject):
         p.join()
         return directories
 
-    @blautils.thread
+    @blautil.thread
     def add_directory(self, directory):
         directories = self.__get_subdirectories(directory)
 
@@ -275,14 +274,14 @@ class BlaLibraryMonitor(gobject.GObject):
                 monitor.connect("changed", self.__queue_event)
                 self.__monitors[directory] = monitor
 
-    @blautils.thread
+    @blautil.thread
     def remove_directories(self, md):
         with self.__lock:
             for directory in sorted(self.__monitors.keys()):
                 if directory.startswith(md):
                     self.__monitors.pop(directory).cancel()
 
-    @blautils.thread
+    @blautil.thread
     def update_directories(self):
         monitored_directories = blacfg.getdotliststr("library", "directories")
         directories = self.__get_subdirectories(monitored_directories)
@@ -425,8 +424,8 @@ class BlaLibraryModel(object):
 
 class BlaLibrary(gobject.GObject):
     __gsignals__ = {
-        "progress": blaplay.signal(1),
-        "update_library_browser": blaplay.signal(1)
+        "progress": blautil.signal(1),
+        "update_library_browser": blautil.signal(1)
     }
 
     __monitored_directories = []
@@ -436,7 +435,7 @@ class BlaLibrary(gobject.GObject):
     __tracks_ool = {}
     __playlists = []
     __queue = []
-    __lock = blautils.BlaLock(strict=True)
+    __lock = blautil.BlaLock(strict=True)
     __pending_save = False
 
     def __init__(self):
@@ -448,7 +447,7 @@ class BlaLibrary(gobject.GObject):
                 % ext for ext in extensions])).match
 
         # restore the library
-        tracks = blautils.deserialize_from_file(blaconst.LIBRARY_PATH)
+        tracks = blautil.deserialize_from_file(blaconst.LIBRARY_PATH)
         if tracks is not None: self.__tracks = tracks
         else: blacfg.set("library", "directories", "")
 
@@ -458,7 +457,7 @@ class BlaLibrary(gobject.GObject):
         # restore playlists and OOL tracks
         try:
             self.__tracks_ool, self.__playlists, self.__queue = \
-                    blautils.deserialize_from_file(blaconst.PLAYLISTS_PATH)
+                    blautil.deserialize_from_file(blaconst.PLAYLISTS_PATH)
         except TypeError: pass
 
         print_d("Restoring library: %d tracks in the library, %d additional "
@@ -473,12 +472,12 @@ class BlaLibrary(gobject.GObject):
             cid = self.__library_monitor.connect("initialized", initialized)
         self.__library_monitor.update_directories()
 
-        def save_library():
-            if pending_save:
-                print_i("Saving pending library changes")
-                self.__save_library()
-            return 0
-        gtk.quit_add(0, save_library)
+        blaplay.bla.register_for_cleanup(self)
+
+    def __call__(self):
+        if pending_save:
+            print_i("Saving pending library changes")
+            self.__save_library()
 
     def __getitem__(self, key):
         try: return self.__tracks[key]
@@ -522,7 +521,7 @@ class BlaLibrary(gobject.GObject):
 
         files = set()
         add = files.add
-        discover = blautils.discover
+        discover = blautil.discover
         new_files = 0
         idx = 0
         for directory in set(directories):
@@ -551,14 +550,8 @@ class BlaLibrary(gobject.GObject):
 
         # finally update the model for the library browser and playlists. the
         # GUI might not be fully initialized yet, so wait for that to happen
-        # before requesting an update. interesting tidbit: if instead of
-        # `import blagui' we would have used `from blaplay import blagui'
-        # python would have marked the name `blaplay' as variable local to this
-        # generator function and thus masking the fact that it's actually an
-        # already imported module that resides in the globals dict, making it
-        # unusable as a module in this method's context
-        import blagui
-        while blagui.bla is None: yield True
+        # before requesting an update
+        while blaplay.bla.window is None: yield True
         if missing or new_files or updated: update_library()
         yield False
 
@@ -577,12 +570,12 @@ class BlaLibrary(gobject.GObject):
         else: filt = restrict_re.match
         return filt
 
-    @blautils.thread_nondaemonic
+    @blautil.thread_nondaemonic
     def __save_library(self):
         # this thread spawns a new process which then writes the library to
         # disk. we start it in a thread so we can join the process to avoid
         # that it turns into a zombie process after it finishes execution
-        p = multiprocessing.Process(target=blautils.serialize_to_file,
+        p = multiprocessing.Process(target=blautil.serialize_to_file,
                 args=(self.__tracks, blaconst.LIBRARY_PATH))
         p.start()
         p.join()
@@ -695,9 +688,8 @@ class BlaLibrary(gobject.GObject):
         # we need BlaPlaylist throughout this module, but we can't import it on
         # module initialization as the class object isn't created at that time.
         # when this method is called we can be sure the class exists
-        from blagui import blaplaylist
         global BlaPlaylist
-        BlaPlaylist = blaplaylist.BlaPlaylist
+        from blaplay.blagui.blaplaylist import BlaPlaylist
 
         return self.__playlists, self.__queue
 
@@ -713,7 +705,7 @@ class BlaLibrary(gobject.GObject):
             ool_uris.difference_update(set(playlist[-1]))
         map(remove_track_ool, ool_uris)
 
-        blautils.serialize_to_file(
+        blautil.serialize_to_file(
                 (self.__tracks_ool, playlists, queue), blaconst.PLAYLISTS_PATH)
 
     def parse_ool_uris(self, uris):
@@ -733,7 +725,7 @@ class BlaLibrary(gobject.GObject):
             for uri in uris:
                 uri = os.path.realpath(uri)
                 if os.path.isdir(uri):
-                    for f in blautils.discover(uri):
+                    for f in blautil.discover(uri):
                         filt(f) and files.append(f)
                         yield True
                 else:
@@ -794,7 +786,7 @@ class BlaLibrary(gobject.GObject):
             files = []
 
             filt = self.__extension_filter
-            for f in blautils.discover(directory):
+            for f in blautil.discover(directory):
                 filt(f) and files.append(f)
                 if self.__aborted:
                     self.emit("progress", "abort")
@@ -853,7 +845,7 @@ class BlaLibrary(gobject.GObject):
                 while ns["wait"]:
                     if gtk.events_pending() and gtk.main_iteration(): return
 
-    @blautils.thread
+    @blautil.thread
     def remove_directory(self, directory):
         directory = os.path.realpath(directory)
         while True:

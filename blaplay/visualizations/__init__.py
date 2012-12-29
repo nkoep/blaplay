@@ -17,7 +17,7 @@
 
 import os
 
-from blaplay import blautils
+from blaplay import blautil
 
 modules = {}
 
@@ -26,7 +26,7 @@ def init():
     def f(s): return not (s.endswith("pyc") or s.startswith("_"))
     _modules = filter(f, os.listdir(os.path.dirname(__file__)))
     for module in _modules:
-        basename = blautils.toss_extension(module)
+        basename = blautil.toss_extension(module)
         vis = basename.capitalize()
         try:
             module = __import__(

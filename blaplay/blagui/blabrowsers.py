@@ -29,8 +29,9 @@ import pango
 import pangocairo
 
 import blaplay
-from blaplay import blaconst, blacfg, blautils, bladb, blagui
-library = bladb.library
+library = blaplay.bla.library
+from blaplay.blacore import blaconst, blacfg
+from blaplay import blautil, blagui
 from blaplaylist import BlaPlaylist, BlaQueue
 from blavisualization import BlaVisualization
 from blatagedit import BlaTagedit
@@ -279,14 +280,14 @@ class BlaTreeView(blaguiutils.BlaTreeViewBase):
                 ("Add to playback queue", "Q", lambda *x:
                         self.__send_to_queue(), True),
                 ("Open containing directory", None, lambda *x:
-                        blautils.open_directory(directory), bool(directory)),
+                        blautil.open_directory(directory), bool(directory)),
                 None,
                 ("Properties", "<Alt>Return", lambda *x:
                         BlaTagedit(tracks) if tracks else True, True)
             ])
         else:
             items.extend([("Open containing directory", None, lambda *x:
-                    blautils.open_directory(directory), bool(directory))])
+                    blautil.open_directory(directory), bool(directory))])
 
         menu = gtk.Menu()
         for item in items:

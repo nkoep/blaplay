@@ -95,13 +95,13 @@ PyTypeObject G_GNUC_INTERNAL PyMmKeys_Type = {
 
 /* ----------- functions ----------- */
 
-const PyMethodDef _mmkeys_functions[] = {
+const PyMethodDef mmkeys__functions[] = {
     { NULL, NULL, 0, NULL }
 };
 
 /* initialise stuff extension classes */
 void
-_mmkeys_register_classes(PyObject *d)
+mmkeys__register_classes(PyObject *d)
 {
     PyObject *module;
 

@@ -32,11 +32,13 @@ import cPickle as pickle
 import gtk
 import gobject
 
-from blaplay import blacfg, blaconst, blautils, bladb, blaplayer
+import blaplay
+player = blaplay.bla.player
+library = blaplay.bla.library
+from blaplay.blacore import blacfg, blaconst
+from blaplay import blautil
 from blaplay.formats._identifiers import *
 
-player = None
-library = None
 scrobbler = None
 
 TIMEOUT = 10
@@ -47,15 +49,12 @@ LEGAL_NOTICE = str(
 
 
 def init():
-    global player, library, scrobbler
-    player = blaplayer.player
-    library = bladb.library
+    global scrobbler
     scrobbler = BlaScrobbler()
     player.connect("track_changed", scrobbler.submit_track)
     player.connect("track_stopped", scrobbler.submit_track)
 
 def get_popup_menu(track=None):
-    player = blaplayer.player
     user = blacfg.getstring("lastfm", "user")
     if track is None: track = player.get_track()
     if not track and not user: return None
@@ -64,7 +63,7 @@ def get_popup_menu(track=None):
     if user:
         m = gtk.MenuItem("View your profile")
         m.connect("activate",
-                lambda *x: blautils.open_url("http://last.fm/user/%s" % user))
+                lambda *x: blautil.open_url("http://last.fm/user/%s" % user))
         menu.append(m)
 
         m = gtk.MenuItem("Love song")
@@ -79,14 +78,14 @@ def get_popup_menu(track=None):
 
     if track:
         m.connect("activate",
-                lambda *x: blautils.open_url("http://last.fm/music/%s/_/%s" %
+                lambda *x: blautil.open_url("http://last.fm/music/%s/_/%s" %
                 (track[ARTIST].replace(" ", "+"),
                 track[TITLE].replace(" ", "+")))
         )
         menu.append(m)
 
         m = gtk.MenuItem("View artist profile")
-        m.connect("activate", lambda *x: blautils.open_url(
+        m.connect("activate", lambda *x: blautil.open_url(
                 "http://last.fm/music/%s" % track[ARTIST].replace(" ", "+")))
         menu.append(m)
 
@@ -120,6 +119,7 @@ def get_response(url, key):
         else:
             f.close()
             try: response = response[key]
+            except TypeError: pass
             except KeyError:
                 error = response["error"]
                 response = response["message"]
@@ -155,7 +155,7 @@ def get_cover(track, image_base):
                 os.listdir(blaconst.COVERS) if f.startswith(name)]
         map(os.unlink, images)
         cover, message = urllib.urlretrieve(
-                url, "%s.%s" % (image_base, blautils.get_extension(url)))
+                url, "%s.%s" % (image_base, blautil.get_extension(url)))
     except IOError: pass
 
     return cover
@@ -175,13 +175,13 @@ def get_biography(track, image_base):
         try:
             if not url: raise IOError
             image, message = urllib.urlretrieve(
-                    url, "%s.%s" % (image_base, blautils.get_extension(url)))
+                    url, "%s.%s" % (image_base, blautil.get_extension(url)))
         except IOError: pass
 
     try: biography = response["bio"]["content"]
     except (TypeError, KeyError): pass
     else:
-        biography = blautils.remove_html_tags(
+        biography = blautil.remove_html_tags(
                 biography.replace(LEGAL_NOTICE, "").strip())
 
     if error or response is None:
@@ -260,9 +260,9 @@ def get_request_token():
 def sign_api_call(params):
     params.sort(key=lambda p: p[0].lower())
     string = "".join(["%s%s" % p for p in params])
-    return blautils.md5("%s%s" % (string, blaconst.LASTFM_SECRET))
+    return blautil.md5("%s%s" % (string, blaconst.LASTFM_SECRET))
 
-@blautils.thread
+@blautil.thread
 def love_unlove_song(track, unlove=False):
     if (not blacfg.getstring("lastfm", "user") or not track[ARTIST] or
             not track[TITLE]):
@@ -305,7 +305,7 @@ class BlaScrobbler(object):
             self.__submitter()
             self.__restore()
 
-        @blautils.thread
+        @blautil.thread
         def __submitter(self):
             while True:
                 self.__not_empty.wait()
@@ -349,7 +349,7 @@ class BlaScrobbler(object):
                 else: map(self.__items.remove, items)
 
         def __restore(self):
-            items = blautils.deserialize_from_file(blaconst.SCROBBLES_PATH)
+            items = blautil.deserialize_from_file(blaconst.SCROBBLES_PATH)
             if items:
                 print_d("Queuing %d unsubmitted scrobble(s)"
                         % len(items))
@@ -362,12 +362,15 @@ class BlaScrobbler(object):
             self.__not_empty.release()
 
         def save(self):
-            blautils.serialize_to_file(self.__items, blaconst.SCROBBLES_PATH)
+            blautil.serialize_to_file(self.__items, blaconst.SCROBBLES_PATH)
 
     def __init__(self):
         super(BlaScrobbler, self).__init__()
-        gtk.quit_add(0, self.__submit_last_track, True)
+        blaplay.bla.register_for_cleanup(self)
         self.__queue = BlaScrobbler.SubmissionQueue()
+
+    def __call__(self):
+        self.__submit_last_track(True)
 
     @classmethod
     def __request_authorization(cls):
@@ -376,7 +379,7 @@ class BlaScrobbler(object):
                 "In order to submit tracks to the last.fm scrobbler, blaplay "
                 "needs to be authorized to use your account. Open the "
                 "last.fm authorization page now?"):
-            blautils.open_url("http://www.last.fm/api/auth/?api_key=%s&"
+            blautil.open_url("http://www.last.fm/api/auth/?api_key=%s&"
                     "token=%s" % (blaconst.LASTFM_APIKEY, cls.__token))
         return False
 
@@ -391,7 +394,7 @@ class BlaScrobbler(object):
                 if search(track[identifier]): return False
         return True
 
-    @blautils.thread
+    @blautil.thread
     def __update_now_playing(self, delay=False):
         if delay: time.sleep(1)
 
@@ -455,8 +458,8 @@ class BlaScrobbler(object):
 
         self.__uri = None
         if shutdown:
+            print_i("Saving scrobbler queue")
             self.__queue.save()
-            return 0
 
     @classmethod
     def get_session_key(cls, create=False):

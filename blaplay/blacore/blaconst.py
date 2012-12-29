@@ -17,8 +17,6 @@
 
 import os
 
-import blautils
-
 VERSION = "0.1"
 APPNAME = "blaplay"
 COMMENT = "A bla that plays"
@@ -30,12 +28,11 @@ AUTHORS = sorted([
 EMAIL = "niklas.koep@gmail.com"
 COPYRIGHT = "Copyright © 2012 %s\n<%s>" % (AUTHOR, EMAIL)
 MINSIZE = [-1, 400]
-STYLE_NAME = blautils.md5(APPNAME)
 
 # dirs
 USERDIR = os.path.join(os.path.expanduser("~"), ".%s" % APPNAME)
 CACHEDIR = os.path.join(USERDIR, "cache")
-BASEDIR = os.path.dirname(os.path.realpath(__file__))
+BASEDIR = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 IMAGES_PATH = os.path.join(BASEDIR, "images")
 COVERS = os.path.join(CACHEDIR, "covers")
 ARTISTS = os.path.join(CACHEDIR, "artists")

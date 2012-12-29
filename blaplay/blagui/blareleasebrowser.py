@@ -30,7 +30,9 @@ import pango
 import pangocairo
 
 import blaplay
-from blaplay import blacfg, blaconst, blautils, blafm
+from blaplay.blacore import blacfg, blaconst
+from blaplay import blautil
+from blaplay.blautil import blafm
 from blaplay.blagui import blaguiutils
 
 IMAGE_SIZE = 65
@@ -147,7 +149,7 @@ class BlaRelease(object):
                 try:
                     image, message = urllib.urlretrieve(url)
                     path = "%s.%s" % (
-                            image_base, blautils.get_extension(image))
+                            image_base, blautil.get_extension(image))
                     shutil.move(image, path)
                     pixbuf = gtk.gdk.pixbuf_new_from_file(
                             path).scale_simple(IMAGE_SIZE, IMAGE_SIZE,
@@ -160,11 +162,11 @@ class BlaRelease(object):
 
 class BlaReleaseBrowser(blaguiutils.BlaScrolledWindow):
     __gsignals__ = {
-        "count_changed": blaplay.signal(2)
+        "count_changed": blautil.signal(2)
     }
     __count_library = 0
     __count_recommended = 0
-    __lock = blautils.BlaLock(strict=True)
+    __lock = blautil.BlaLock(strict=True)
 
     def __init__(self):
         super(BlaReleaseBrowser, self).__init__()
@@ -256,14 +258,16 @@ class BlaReleaseBrowser(blaguiutils.BlaScrolledWindow):
         self.add_with_viewport(vbox)
         self.show_all()
 
-        gtk.quit_add(0, self.__save)
+        blaplay.bla.register_for_cleanup(self)
+
+    def __call__(self):
+        self.__save()
 
     def __save(self):
         releases = [row[0] for row in self.__treeview.get_model()]
-        blautils.serialize_to_file(releases, blaconst.RELEASES_PATH)
-        return 0
+        blautil.serialize_to_file(releases, blaconst.RELEASES_PATH)
 
-    @blautils.thread
+    @blautil.thread
     def __update_models(self):
         def set_sensitive(state):
             self.__hbox.set_sensitive(state)
@@ -283,7 +287,7 @@ class BlaReleaseBrowser(blaguiutils.BlaScrolledWindow):
             queue = Queue.Queue()
             threads = []
             for x in xrange(3):
-                t = blautils.BlaThread(target=worker)
+                t = blautil.BlaThread(target=worker)
                 t.daemon = True
                 threads.append(t)
                 t.start()
@@ -320,10 +324,10 @@ class BlaReleaseBrowser(blaguiutils.BlaScrolledWindow):
 
             # wait until all items are processed and kill the worker threads
             queue.join()
-            map(blautils.BlaThread.kill, threads)
+            map(blautil.BlaThread.kill, threads)
 
             # get rid of covers for releases that don't show up anymore
-            for image in set(blautils.discover(blaconst.RELEASES)).difference(
+            for image in set(blautil.discover(blaconst.RELEASES)).difference(
                     images):
                 try: os.unlink(image)
                 except OSError: pass
@@ -349,7 +353,7 @@ class BlaReleaseBrowser(blaguiutils.BlaScrolledWindow):
             self.emit("count_changed", blaconst.VIEW_RELEASES, count)
 
     def __row_activated(self, treeview, path, column):
-        blautils.open_url(treeview.get_model()[path][0].release_url)
+        blautil.open_url(treeview.get_model()[path][0].release_url)
 
     def __button_press_event(self, treeview, event):
         try: path = treeview.get_path_at_pos(*map(int, [event.x, event.y]))[0]
@@ -367,8 +371,8 @@ class BlaReleaseBrowser(blaguiutils.BlaScrolledWindow):
         artist_url = release.artist_url
 
         items = [
-            ("View release page", lambda *x: blautils.open_url(release_url)),
-            ("View artist profile", lambda *x: blautils.open_url(artist_url))
+            ("View release page", lambda *x: blautil.open_url(release_url)),
+            ("View artist profile", lambda *x: blautil.open_url(artist_url))
         ]
 
         user = blacfg.getstring("lastfm", "user")
@@ -377,7 +381,7 @@ class BlaReleaseBrowser(blaguiutils.BlaScrolledWindow):
             artist_history_url = ("http://www.last.fm/user/%s/library/music/%s"
                     % (user, artist_history_url))
             items.append(("View artist history",
-                    lambda *x: blautils.open_url(artist_history_url)))
+                    lambda *x: blautil.open_url(artist_history_url)))
 
         menu = gtk.Menu()
         for label, callback in items:
@@ -395,7 +399,7 @@ class BlaReleaseBrowser(blaguiutils.BlaScrolledWindow):
         return date + timedelta, date + timedelta + datetime.timedelta(days=6)
 
     def restore(self):
-        releases = blautils.deserialize_from_file(blaconst.RELEASES_PATH)
+        releases = blautil.deserialize_from_file(blaconst.RELEASES_PATH)
         if releases:
             model = gtk.ListStore(gobject.TYPE_PYOBJECT)
             # pixbufs aren't initialized when they're unpickled so we need to

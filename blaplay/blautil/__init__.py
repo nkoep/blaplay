@@ -33,10 +33,12 @@ import ctypes
 
 import gobject
 import gtk
-gtk.gdk.threads_init()
 
 KEY, PREV, NEXT = xrange(3)
 
+
+def signal(n_args):
+    return (gobject.SIGNAL_RUN_LAST, gobject.TYPE_NONE, (object,) * n_args)
 
 def get_thread_id():
     try:
@@ -100,8 +102,8 @@ def remove_html_tags(string):
 
 @thread
 def open_url(url):
-    # redirect output of stdout to /dev/null for this thread to hide the status
-    # message of the webbrowser module
+    # redirect stdout to /dev/null for this thread to hide the status message
+    # of the webbrowser module
     stdout = os.dup(1)
     os.dup2(os.open(os.devnull, os.O_RDWR), 1)
     try: webbrowser.open(url, new=2)
@@ -265,7 +267,10 @@ class BlaThread(Thread):
         return self.__localtrace
 
 class BlaOrderedSet(collections.MutableSet):
-    """ implementation from http://code.activestate.com/recipes/576694 """
+    """
+    set-like class which maintains the order in which elements were added
+    implementation from http://code.activestate.com/recipes/576694
+    """
 
     def __init__(self, iterable=None):
         self.end = end = []
