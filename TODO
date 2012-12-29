@@ -3,7 +3,6 @@
 
 0.2:
 - add acoustid support
-- improve lyrics fetcher (more robust search, more search engines)
 - add iPod support, possibly other players, too
 - support for CUE sheets
 - gapless playback
@@ -20,6 +19,7 @@
 - write up some crude unit/regression tests
 
 0.3+:
+- restore closed playlists
 - lower memory footprint
 - improve startup speed/reduce import overhead
 - Qt's QTableView clone in GTK+ to allow cells to span across multiple columns
@@ -27,4 +27,3 @@
 - port to GI once stability/performance is satisfying
 - py3k port once all required modules are ported (the main requirement
   being mutagen as Gtk and Gst won't be a problem once we ported to GI)
-
