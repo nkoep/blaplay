@@ -33,7 +33,6 @@ def init():
     from blamainwindow import BlaMainWindow
     global tray
 
-    gtk.gdk.threads_init()
     gtk.icon_theme_get_default().append_search_path(blaconst.IMAGES_PATH)
 
     window = BlaMainWindow()

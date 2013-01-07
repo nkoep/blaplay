@@ -1097,6 +1097,9 @@ class BlaPlaylist(gtk.Notebook):
                 return False
             self.__entry.connect("key_press_event", key_press_event)
 
+            mode_button = gtk.ToggleButton(label="Regexp")
+            mode_button.connect("toggled", lambda *x: True)
+
             button = gtk.Button()
             button.add(gtk.image_new_from_stock(
                     gtk.STOCK_FIND, gtk.ICON_SIZE_BUTTON))
@@ -1104,6 +1107,7 @@ class BlaPlaylist(gtk.Notebook):
 
             self.__hbox = gtk.HBox()
             self.__hbox.pack_start(self.__entry, expand=True)
+            self.__hbox.pack_start(mode_button, expand=False)
             self.__hbox.pack_start(button, expand=False)
             self.__hbox.show_all()
             self.__hbox.set_visible(False)

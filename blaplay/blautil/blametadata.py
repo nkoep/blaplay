@@ -36,9 +36,29 @@ from blaplay.formats._identifiers import *
 
 TIMEOUT = 10
 
+metadata = None
+
+
+def init():
+    global metadata
+    metadata = BlaMetadata()
+    blaplay.bla.register_for_cleanup(metadata)
+
 
 class BlaMetadata(object):
-    pass
+    def __init__(self):
+        metadata = blautil.deserialize_from_file(blaconst.METADATA_PATH)
+        self.__metadata = metadata or {"bio": {}, "lyrics": {}}
+
+    def __call__(self):
+        blautil.serialize_to_file(self.__metadata, blaconst.METADATA_PATH)
+
+    def add(self, section, key, value):
+        self.__metadata[section][key] = value
+
+    def get(self, section, key):
+        try: return self.__metadata[section][key]
+        except KeyError: return None
 
 class BlaFetcher(gobject.GObject):
     __gsignals__ = {
@@ -169,7 +189,7 @@ class BlaFetcher(gobject.GObject):
         lyrics_key = track.get_lyrics_key()
 
         # try locally stored lyrics first
-        lyrics = blaplay.get_metadata("lyrics", lyrics_key)
+        lyrics = metadata.get("lyrics", lyrics_key)
         if lyrics and False:
             gobject.idle_add(self.emit, "lyrics", lyrics)
             return
@@ -222,7 +242,7 @@ class BlaFetcher(gobject.GObject):
             try: lyrics = lyrics.decode("utf-8", "replace")
             except (AttributeError, UnicodeDecodeError):
                 print_d("Failed to store lyrics")
-            blaplay.add_metadata("lyrics", lyrics_key, lyrics)
+            metadata.add("lyrics", lyrics_key, lyrics)
 
         gobject.idle_add(self.emit, "lyrics", lyrics)
 
@@ -287,12 +307,12 @@ class BlaFetcher(gobject.GObject):
                 image = "%s.png" % image_base
 
             # check if biography exists
-            biography = blaplay.get_metadata("bio", track[ARTIST])
+            biography = metadata.get("bio", track[ARTIST])
 
             if not biography or not image:
                 image, biography = blafm.get_biography(track, image_base)
                 if biography:
-                    blaplay.add_metadata("bio", track[ARTIST], biography)
+                    metadata.add("bio", track[ARTIST], biography)
 
         gobject.idle_add(self.emit, "biography", image, biography)
 

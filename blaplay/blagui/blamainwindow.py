@@ -258,8 +258,9 @@ class BlaMainWindow(gtk.Window):
             blagui.tray.set_has_tooltip(False)
 
     def raise_window(self):
+        # FIXME: this doesn't raise the window to the top :S
         self.show()
-        self.deiconify()
+        self.present()
         self.__hidden = False
         if not blacfg.getboolean("general", "always.show.tray"):
             blagui.tray.set_visible(False)

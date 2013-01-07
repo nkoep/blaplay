@@ -38,6 +38,7 @@ def query_bus(query, arg=None):
     #        after complying to MPRIS 2.2
     from blaplay.formats._identifiers import ARTIST, TITLE, ALBUM, DATE, GENRE
 
+    # TODO: don't encapsulate this in try... except
     try:
         bus = dbus.SessionBus()
         try: proxy = bus.get_object(SERVICE, "/BlaDBus")
@@ -75,7 +76,7 @@ def query_bus(query, arg=None):
             elif query == "raise_window": interface.raise_window()
             elif query in ["append", "new", "replace"] and arg:
                 interface.parse_uris(query, arg)
-    except: pass
+    except: raise #pass
     raise SystemExit
 
 
@@ -85,7 +86,7 @@ class BlaDBus(dbus.service.Object):
         import blaplay
         self.__player = blaplay.bla.player
 
-    @dbus.service.method(dbus_interface=INTERFACE, in_signature="s",
+    @dbus.service.method(dbus_interface=INTERFACE, in_signature="i",
             out_signature="s")
     def get_tag(self, identifier):
         from blaplay.formats._identifiers import ARTIST, TITLE
@@ -134,7 +135,7 @@ class BlaDBus(dbus.service.Object):
             out_signature="")
     def raise_window(self):
         import blaplay
-        blaplay.bla.raise_window()
+        blaplay.bla.window.raise_window()
 
     @dbus.service.method(dbus_interface=INTERFACE, in_signature="sas",
             out_signature="")
@@ -144,5 +145,14 @@ class BlaDBus(dbus.service.Object):
         if action == "append": f = BlaPlaylist.add_to_current_playlist
         elif action == "new": f = BlaPlaylist.send_to_new_playlist
         else: f = BlaPlaylist.send_to_current_playlist
+        import gtk
+
+        import threading
+        print threading.current_thread()
+
+        # FIXME: why is this necessary? these callbacks are processed from the
+        #        main thread
+        gtk.gdk.threads_enter()
         f("", uris, resolve=True)
+        gtk.gdk.threads_leave()
 

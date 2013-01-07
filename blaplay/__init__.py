@@ -19,23 +19,23 @@ import sys
 import os
 
 import gobject
+gobject.threads_init()
 import gtk
+gtk.gdk.threads_init()
 
 from blaplay.blacore import blaconst
 
-blacfg = None
-bladbus = None
-metadata = {"bio": {}, "lyrics": {}}
+blacfg = bladbus = blautil = None
 cli_queue = None
 
 
 class Blaplay(object):
-    # class instances which need to shut down gracefully and preferable before
+    # class instances which need to shut down gracefully and preferably before
     # the user interface has been destroyed can register themselves via the
-    # "register_for_cleanup" method. classes that do so need to implement
-    # __call__ as their cleanup routine
+    # "register_for_cleanup" method. classes that do so need to implement the
+    # __call__ method as their cleanup routine
 
-    __cleanup = dict()
+    __cleanup = []
 
     def __init__(self):
         self.library = self.player = self.window = None
@@ -45,22 +45,21 @@ class Blaplay(object):
         gtk.main()
 
     def register_for_cleanup(self, instance):
-        self.__cleanup[instance.__class__.__name__] = instance
+        self.__cleanup.append(instance)
 
     def shutdown(self):
-        for class_name, instance in self.__cleanup.items():
-            print_d("Calling shutdown routine for %s" % class_name)
+        for instance in self.__cleanup:
+            print_d("Calling shutdown routine for %s"
+                    % instance.__class__.__name__)
             instance()
 
 bla = Blaplay()
 
 
 def finalize():
-    gobject.threads_init()
-
-    global blacfg
-
+    global blacfg, blautil
     from blaplay.blacore import blacfg, bladb
+    from blaplay import blautil
 
     # initialize the config
     blacfg.init()
@@ -98,19 +97,9 @@ def finalize():
     from blaplay.blautil import blafm
     blafm.init()
 
-
-
-
-    # TODO: move this to blametadata.py
-    # get cached metadata
-    from blaplay import blautil
-    global metadata
-    _metadata = blautil.deserialize_from_file(blaconst.METADATA_PATH)
-    if _metadata: metadata = _metadata
-
-
-
-
+    # initialize metadata module
+    from blaplay.blautil import blametadata
+    blametadata.init()
 
     # set process name for programs like top or gnome-system-monitor
     import ctypes
@@ -133,34 +122,13 @@ def shutdown(window):
     print_d("Shutting down...")
 
     bla.player.stop()
+
+    blautil.BlaThread.clean_up()
+
     bla.shutdown()
 
-    # TODO: do we have to call gtk.Window.destroy(window) here?
-
-    from blaplay import blautil
-    blautil.BlaThread.clean_up()
-    save_metadata()
     blacfg.save()
 
-    # process remaining events manually before calling gtk.main_quit
-    while False and gtk.events_pending():
-        if gtk.main_iteration(False): break
-    else: gtk.main_quit()
-
-
-
-
-
-
-
-def add_metadata(section, key, value):
-    global metadata
-    metadata[section][key] = value
-
-def get_metadata(section, key):
-    try: return metadata[section][key]
-    except KeyError: return None
-
-def save_metadata():
-    blautil.serialize_to_file(metadata, blaconst.METADATA_PATH)
+    print_d("Stopping event loop")
+    gtk.main_quit()
 

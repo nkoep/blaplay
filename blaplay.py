@@ -23,6 +23,9 @@ import gobject
 
 from blaplay.blacore import blaconst
 
+lock_file = None
+cli_queue = None
+
 
 def init_signals():
     import signal
@@ -35,13 +38,13 @@ def init_signals():
         gobject.idle_add(idle_quit, priority=gobject.PRIORITY_HIGH)
         return False
 
+    # writing to a file descriptor that's monitored by gobject is buffered,
+    # i.e. we can write to it here and the event gets handled as soon as a main
+    # loop is started. we use this to defer shutdown instructions during
+    # startup
     r, w = os.pipe()
     gobject.io_add_watch(r, gobject.IO_IN, main_quit)
     for sig in (signal.SIGTERM, signal.SIGINT):
-        # writing to a file descriptor that's monitored by gobject is buffered,
-        # i.e. we can write to it here and the event gets handled as soon as a
-        # main loop is started. we use this to defer shutdown instructions
-        # during startup
         signal.signal(sig, lambda sig, frame: os.write(w, "bla"))
 
 def parse_args():
@@ -116,6 +119,7 @@ def init_logging(debug, quiet):
 def process_args(args):
     from blaplay.blautil import bladbus
     # FIXME: bladbus needs to be treated differently
+    global cli_queue
 
     # player info formatting
     if args["format"]: bladbus.query_bus(args["format"][0])
@@ -125,8 +129,11 @@ def process_args(args):
         elif args["new"]: action = "new"
         else: action = "replace"
         n = lambda uri: os.path.normpath(os.path.abspath(uri))
-        # TODO: do this differently
+        # TODO: make cli_queue a FIFO we write to here. then connect a handler
+        #       which monitors the FIFO in the main thread and adds tracks as
+        #       they arrive
         cli_queue = (action, map(n, args["URI"]))
+    else: cli_queue = ("raise_window", None)
 
     # player commands
     for cmd in ["play_pause", "stop", "next", "previous"]:
@@ -151,18 +158,23 @@ def force_singleton():
                 # inode exists, but it's a file. we can only bail in this case
                 if errno != 17: raise
 
-    pid = os.getpid()
-    with open(blaconst.PIDFILE, "w") as lock_file:
-        try: fcntl.lockf(lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except IOError:
-            print_d("blaplay already running")
-            from blaplay import bladbus
-            bladbus.query_bus(*cli_queue)
-            cli_queue = None
-            raise SystemExit
-        lock_file.write(str(pid))
+    # we use a lock file to ensure a singleton for blaplay. however, the lock
+    # is only valid as long as the file descriptor is valid. that's why we need
+    # to keep it open (and referenced)
+    global lock_file
+    lock_file = open(blaconst.PIDFILE, "w")
+    try: fcntl.lockf(lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except IOError:
+        print_i("%s is already running" % blaconst.APPNAME)
+        from blaplay.blautil import bladbus
+        global cli_queue
+        try: bladbus.query_bus(*cli_queue)
+        except TypeError: pass
+        else: cli_queue = None
+        raise SystemExit
+    lock_file.write(str(os.getpid()))
 
-if __name__ == "__main__":
+def main():
     init_signals()
 
     args = parse_args()
@@ -177,11 +189,14 @@ if __name__ == "__main__":
     import blaplay
     blaplay.finalize()
 
-    # shutdown
-    with open(blaconst.PIDFILE, "w") as lock_file:
-        fcntl.lockf(lock_file, fcntl.LOCK_UN)
+    # clean up lock file
+    fcntl.lockf(lock_file, fcntl.LOCK_UN)
+    lock_file.close()
     try: os.unlink(blaconst.PIDFILE)
     except OSError: pass
 
     print_d("Shutdown complete")
+
+if __name__ == "__main__":
+    main()
 

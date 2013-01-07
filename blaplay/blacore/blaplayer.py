@@ -38,6 +38,8 @@ from blaplay.blacore import blaconst, blacfg
 from blaplay import blautil
 from blaplay.formats._identifiers import TITLE
 
+BlaStatusbar = None
+
 gstreamer_is_working = None
 
 
@@ -165,7 +167,9 @@ class BlaPlayer(gobject.GObject):
         elif message.type == gst.MESSAGE_BUFFERING:
             # we can't import from blastatusbar on module level as it'd create
             # circular imports
-            from blaplay.blagui.blastatusbar import BlaStatusbar
+            global BlaStatusbar
+            if BlaStatusbar is None:
+                from blaplay.blagui.blastatusbar import BlaStatusbar
             percentage = message.parse_buffering()
             s = "Buffering: %d %%" % percentage
             gobject.idle_add(
@@ -183,7 +187,10 @@ class BlaPlayer(gobject.GObject):
             self.stop()
             err, debug = message.parse_error()
             from blaplay.blagui import blaguiutils
-            blaguiutils.error_dialog("Error", "%s" % err)
+            # FIXME: why isn't this lock redundant!!
+            import gtk
+            with gtk.gdk.lock:
+                blaguiutils.error_dialog("Error", "%s" % err)
 
     def __parse_tags(self, tags):
         MAPPING = {
