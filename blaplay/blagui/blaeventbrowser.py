@@ -20,8 +20,7 @@ import shutil
 import Queue
 import urllib
 import json
-from email.utils import parsedate_tz as parse_rfc_time
-import time
+from email.utils import parsedate as parse_rfc_time
 import cPickle as pickle
 
 import gobject
@@ -52,8 +51,7 @@ class BlaEvent(object):
                 if artist not in self.artists]
         try: self.artists.remove(self.event_name)
         except ValueError: pass
-        self.date = time.strftime(
-                "%A %d %B %Y", parse_rfc_time(raw["startDate"])[:-1])
+        self.date = blautil.format_date(parse_rfc_time(raw["startDate"]))
         self.image = BlaEvent.__EMPTY_PIXBUF
         venue = raw["venue"]
         self.venue = venue["name"]
@@ -342,22 +340,8 @@ class BlaEventBrowser(blaguiutils.BlaScrolledWindow):
             return False
         gobject.idle_add(set_sensitive, False)
 
-        def worker():
-            while True:
-                event = queue.get()
-                path = event.get_image()
-                if path: images.add(path)
-                queue.task_done()
-
         with self.__lock:
             images = set()
-            queue = Queue.Queue()
-            threads = []
-            for x in xrange(3):
-                t = blautil.BlaThread(target=worker)
-                t.daemon = True
-                threads.append(t)
-                t.start()
 
             active = blacfg.getint("general", "events.filter")
             limit = blacfg.getint("general", "events.limit")
@@ -386,12 +370,9 @@ class BlaEventBrowser(blaguiutils.BlaScrolledWindow):
                         model.append(["\n<span "
                                 "size=\"larger\"><b>%s</b></span>\n" % date])
                     model.append([event])
-                    queue.put(event)
+                    path = event.get_image()
+                    if path: images.add(path)
                 self.__models[filt] = model
-
-            # wait until all items are processed and kill the worker threads
-            queue.join()
-            map(blautil.BlaThread.kill, threads)
 
             # get rid of images for events that don't show up anymore
             for image in set(blautil.discover(blaconst.EVENTS)).difference(

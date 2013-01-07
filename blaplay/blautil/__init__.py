@@ -30,6 +30,7 @@ import functools
 from threading import Thread, ThreadError, Lock
 import collections
 import ctypes
+import time
 
 import gobject
 import gtk
@@ -51,7 +52,7 @@ def thread(f):
     @functools.wraps(f)
     def wrapper(*args, **kwargs):
         t = BlaThread(target=f, args=args, kwargs=kwargs)
-        t.setDaemon(True)
+        t.daemon = True
         t.start()
         return t
     return wrapper
@@ -59,16 +60,15 @@ def thread(f):
 def thread_nondaemonic(f):
     @functools.wraps(f)
     def wrapper(*args, **kwargs):
-        t = BlaThread(
-                target=f, args=args, kwargs=kwargs, register_for_cleanup=False)
+        t = Thread(target=f, args=args, kwargs=kwargs)
         t.start()
         return t
     return wrapper
 
 def idle(f):
     @functools.wraps(f)
-    def wrapper(*args, **kwargs):
-        gobject.idle_add(f, *args, **kwargs)
+    def wrapper(*args):
+        gobject.idle_add(f, *args)
     return wrapper
 
 # there's nothing complicated about this decorator at all...
@@ -97,8 +97,11 @@ def md5(string):
     return m.hexdigest()
 
 def remove_html_tags(string):
-    p = re.compile(r"<.*?>")
-    return p.sub("", string)
+    return re.sub(r"<.*?>", "", string)
+
+def format_date(date):
+    # parses a date tuple into a date string, e.g. Thursday 10. January 2013
+    return time.strftime("%A %d %B %Y", time.localtime(time.mktime(date)))
 
 @thread
 def open_url(url):
@@ -219,20 +222,30 @@ class BlaLock(object):
         self.release()
 
 class BlaThread(Thread):
-    """ A kill'able thread class. """
+    """
+    A kill'able thread class. This is certainly a bit of an overkill solution
+    as the class inserts a bytecode trace which checks for the kill condition
+    before every function call or line interpretation to break out of loops as
+    soon as possible. However, it's the only way to make it work without adding
+    kill condition checks to the threaded function/method itself. Additionally,
+    it's the only way we can guarantee that daemonic threads are terminated
+    before the interpreter shuts down. In theory this is supposed to be readily
+    handled by threading.Thread. However, instead of suppressing exceptions
+    from daemon threads on interpreter shutdown the Thread class tries to
+    reconstruct the backtrace of the exception and prints it to stderr (which
+    we can't catch). Those are (almost) always AttributeError exceptions caused
+    by accessing a member of the globals dict which gets wiped clean by CPython
+    on shutdown.
+    """
 
-    threads = []
+    __threads = []
 
     def __init__(self, register_for_cleanup=True, *args, **kwargs):
         super(BlaThread, self).__init__(*args, **kwargs)
-
-        # clean up when there's more than 100 threads in the reference list
-        if len(BlaThread.threads) > 100:
-            remove = BlaThread.threads.remove
-            map(remove, [t for t in BlaThread.threads if not t.is_alive()])
-
         self.__killed = False
-        if register_for_cleanup: BlaThread.threads.append(self)
+        BlaThread.__threads = filter(
+                lambda t: t.is_alive(), BlaThread.__threads)
+        BlaThread.__threads.append(self)
 
     def start(self):
         self.__run_ = self.run
@@ -244,26 +257,21 @@ class BlaThread(Thread):
 
     @classmethod
     def clean_up(cls):
-        try:
-            for t in cls.threads:
-                t.kill()
-                t._Thread__stop()
-                while t.is_alive(): pass
-        except AttributeError: pass
+        map(cls.kill, cls.__threads)
 
     def __run(self):
         sys.settrace(self.__globaltrace)
         self.__run_()
         self.run = self.__run_
 
-    def __globaltrace(self, frame, why, arg):
-        if why == "call": return self.__localtrace
+    def __globaltrace(self, frame, event, arg):
+        if event == "call": return self.__localtrace
         return None
 
-    def __localtrace(self, frame, why, arg):
-        if self.__killed and why == "line":
-            BlaThread.threads.remove(self)
-            raise SystemExit()
+    def __localtrace(self, frame, event, arg):
+        if self.__killed and event == "line":
+            BlaThread.__threads.remove(self)
+            raise SystemExit
         return self.__localtrace
 
 class BlaOrderedSet(collections.MutableSet):

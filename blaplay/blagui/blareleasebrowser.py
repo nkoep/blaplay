@@ -20,9 +20,8 @@ import shutil
 import math
 import Queue
 import urllib
+from email.utils import parsedate as parse_rfc_time
 import datetime
-from email.utils import parsedate_tz as parse_rfc_time
-import time
 
 import gobject
 import gtk
@@ -122,13 +121,15 @@ class BlaRelease(object):
 
     @property
     def release_date(self):
-        return time.strftime("%A %d %B %Y", self.date[:-1])
+        return blautil.format_date(self.date)
 
     @property
     def calender_week(self):
         return datetime.date(*self.date[:3]).isocalendar()[:2]
 
     def get_cover(self, restore=False):
+        import gobject
+
         pixbuf = path = None
         image_base = os.path.join(blaconst.RELEASES, ("%s-%s" % (
                     self.artist_name, self.release_name)).replace(
@@ -275,23 +276,8 @@ class BlaReleaseBrowser(blaguiutils.BlaScrolledWindow):
             return False
         gobject.idle_add(set_sensitive, False)
 
-        def worker():
-            while True:
-                release = queue.get()
-                path = release.get_cover()
-                if path: images.add(path)
-                queue.task_done()
-
         with self.__lock:
             images = set()
-            queue = Queue.Queue()
-            threads = []
-            for x in xrange(3):
-                t = blautil.BlaThread(target=worker)
-                t.daemon = True
-                threads.append(t)
-                t.start()
-
             releases = (blafm.get_new_releases(),
                     blafm.get_new_releases(recommended=True))
             active = blacfg.getint("general", "releases.filter")
@@ -319,12 +305,9 @@ class BlaReleaseBrowser(blaguiutils.BlaScrolledWindow):
                         else: datestring %= "Week of %s</b></span>" % date
                         model.append([datestring])
                     model.append([release])
-                    queue.put(release)
+                    path = release.get_cover()
+                    if path: images.add(path)
                 self.__models[filt] = model
-
-            # wait until all items are processed and kill the worker threads
-            queue.join()
-            map(blautil.BlaThread.kill, threads)
 
             # get rid of covers for releases that don't show up anymore
             for image in set(blautil.discover(blaconst.RELEASES)).difference(
@@ -338,7 +321,8 @@ class BlaReleaseBrowser(blaguiutils.BlaScrolledWindow):
             if active == blaconst.NEW_RELEASES_FROM_LIBRARY:
                 count = self.__count_library
             else: count = self.__count_recommended
-            self.emit("count_changed", blaconst.VIEW_RELEASES, count)
+            gobject.idle_add(
+                    self.emit, "count_changed", blaconst.VIEW_RELEASES, count)
             return True
 
     def __filter_changed(self, radiobutton, filt):
@@ -394,6 +378,7 @@ class BlaReleaseBrowser(blaguiutils.BlaScrolledWindow):
         return False
 
     def __cw_to_start_end_day(self, year, week):
+        # FIXME: this is erroneous
         date = datetime.date(year, 1, 1)
         timedelta = datetime.timedelta(days=(week-1)*7+1)
         return date + timedelta, date + timedelta + datetime.timedelta(days=6)
