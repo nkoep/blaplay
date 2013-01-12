@@ -28,6 +28,7 @@ import gtk
 import cairo
 import pango
 import pangocairo
+import numpy as np
 
 import blaplay
 player = blaplay.bla.player
@@ -2543,12 +2544,14 @@ class BlaPlaylist(gtk.Notebook):
 
     @classmethod
     def update_uris(cls, uris):
-        old_uris = dict(
-            zip(BlaPlaylist.uris.values(), BlaPlaylist.uris.keys()))
+        # sort of a weird use of numpy, but since we depend on it anyway we
+        # might as well use some of its nice matlab-inspired array manipulation
+        # features
+        ids = BlaPlaylist.uris.keys()
+        old_uris = np.array(BlaPlaylist.uris.values())
         for old_uri, new_uri in uris:
-            try: old_uris[new_uri] = old_uris.pop(old_uri)
-            except KeyError: pass
-        BlaPlaylist.uris = dict(zip(old_uris.values(), old_uris.keys()))
+            old_uris[np.where(old_uris == old_uri)] = new_uri
+        BlaPlaylist.uris = dict(zip(ids, old_uris))
 
     @classmethod
     def update_contents(cls):
