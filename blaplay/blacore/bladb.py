@@ -321,7 +321,6 @@ class BlaLibrary(gobject.GObject):
     __playlists = []
     __queue = []
     __lock = blautil.BlaLock(strict=True)
-    __pending_save = False
 
     class BlaLibraryModel(object):
         # FIXME: for a library of 9000~ tracks creating an instance of the
@@ -396,8 +395,8 @@ class BlaLibrary(gobject.GObject):
             except ValueError: label = ""
             try: label += "%02d. " % int(track[TRACK].split("/")[0])
             except ValueError: pass
-            artist = (track[ALBUM_ARTIST] or track[ARTIST] or track[PERFORMER] or
-                    track[COMPOSER])
+            artist = (track[ALBUM_ARTIST] or track[ARTIST] or
+                    track[PERFORMER] or track[COMPOSER])
             if track[ARTIST] and artist != track[ARTIST]:
                 label += "%s - " % track[ARTIST]
             return "%s%s" % (label, track[TITLE] or track.basename)
@@ -405,8 +404,8 @@ class BlaLibrary(gobject.GObject):
         @classmethod
         def __organize_by_directory(cls, uri, track):
             if not track[MONITORED_DIRECTORY]:
-                raise ValueError("Trying to include track in the library browser "
-                        "that has no monitored directory")
+                raise ValueError("Trying to include track in the library "
+                                 "browser that has no monitored directory")
             directory = os.path.dirname(
                     track.uri)[len(track[MONITORED_DIRECTORY])+1:]
             comps = directory.split("/")
@@ -421,8 +420,8 @@ class BlaLibrary(gobject.GObject):
 
         @classmethod
         def __organize_by_artist_album(cls, uri, track):
-            artist = (track[ALBUM_ARTIST] or track[PERFORMER] or track[ARTIST] or
-                    "?")
+            artist = (track[ALBUM_ARTIST] or track[PERFORMER] or
+                      track[ARTIST] or "?")
             return (["%s - %s" % (artist, track[ALBUM] or "?")],
                     cls.__get_track_label(track))
 
@@ -448,8 +447,8 @@ class BlaLibrary(gobject.GObject):
 
         formats.init()
         extensions = formats.formats.keys()
-        self.__extension_filter = re.compile("(%s)" % ")|(".join([r".*\.%s$"
-                % ext for ext in extensions])).match
+        self.__extension_filter = re.compile(
+                r".*\.(%s)$" % "|".join(extensions)).match
 
         # restore the library
         tracks = blautil.deserialize_from_file(blaconst.LIBRARY_PATH)
@@ -564,7 +563,7 @@ class BlaLibrary(gobject.GObject):
         def get_regexp(string):
             tokens = [t.replace(".", "\.").replace("*", ".*")
                     for t in map(str.strip, string.split(","))]
-            return re.compile("(%s)" % ")|(".join([r"%s" % t for t in tokens]))
+            return re.compile(r"(%s)" % "|".join(tokens))
 
         restrict_re = get_regexp(
                 blacfg.getstring("library", "restrict.to").strip())
