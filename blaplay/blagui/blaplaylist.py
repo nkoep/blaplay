@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# blaplay, Copyright (C) 2012  Niklas Koep
+# blaplay, Copyright (C) 2012-2013  Niklas Koep
 
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -1097,7 +1097,7 @@ class BlaPlaylist(gtk.Notebook):
                 return False
             self.__entry.connect("key_press_event", key_press_event)
 
-            self.__regexp_button = gtk.ToggleButton(label="Regexp")
+            self.__regexp_button = gtk.ToggleButton(label="re")
             self.__regexp_button.set_tooltip_text("Use regular expression")
 
             button = gtk.Button()
@@ -1106,8 +1106,8 @@ class BlaPlaylist(gtk.Notebook):
             button.connect("clicked", self.__filter)
 
             self.__hbox = gtk.HBox()
-            self.__hbox.pack_start(self.__entry, expand=True)
             self.__hbox.pack_start(self.__regexp_button, expand=False)
+            self.__hbox.pack_start(self.__entry, expand=True)
             self.__hbox.pack_start(button, expand=False)
             self.__hbox.show_all()
             self.__hbox.set_visible(False)
