@@ -146,10 +146,35 @@ class BlaWindow(gtk.Window):
             self.vbox.set_border_width(10)
             self.vbox.pack_end(self.buttonbox, expand=False, fill=False)
 
-        self.connect_object("destroy", self.__destroy, self)
+        self.__pos = (-1, -1)
+        self.__size = (-1, -1)
 
-    def do_close_accel(self):
-        self.__clicked()
+        self.connect_object("destroy", self.__destroy, self)
+        self.connect("configure_event", self.__save_size)
+        self.connect("map", self.__map)
+
+    def __map(self, *args):
+        # Some WMs (metacity..) tend to forget the position randomly
+        self.__restore_window_state()
+
+    def __restore_window_state(self):
+        self.__restore_size()
+        self.__restore_position()
+
+    def __restore_position(self):
+        x, y = self.__pos
+        if x >= 0 and y >= 0: self.move(x, y)
+
+    def __restore_size(self):
+        x, y = self.__size
+        screen = self.get_screen()
+        x = min(x, screen.get_width())
+        y = min(y, screen.get_height())
+        if x >= 0 and y >= 0: self.resize(x, y)
+
+    def __save_size(self, window, event):
+        self.__size = (event.width, event.height)
+        if self.get_property("visible"): self.__pos = self.get_position()
 
     def __clicked(self, *args):
         if not self.emit("delete_event", gtk.gdk.Event(gtk.gdk.DELETE)):
@@ -158,6 +183,9 @@ class BlaWindow(gtk.Window):
     def __destroy(self, *args):
         try: type(self).children.remove(self)
         except ValueError: return
+
+    def do_close_accel(self):
+        self.__clicked()
 
 class BlaUniqueWindow(BlaWindow):
     __window = None

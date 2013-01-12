@@ -258,12 +258,11 @@ class BlaMainWindow(gtk.Window):
             blagui.tray.set_has_tooltip(False)
 
     def raise_window(self):
-        # FIXME: this doesn't raise the window to the top :S
-        self.show()
         self.present()
         self.__hidden = False
         if not blacfg.getboolean("general", "always.show.tray"):
             blagui.tray.set_visible(False)
+        # FIXME: yeah... this shouldn't have to be called here
         BlaVisualization.flush_buffers()
 
     def toggle_hide(self, window, event=None):
@@ -316,7 +315,6 @@ class BlaMainWindow(gtk.Window):
         elif not (event.new_window_state & gtk.gdk.WINDOW_STATE_MAXIMIZED):
             blacfg.setboolean("general", "maximized", False)
             self.__set_geometry()
-        return True
 
     def __set_geometry(self, *args):
         size = blacfg.getlistint("general", "size")
