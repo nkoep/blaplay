@@ -168,7 +168,7 @@ def save(force=True):
     global last_save
 
     t = time.time()
-    if not force and last_save and (t-last_save) < 10 * 60: return
+    if not force and last_save and (t-last_save) < 10 * 60: return True
     last_save = t
     print_d("Saving config")
 
@@ -186,6 +186,8 @@ def save(force=True):
     else:
         try: os.unlink("%s.bak" % blaconst.CFG_PATH)
         except OSError: pass
+
+    return True
 
 def add_section(section):
     if not cfg.has_section(section): cfg.add_section(section)
