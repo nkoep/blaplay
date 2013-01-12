@@ -144,7 +144,7 @@ class BlaPlayer(gobject.GObject):
 
         bus = self.__bin.get_bus()
         bus.add_signal_watch()
-        self.__busid = bus.connect("message", self.__on_message)
+        self.__busid = bus.connect("message", self.__message)
 
         if blacfg.getboolean("player", "muted"): volume = 0
         else: volume = blacfg.getfloat("player", "volume") * 100
@@ -154,12 +154,14 @@ class BlaPlayer(gobject.GObject):
 
         return True
 
+    @blautil.idle
     def __about_to_finish(self, player):
         # TODO: implement gapless playback
+        # the signal we connect this callback to is emitted in a gst streaming
+        # thread so we decorate it with `idle' to push it to the main thread
         pass
 
-    @blautil.idle
-    def __on_message(self, bus, message):
+    def __message(self, bus, message):
         if message.type == gst.MESSAGE_EOS:
             self.next(force_advance=False)
         elif message.type == gst.MESSAGE_TAG:
@@ -172,8 +174,7 @@ class BlaPlayer(gobject.GObject):
                 from blaplay.blagui.blastatusbar import BlaStatusbar
             percentage = message.parse_buffering()
             s = "Buffering: %d %%" % percentage
-            gobject.idle_add(
-                    BlaStatusbar.set_view_info, blaconst.VIEW_RADIO, s)
+            BlaStatusbar.set_view_info(blaconst.VIEW_RADIO, s)
             if percentage == 0: print_d("Start buffering...")
             elif percentage == 100:
                 self.__bin.set_state(gst.STATE_PLAYING)
@@ -189,8 +190,7 @@ class BlaPlayer(gobject.GObject):
             from blaplay.blagui import blaguiutils
             # FIXME: why isn't this lock redundant!!
             import gtk
-            with gtk.gdk.lock:
-                blaguiutils.error_dialog("Error", "%s" % err)
+            with gtk.gdk.lock: blaguiutils.error_dialog("Error", "%s" % err)
 
     def __parse_tags(self, tags):
         MAPPING = {

@@ -42,9 +42,10 @@ def signal(n_args):
     return (gobject.SIGNAL_RUN_LAST, gobject.TYPE_NONE, (object,) * n_args)
 
 def get_thread_id():
+    soname = ctypes.util.find_library("c")
     try:
-        soname = ctypes.util.find_library("c")
-        # 15 == PR_SET_NAME
+        # FIXME: this value is only valid for x86_64. make this at least
+        #        portable across unices
         return ctypes.CDLL(soname).syscall(186) # SYS_gettid
     except AttributeError: return -1
 

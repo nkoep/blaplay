@@ -22,61 +22,59 @@ import dbus.service
 import dbus.mainloop.glib
 dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
 
-SERVICE = "blub.bla.blaplayService"
-INTERFACE = "blub.bla.blaplayInterface"
+INTERFACE = "org.freedesktop.blaplay" # we use the same bus and interface name
+OBJECT_PATH = "/%s/BlaDBus" % INTERFACE.replace(".", "/")
 
 
 def setup_bus():
     print_i("Setting up D-Bus")
 
-    bus = dbus.SessionBus()
-    bus_name = dbus.service.BusName(SERVICE, bus)
-    BlaDBus(object_path="/BlaDBus", bus_name=bus_name)
+    bus_name = dbus.service.BusName(INTERFACE, dbus.SessionBus())
+    BlaDBus(object_path=OBJECT_PATH, bus_name=bus_name)
 
 def query_bus(query, arg=None):
-    # FIXME: do this server-side. or better yet, see how this should be done
-    #        after complying to MPRIS 2.2
+    # FIXME: do this properly once we comply to MPRIS 2.2
     from blaplay.formats._identifiers import ARTIST, TITLE, ALBUM, DATE, GENRE
 
-    # TODO: don't encapsulate this in try... except
-    try:
-        bus = dbus.SessionBus()
-        try: proxy = bus.get_object(SERVICE, "/BlaDBus")
-        except: raise SystemExit
-        interface = dbus.Interface(proxy, INTERFACE)
+    # get a proxy to the bus object of the running blaplay instance
+    try: proxy = dbus.SessionBus().get_object(INTERFACE, OBJECT_PATH)
+    except dbus.DBusException: raise SystemExit
 
-        if isinstance(query, list):
-            args = query[0].split("%")
-            for idx, arg in enumerate(args):
-                if arg != "": continue
-                if (idx == len(args)-1 or
-                        args[idx+1][0] not in ["a", "t", "b", "y", "g", "c"]):
-                    print_e("Invalid format string `%s'" % args)
+    # get an interface to the proxy. this offers direct access to methods
+    # exposed on the interface
+    interface = dbus.Interface(proxy, INTERFACE)
 
-            callbacks = {
-                "%a": lambda: interface.get_tag(ARTIST),
-                "%t": lambda: interface.get_tag(TITLE),
-                "%b": lambda: interface.get_tag(ALBUM),
-                "%y": lambda: interface.get_tag(DATE),
-                "%g": lambda: interface.get_tag(GENRE),
-                "%c": lambda: interface.get_cover()
-            }
+    if isinstance(query, list):
+        args = query[0].split("%")
+        for idx, arg in enumerate(args):
+            if arg != "": continue
+            if (idx == len(args)-1 or
+                    args[idx+1][0] not in ["a", "t", "b", "y", "g", "c"]):
+                print_e("Invalid format string `%s'" % args)
 
-            format_ = query[0]
-            for key in callbacks.iterkeys():
-                if key in format_:
-                    format_ = format_.replace(key, callbacks[key]())
-            print format_.encode("utf-8")
+        callbacks = {
+            "%a": lambda: interface.get_tag(ARTIST),
+            "%t": lambda: interface.get_tag(TITLE),
+            "%b": lambda: interface.get_tag(ALBUM),
+            "%y": lambda: interface.get_tag(DATE),
+            "%g": lambda: interface.get_tag(GENRE),
+            "%c": lambda: interface.get_cover()
+        }
 
-        else:
-            if query == "play_pause": interface.play_pause()
-            elif query == "stop": interface.stop()
-            elif query == "next": interface.next()
-            elif query == "previous": interface.previous()
-            elif query == "raise_window": interface.raise_window()
-            elif query in ["append", "new", "replace"] and arg:
-                interface.parse_uris(query, arg)
-    except: raise #pass
+        format_ = query[0]
+        for key in callbacks.iterkeys():
+            if key in format_:
+                format_ = format_.replace(key, callbacks[key]())
+        print format_.encode("utf-8")
+
+    else:
+        if query == "play_pause": interface.play_pause()
+        elif query == "stop": interface.stop()
+        elif query == "next": interface.next()
+        elif query == "previous": interface.previous()
+        elif query == "raise_window": interface.raise_window()
+        elif query in ["append", "new", "replace"] and arg:
+            interface.parse_uris(query, arg)
     raise SystemExit
 
 
@@ -134,6 +132,7 @@ class BlaDBus(dbus.service.Object):
     @dbus.service.method(dbus_interface=INTERFACE, in_signature="",
             out_signature="")
     def raise_window(self):
+        # FIXME: this seems to work only once
         import blaplay
         blaplay.bla.window.raise_window()
 
@@ -152,7 +151,6 @@ class BlaDBus(dbus.service.Object):
 
         # FIXME: why is this necessary? these callbacks are processed from the
         #        main thread
-        gtk.gdk.threads_enter()
-        f("", uris, resolve=True)
-        gtk.gdk.threads_leave()
+        with gtk.gdk.lock:
+            f("", uris, resolve=True)
 
