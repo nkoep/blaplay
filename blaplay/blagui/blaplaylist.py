@@ -22,6 +22,7 @@ import urllib
 import re
 import xml.etree.cElementTree as ETree
 from xml.sax.saxutils import escape as xml_escape
+from copy import copy
 
 import gobject
 import gtk
@@ -385,11 +386,7 @@ def header_popup(button, event, view_id):
 
 
 class BlaQuery(object):
-    def __init__(self, tokens):
-        if not tokens:
-            self.query = lambda *x: True
-            return
-
+    def __init__(self, filter_string, regexp):
         self.__query_identifiers = [ARTIST, TITLE, ALBUM]
         columns = blacfg.getlistint("general", "columns.playlist")
         if columns is None: columns = COLUMNS_DEFAULT_PLAYLIST
@@ -397,9 +394,12 @@ class BlaQuery(object):
             self.__query_identifiers.extend(
                     self.__column_to_tag_ids(column_id))
 
-        self.__res = [re.compile(t.decode("utf-8"), re.UNICODE | re.IGNORECASE)
-                for t in map(re.escape, tokens)]
-        self.query = self.__query
+        flags = re.UNICODE | re.IGNORECASE
+        if regexp:
+            self.__res = [re.compile(r"%s" % filter_string, flags)]
+        else:
+            self.__res = [re.compile(t.decode("utf-8"), flags)
+                    for t in map(re.escape, filter_string.split())]
 
     def __column_to_tag_ids(self, column_id):
         if column_id == COLUMN_ALBUM_ARTIST:
@@ -412,7 +412,7 @@ class BlaQuery(object):
             return [FORMAT]
         return []
 
-    def __query(self, identifier):
+    def query(self, identifier):
         track = BlaPlaylist.get_track_from_id(identifier)
         for r in self.__res:
             search = r.search
@@ -1080,7 +1080,6 @@ class BlaPlaylist(gtk.Notebook):
         __current = None
         __sort_parameters = None
         __fid = -1
-        __filter_parameters = []
 
         def __init__(self):
             super(BlaPlaylist.Playlist, self).__init__()
@@ -1098,8 +1097,8 @@ class BlaPlaylist(gtk.Notebook):
                 return False
             self.__entry.connect("key_press_event", key_press_event)
 
-            mode_button = gtk.ToggleButton(label="Regexp")
-            mode_button.connect("toggled", lambda *x: True)
+            self.__regexp_button = gtk.ToggleButton(label="Regexp")
+            self.__regexp_button.set_tooltip_text("Use regular expression")
 
             button = gtk.Button()
             button.add(gtk.image_new_from_stock(
@@ -1108,7 +1107,7 @@ class BlaPlaylist(gtk.Notebook):
 
             self.__hbox = gtk.HBox()
             self.__hbox.pack_start(self.__entry, expand=True)
-            self.__hbox.pack_start(mode_button, expand=False)
+            self.__hbox.pack_start(self.__regexp_button, expand=False)
             self.__hbox.pack_start(button, expand=False)
             self.__hbox.show_all()
             self.__hbox.set_visible(False)
@@ -1332,11 +1331,14 @@ class BlaPlaylist(gtk.Notebook):
             BlaPlaylist.uris.update(dict(zip(ids, uris)))
 
             self.insert(ids, path, restore=bool(restore))
-            try: query, sort_parameters = restore
+            try: query, regexp, sort_parameters = restore
             except TypeError:
                 query = None
+                # preserve regexp button state when appending tracks
+                regexp = self.__regexp_button.get_active()
                 sort_parameters = None
 
+            self.__regexp_button.set_active(regexp)
             self.__sort_parameters = sort_parameters
             if not (restore and (query or sort_parameters)):
                 scroll_id = ids[-1]
@@ -1619,8 +1621,9 @@ class BlaPlaylist(gtk.Notebook):
             # since we sort on startup anyway, just get the __all_tracks list
             uris = [BlaPlaylist.uris[identifier]
                     for identifier in self.__all_tracks]
-            playlist = [(self.__entry.get_text(), self.__sort_parameters),
-                    path, uris]
+            playlist = [(self.__entry.get_text(),
+                         self.__regexp_button.get_active(),
+                         self.__sort_parameters), path, uris]
             return playlist
 
         def get_uris(self):
@@ -1960,15 +1963,19 @@ class BlaPlaylist(gtk.Notebook):
                 self.__fid = gobject.timeout_add(500, activate)
 
         def __filter(self, *args):
-            self.__filter_parameters = self.__entry.get_text().strip().split()
+            filter_string = self.__entry.get_text().strip()
+
             row_align, selected_ids, scroll_identifier = \
                     self.__get_selection_and_row()
 
-            if self.__filter_parameters: self.__mode |= MODE_FILTERED
-            else: self.__mode ^= MODE_FILTERED
-
-            query = BlaQuery(self.__filter_parameters).query
-            self.__tracks = filter(query, self.__all_tracks)
+            if filter_string:
+                self.__mode |= MODE_FILTERED
+                query = BlaQuery(filter_string,
+                                 self.__regexp_button.get_active()).query
+                self.__tracks = filter(query, self.__all_tracks)
+            else:
+                self.__mode ^= MODE_FILTERED
+                self.__tracks = list(self.__all_tracks)
 
             if self.__mode & MODE_SORTED or self.__sort_parameters:
                 # selection is handled in the sort method
@@ -1979,8 +1986,7 @@ class BlaPlaylist(gtk.Notebook):
                 model = self.__freeze_treeview()
                 model.clear()
                 append = model.append
-                [append([identifier, "", []])
-                        for identifier in self.__tracks]
+                [append([identifier, "", []]) for identifier in self.__tracks]
                 self.__thaw_treeview()
 
             self.__set_selection_and_row(
