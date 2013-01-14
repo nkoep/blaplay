@@ -39,8 +39,6 @@ from blaabout import BlaAbout
 
 
 class BlaMainWindow(gtk.Window):
-    __hidden = False
-
     def __init__(self):
         super(BlaMainWindow, self).__init__(gtk.WINDOW_TOPLEVEL)
         gtk.window_set_default_icon_name(blaconst.APPNAME)
@@ -259,24 +257,22 @@ class BlaMainWindow(gtk.Window):
 
     def raise_window(self):
         self.present()
-        self.__hidden = False
         if not blacfg.getboolean("general", "always.show.tray"):
             blagui.tray.set_visible(False)
         # FIXME: yeah... this shouldn't have to be called here
         BlaVisualization.flush_buffers()
 
     def toggle_hide(self, window, event=None):
-        blaguiutils.set_visible(self.__hidden)
-        if self.__hidden: self.raise_window()
-        else:
+        visible = self.get_property("visible")
+        blaguiutils.set_visible(not visible)
+        if visible:
             self.hide()
-            self.__hidden = True
             blagui.tray.set_visible(True)
+        else: self.raise_window()
+
         return True
 
     def quit(self, *args):
-        # hide all windows for the illusion of a faster shutdown. once the main
-        # loop quits the signal handlers to save the state to disk are run
         self.hide()
         blaguiutils.set_visible(False)
         blagui.tray.set_visible(False)
