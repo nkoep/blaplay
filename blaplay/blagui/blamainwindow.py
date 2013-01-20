@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# blaplay, Copyright (C) 2012  Niklas Koep
+# blaplay, Copyright (C) 2012-2013  Niklas Koep
 
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -38,19 +38,14 @@ from blapreferences import BlaPreferences
 from blaabout import BlaAbout
 
 
-class BlaMainWindow(gtk.Window):
+class BlaMainWindow(blaguiutils.BlaBaseWindow):
     def __init__(self):
         super(BlaMainWindow, self).__init__(gtk.WINDOW_TOPLEVEL)
+
         gtk.window_set_default_icon_name(blaconst.APPNAME)
-
         self.set_resizable(True)
-        self.set_title("%s %s" % (blaconst.APPNAME, blaconst.VERSION))
-        self.set_size_request(*blaconst.MINSIZE)
-
-        # connect window signals
         self.connect("delete_event", self.__delete_event)
-        self.connect("window_state_event", self.__window_state_event)
-        self.connect("configure_event", self.__save_geometry)
+        self.enable_tracking(is_main_window=True)
 
         # mainmenu
         blagui.uimanager = uimanager = gtk.UIManager()
@@ -194,21 +189,20 @@ class BlaMainWindow(gtk.Window):
         hpane.show()
 
         # restore left pane handle position
-        pane_pos = blacfg.getint("general", "pane.pos.left")
-        if pane_pos is not None: hpane.set_position(pane_pos)
+        try: hpane.set_position(blacfg.getint("general", "pane.pos.left"))
+        except TypeError: pass
         hpane.connect("notify", lambda pane, propspec:
-                blacfg.set("general", "pane.pos.left",
-                "%d" % pane.get_position())
-        )
+                      blacfg.set("general", "pane.pos.left",
+                      "%d" % pane.get_position()))
 
-        # FIXME: the position gets reset by one of the subsequent calls
-        # restore right pane handle position (of the view)
-        pane_pos = blacfg.getint("general", "pane.pos.right")
-        if pane_pos is not None: self.__view.set_position(pane_pos)
+        # restore right pane handle position
+        try:
+            self.__view.set_position(
+                    blacfg.getint("general", "pane.pos.right"))
+        except TypeError: pass
         self.__view.connect("notify", lambda pane, propspec:
-                blacfg.set("general", "pane.pos.right",
-                "%d" % pane.get_position())
-        )
+                            blacfg.set("general", "pane.pos.right",
+                            "%d" % pane.get_position()))
 
         # create a vbox for the toolbar, browser and playlist view. this allows
         # for setting a border around those items, excluding the menubar
@@ -224,7 +218,6 @@ class BlaMainWindow(gtk.Window):
         self.child.pack_start(vbox)
 
         # position main window, set colors and show everything
-        self.__set_geometry()
         blagui.update_colors()
         self.child.show()
 
@@ -259,25 +252,31 @@ class BlaMainWindow(gtk.Window):
         self.present()
         if not blacfg.getboolean("general", "always.show.tray"):
             blagui.tray.set_visible(False)
-        # FIXME: yeah... this shouldn't have to be called here
         BlaVisualization.flush_buffers()
 
-    def toggle_hide(self, window, event=None):
-        visible = self.get_property("visible")
+    def toggle_hide(self, *args):
+        visible = self.get_visible()
         blaguiutils.set_visible(not visible)
         if visible:
             self.hide()
             blagui.tray.set_visible(True)
         else: self.raise_window()
 
-        return True
-
     def quit(self, *args):
+        # hide the main window, the tray icon, and every other tracked window.
+        # then destroy the main window which in turn initiates the actual
+        # shutdown sequence
         self.hide()
         blaguiutils.set_visible(False)
         blagui.tray.set_visible(False)
         self.destroy()
         return False
+
+    def __delete_event(self, window, event):
+        if blacfg.getboolean("general", "close.to.tray"):
+            self.toggle_hide()
+            return True
+        return self.quit()
 
     def __toggle_browsers(self, event):
         state = event.get_active()
@@ -295,50 +294,6 @@ class BlaMainWindow(gtk.Window):
 
     def __toggle_visualization(self, event):
         BlaVisualization.set_visibility(event.get_active())
-
-    def __delete_event(self, window, event):
-        if blacfg.getboolean("general", "close.to.tray"):
-            return self.toggle_hide(window, event)
-        return self.destroy()
-
-    def __window_state_event(self, window, event):
-        if (event.changed_mask & gtk.gdk.WINDOW_STATE_ICONIFIED and
-                event.new_window_state & gtk.gdk.WINDOW_STATE_ICONIFIED and
-                blacfg.getboolean("general", "minimize.to.tray")):
-            self.toggle_hide(window, event)
-        if event.new_window_state == gtk.gdk.WINDOW_STATE_MAXIMIZED:
-            blacfg.setboolean("general", "maximized", True)
-        elif not (event.new_window_state & gtk.gdk.WINDOW_STATE_MAXIMIZED):
-            blacfg.setboolean("general", "maximized", False)
-            self.__set_geometry()
-
-    def __set_geometry(self, *args):
-        size = blacfg.getlistint("general", "size")
-        position = blacfg.getlistint("general", "position")
-
-        screen = self.get_screen()
-        w, h = screen.get_width(), screen.get_height()
-
-        if (size is None or position[0] + size[0] < 0 or
-                position[-1] + size[-1] < 0 or position[0] > w or
-                position[-1] > h):
-            x, y, w, h = screen.get_monitor_geometry(0)
-            size = map(int, [w / 2.0, h / 2.0])
-            self.resize(*size)
-            self.set_position(gtk.WIN_POS_CENTER)
-        else:
-            self.resize(*size)
-            self.move(*position)
-
-        if blacfg.getboolean("general", "maximized"): self.maximize()
-
-    def __save_geometry(self, window, event):
-        size = self.get_size()
-        position = self.get_position()
-
-        if not blacfg.getboolean("general", "maximized"):
-            blacfg.set("general", "size", "%d, %d" % size)
-            blacfg.set("general", "position", "%d, %d" % position)
 
     def __set_file_chooser_directory(self, diag):
         directory = blacfg.getstring("general", "filechooser.directory")

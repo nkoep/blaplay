@@ -37,6 +37,7 @@ def init():
 
     window = BlaMainWindow()
     tray = BlaTray(window)
+    window.update_title()
 
     return window
 

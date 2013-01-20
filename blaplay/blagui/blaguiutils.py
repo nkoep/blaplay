@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# blaplay, Copyright (C) 2012  Niklas Koep
+# blaplay, Copyright (C) 2012-2013  Niklas Koep
 
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -22,7 +22,6 @@ import blaplay
 from blaplay import blautil
 from blaplay import blaconst, blacfg
 
-# these are also needed in blabrowsers.py
 PADDING_X, PADDING_Y, PADDING_WIDTH, PADDING_HEIGHT = -2, 0, 4, 0
 
 
@@ -65,10 +64,9 @@ def error_dialog(text, secondary_text=""):
     diag.destroy()
 
 def set_visible(state):
-    if state: f = gtk.Window.present
+    if state: f = BlaWindow.present
     else: f = gtk.Window.hide
-    map(f, BlaWindow.children)
-
+    map(f, BlaWindow.instances)
 
 class BlaScrolledWindow(gtk.ScrolledWindow):
     def __init__(self):
@@ -94,9 +92,82 @@ class BlaCellRendererBase(gtk.GenericCellRenderer):
     def do_get_property(self, prop):
         return getattr(self, prop.name)
 
-# the following classes are modified versions of implementations from quodlibet
+class BlaBaseWindow(gtk.Window):
+    """
+    The bare base for all of our windows. This tracks position, state and size,
+    and possibly saves the various values to the config if enable_tracking is
+    called with `is_main_window=True'.
+    """
 
-class BlaWindow(gtk.Window):
+    def __init__(self, *args, **kwargs):
+        super(BlaBaseWindow, self).__init__(*args, **kwargs)
+        self.__position = (-1, -1)
+        self.__size = (-1, -1)
+        self.__maximized = False
+
+    def present(self, *args):
+        # set the proper window state before presenting the window to the user.
+        # this is necessary to avoid that the window appears in its default
+        # state for a brief moment first
+        self.__restore_window_state()
+        super(BlaBaseWindow, self).present()
+
+    def enable_tracking(self, is_main_window=False):
+        self.__is_main_window = is_main_window
+        self.connect("configure_event", self.__configure_event)
+        self.connect("window_state_event", self.__window_state_event)
+        self.connect("map", self.__map)
+        self.__restore_window_state()
+
+    def __configure_event(self, window, event):
+        if self.__maximized: return
+        self.__size = (event.width, event.height)
+        if self.__is_main_window:
+            blacfg.set("general", "size", "%d, %d" % self.__size)
+
+        if self.get_property("visible"):
+            self.__position = self.get_position()
+            if self.__is_main_window:
+                blacfg.set("general", "position", "%d, %d" % self.__position)
+
+    def __window_state_event(self, window, event):
+        self.__maximized = bool(event.new_window_state &
+                                gtk.gdk.WINDOW_STATE_MAXIMIZED)
+        if event.new_window_state & gtk.gdk.WINDOW_STATE_WITHDRAWN: return
+        blacfg.setboolean("general", "maximized", self.__maximized)
+
+    def __map(self, *args):
+        self.__restore_window_state()
+
+    def __restore_window_state(self):
+        self.__restore_size()
+        self.__restore_state()
+        self.__restore_position()
+
+    def __restore_size(self):
+        if self.__is_main_window:
+            size = blacfg.getlistint("general", "size")
+            if size is not None: self.__size = size
+        w, h = self.__size
+        screen = self.get_screen()
+        w = min(w, screen.get_width())
+        h = min(h, screen.get_height())
+        if w >= 0 and h >= 0: self.resize(w, h)
+
+    def __restore_state(self):
+        if self.__is_main_window:
+            self.__maximized = blacfg.getboolean("general", "maximized")
+        if self.__maximized: self.maximize()
+        else: self.unmaximize()
+
+    def __restore_position(self):
+        if self.__is_main_window:
+            position = blacfg.getlistint("general", "position")
+            if position is not None: self.__position = position
+        x, y = self.__position
+        if x >= 0 and y >= 0: self.move(x, y)
+
+class BlaWindow(BlaBaseWindow):
     """ A window that binds the ^W accelerator to close. """
 
     __gsignals__ = {
@@ -104,7 +175,7 @@ class BlaWindow(gtk.Window):
                 gobject.TYPE_NONE, ())
     }
 
-    children = []
+    instances = []
 
     def __init__(self, *args, **kwargs):
         dialog = kwargs.pop("dialog", True)
@@ -114,7 +185,7 @@ class BlaWindow(gtk.Window):
         close_on_escape = kwargs.pop("close_on_escape", True)
 
         super(BlaWindow, self).__init__(*args, **kwargs)
-        type(self).children.append(self)
+        type(self).instances.append(self)
         if dialog: self.set_type_hint(gtk.gdk.WINDOW_TYPE_HINT_DIALOG)
         self.set_destroy_with_parent(True)
         self.set_position(gtk.WIN_POS_CENTER_ON_PARENT)
@@ -146,42 +217,15 @@ class BlaWindow(gtk.Window):
             self.vbox.set_border_width(10)
             self.vbox.pack_end(self.buttonbox, expand=False, fill=False)
 
-        self.__pos = (-1, -1)
-        self.__size = (-1, -1)
-
         self.connect_object("destroy", self.__destroy, self)
-        self.connect("configure_event", self.__save_size)
-        self.connect("map", self.__map)
-
-    def __map(self, *args):
-        # Some WMs (metacity..) tend to forget the position randomly
-        self.__restore_window_state()
-
-    def __restore_window_state(self):
-        self.__restore_size()
-        self.__restore_position()
-
-    def __restore_position(self):
-        x, y = self.__pos
-        if x >= 0 and y >= 0: self.move(x, y)
-
-    def __restore_size(self):
-        x, y = self.__size
-        screen = self.get_screen()
-        x = min(x, screen.get_width())
-        y = min(y, screen.get_height())
-        if x >= 0 and y >= 0: self.resize(x, y)
-
-    def __save_size(self, window, event):
-        self.__size = (event.width, event.height)
-        if self.get_property("visible"): self.__pos = self.get_position()
+        self.enable_tracking()
 
     def __clicked(self, *args):
         if not self.emit("delete_event", gtk.gdk.Event(gtk.gdk.DELETE)):
             self.destroy()
 
     def __destroy(self, *args):
-        try: type(self).children.remove(self)
+        try: type(self).instances.remove(self)
         except ValueError: return
 
     def do_close_accel(self):

@@ -20,14 +20,13 @@ import os
 VERSION = "0.1"
 APPNAME = "blaplay"
 COMMENT = "A bla that plays"
-WEB = "http://nkoep.github.com/blaplay"
+WEB = "https://nkoep.github.com/blaplay"
 AUTHOR = "Niklas Koep"
 AUTHORS = sorted([
     AUTHOR
 ])
 EMAIL = "niklas.koep@gmail.com"
 COPYRIGHT = "Copyright © 2012 %s\n<%s>" % (AUTHOR, EMAIL)
-MINSIZE = [-1, 400]
 CFG_TIMEOUT = 30
 
 # dirs

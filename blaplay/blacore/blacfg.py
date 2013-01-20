@@ -35,7 +35,6 @@ def init():
             "pane.pos.left": "",
             "pane.pos.right": "",
             "always.show.tray": "yes",
-            "minimize.to.tray": "no",
             "close.to.tray": "yes",
             "tray.tooltip": "yes",
             "browsers": "yes",

@@ -86,9 +86,8 @@ class BlaPreferences(blaguiutils.BlaUniqueWindow):
             options = [
                 ("Always display tray icon", "always.show.tray", True,
                         [0, 1, 0, 1]),
-                ("Minimize to tray", "minimize.to.tray", False, [0, 1, 1, 2]),
-                ("Close to tray", "close.to.tray", False, [1, 2, 0, 1]),
-                ("Show tooltip", "tray.tooltip", False, [1, 2, 1, 2])
+                ("Close to tray", "close.to.tray", False, [0, 1, 1, 2]),
+                ("Show tooltip", "tray.tooltip", False, [1, 2, 0, 1])
             ]
 
             for (label, key, update_visibility, coords) in options:
