@@ -19,9 +19,7 @@ import sys
 import os
 
 import gobject
-gobject.threads_init()
 import gtk
-gtk.gdk.threads_init()
 
 from blaplay.blacore import blaconst
 

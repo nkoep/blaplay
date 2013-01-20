@@ -41,14 +41,6 @@ KEY, PREV, NEXT = xrange(3)
 def signal(n_args):
     return (gobject.SIGNAL_RUN_LAST, gobject.TYPE_NONE, (object,) * n_args)
 
-def get_thread_id():
-    soname = ctypes.util.find_library("c")
-    try:
-        # FIXME: this value is only valid for x86_64. make this at least
-        #        portable across unices
-        return ctypes.CDLL(soname).syscall(186) # SYS_gettid
-    except AttributeError: return -1
-
 def thread(f):
     @functools.wraps(f)
     def wrapper(*args, **kwargs):
@@ -241,11 +233,10 @@ class BlaThread(Thread):
 
     __threads = []
 
-    def __init__(self, register_for_cleanup=True, *args, **kwargs):
+    def __init__(self, *args, **kwargs):
         super(BlaThread, self).__init__(*args, **kwargs)
         self.__killed = False
-        BlaThread.__threads = filter(
-                lambda t: t.is_alive(), BlaThread.__threads)
+        BlaThread.__threads = filter(BlaThread.is_alive, BlaThread.__threads)
         BlaThread.__threads.append(self)
 
     def start(self):
@@ -270,14 +261,18 @@ class BlaThread(Thread):
         return None
 
     def __localtrace(self, frame, event, arg):
-        if self.__killed and event == "line":
-            BlaThread.__threads.remove(self)
-            raise SystemExit
-        return self.__localtrace
+        # avoid exceptions on shutdown when the BlaThread class itself has been
+        # destroyed
+        try:
+            if self.__killed and event == "line":
+                BlaThread.__threads.remove(self)
+                raise SystemExit
+            return self.__localtrace
+        except AttributeError: SystemExit
 
 class BlaOrderedSet(collections.MutableSet):
     """
-    set-like class which maintains the order in which elements were added
+    set-like class which maintains the order in which elements were added.
     implementation from http://code.activestate.com/recipes/576694
     """
 

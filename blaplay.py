@@ -20,6 +20,7 @@ import os
 import fcntl
 
 import gobject
+gobject.threads_init()
 
 from blaplay.blacore import blaconst
 
@@ -45,7 +46,7 @@ def init_signals():
     r, w = os.pipe()
     gobject.io_add_watch(r, gobject.IO_IN, main_quit)
     for sig in (signal.SIGTERM, signal.SIGINT):
-        signal.signal(sig, lambda sig, frame: os.write(w, "bla"))
+        signal.signal(sig, lambda *x: os.write(w, "bla"))
 
 def parse_args():
     from argparse import ArgumentParser, RawTextHelpFormatter
@@ -132,7 +133,8 @@ def process_args(args):
         # TODO: make cli_queue a FIFO we write to here. then connect a handler
         #       which monitors the FIFO in the main thread and adds tracks as
         #       they arrive
-        cli_queue = (action, map(n, args["URI"]))
+        isfile = os.path.isfile
+        cli_queue = (action, filter(isfile, map(n, args["URI"])))
     else: cli_queue = ("raise_window", None)
 
     # player commands
@@ -158,9 +160,9 @@ def force_singleton():
                 # inode exists, but it's a file. we can only bail in this case
                 if errno != 17: raise
 
-    # we use a lock file to ensure a singleton for blaplay. however, the lock
-    # is only valid as long as the file descriptor is valid. that's why we need
-    # to keep it open (and referenced)
+    # we use a lock file to ensure a singleton of blaplay. however, the lock is
+    # only valid as long as the file descriptor is valid. that's why we need to
+    # keep it open (and referenced)
     global lock_file
     lock_file = open(blaconst.PIDFILE, "w")
     try: fcntl.lockf(lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)

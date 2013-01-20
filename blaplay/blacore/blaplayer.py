@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# blaplay, Copyright (C) 2012  Niklas Koep
+# blaplay, Copyright (C) 2012-2013  Niklas Koep
 
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -188,9 +188,7 @@ class BlaPlayer(gobject.GObject):
             self.stop()
             err, debug = message.parse_error()
             from blaplay.blagui import blaguiutils
-            # FIXME: why isn't this lock redundant!!
-            import gtk
-            with gtk.gdk.lock: blaguiutils.error_dialog("Error", "%s" % err)
+            blaguiutils.error_dialog("Error", "%s" % err)
 
     def __parse_tags(self, tags):
         MAPPING = {

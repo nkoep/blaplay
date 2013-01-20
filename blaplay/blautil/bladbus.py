@@ -144,13 +144,5 @@ class BlaDBus(dbus.service.Object):
         if action == "append": f = BlaPlaylist.add_to_current_playlist
         elif action == "new": f = BlaPlaylist.send_to_new_playlist
         else: f = BlaPlaylist.send_to_current_playlist
-        import gtk
-
-        import threading
-        print threading.current_thread()
-
-        # FIXME: why is this necessary? these callbacks are processed from the
-        #        main thread
-        with gtk.gdk.lock:
-            f("", uris, resolve=True)
+        f("", uris, resolve=True)
 
