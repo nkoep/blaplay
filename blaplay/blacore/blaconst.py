@@ -28,6 +28,7 @@ AUTHORS = sorted([
 EMAIL = "niklas.koep@gmail.com"
 COPYRIGHT = "Copyright © 2012 %s\n<%s>" % (AUTHOR, EMAIL)
 MINSIZE = [-1, 400]
+CFG_TIMEOUT = 30
 
 # dirs
 USERDIR = os.path.join(os.path.expanduser("~"), ".%s" % APPNAME)

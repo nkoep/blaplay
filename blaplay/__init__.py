@@ -110,8 +110,8 @@ def finalize():
         ctypes.CDLL(soname).prctl(15, blaconst.APPNAME, 0, 0, 0)
     except AttributeError: pass
 
-    # write config to disk every 10 minutes
-    gobject.timeout_add(10 * 60 * 1000, blacfg.save, False)
+    # update the config on disk from time to time
+    gobject.timeout_add(blaconst.CFG_TIMEOUT * 60 * 1000, blacfg.save, False)
 
     # start the main loop
     bla.main()

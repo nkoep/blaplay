@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# blaplay, Copyright (C) 2012  Niklas Koep
+# blaplay, Copyright (C) 2012-2013  Niklas Koep
 
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -168,7 +168,8 @@ def save(force=True):
     global last_save
 
     t = time.time()
-    if not force and last_save and (t-last_save) < 10 * 60: return True
+    if not force and last_save and (t-last_save) < blaconst.CFG_TIMEOUT * 60:
+        return True
     last_save = t
     print_d("Saving config")
 
