@@ -91,6 +91,8 @@ class BlaRadio(gtk.VBox):
     }
     __current = None
 
+    name = property(lambda self: "Internet Radio")
+
     def __init__(self):
         super(BlaRadio, self).__init__(spacing=3)
 

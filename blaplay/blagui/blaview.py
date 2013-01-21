@@ -39,12 +39,11 @@ from blaplay.formats._identifiers import *
 
 class BlaSidePane(gtk.VBox):
     track = None
-    __VIEWS = ["Playlists", "Queue", "Internet radio", "Recommended events",
-            "New releases"]
+    timestamp = 0.0
+
     __MIN_WIDTH = 175
     __delay = 100
     __tid = -1
-    __lock = blautil.BlaLock(strict=True)
 
     class BlaCoverDisplay(gtk.Viewport):
         __alpha = 1.0
@@ -77,7 +76,8 @@ class BlaSidePane(gtk.VBox):
                         "Failed to open image '%s'" % self.__cover)
 
             def fetch_cover(*args):
-                BlaSidePane.fetcher.start(BlaSidePane.track, cover_only=True)
+                BlaSidePane.fetcher.start(
+                        BlaSidePane.track, cover_only=True)
 
             def set_cover(*args):
                 diag = gtk.FileChooserDialog("Select cover",
@@ -164,6 +164,7 @@ class BlaSidePane(gtk.VBox):
             cr.set_source_pixbuf(self.__pb, 0, 0)
             cr.paint_with_alpha(1.0 - self.__alpha)
 
+        @blautil.idle
         def update(self, cover, force_download):
             def crossfade():
                 repeat = False
@@ -186,7 +187,7 @@ class BlaSidePane(gtk.VBox):
             else: self.__bg_color = self.get_style().bg[gtk.STATE_NORMAL]
             self.__da.queue_draw()
 
-    def __init__(self):
+    def __init__(self, views):
         super(BlaSidePane, self).__init__(spacing=5)
 
         notebook = gtk.Notebook()
@@ -251,7 +252,7 @@ class BlaSidePane(gtk.VBox):
         viewport.add(self.__treeview)
         model = gtk.ListStore(gobject.TYPE_STRING, gobject.TYPE_INT)
         self.__treeview.set_model(model)
-        [model.append([item, 0]) for idx, item in enumerate(self.__VIEWS)]
+        [model.append([view.name, 0]) for view in views]
         selection = self.__treeview.get_selection()
         selection.select_path(blacfg.getint("general", "view"))
         self.__treeview.get_selection().connect(
@@ -276,9 +277,10 @@ class BlaSidePane(gtk.VBox):
         style = gtk.RcStyle()
         style.xthickness = style.ythickness = 0
         button.modify_style(style)
-        button.connect("clicked", lambda *x: print_w("TODO"))
+        button.connect("clicked", lambda *x: print_d("TODO"))
         button.show_all()
-        notebook.set_action_widget(button, gtk.PACK_END)
+        # TODO: implement a widget to edit metadata
+#        notebook.set_action_widget(button, gtk.PACK_END)
 
         self.pack_start(notebook, expand=True)
         self.pack_start(hbox, expand=False)
@@ -318,7 +320,6 @@ class BlaSidePane(gtk.VBox):
             action.set_active(states[idx])
 
     @blautil.idle
-    @blautil.lock(__lock)
     def __update_track(self, track):
         iterator = self.__tb.get_iter_at_mark(self.__tb.get_insert())
 
@@ -338,14 +339,12 @@ class BlaSidePane(gtk.VBox):
                     iterator, "\n%s" % artist, "bold", "large", "color")
 
     @blautil.idle
-    @blautil.lock(__lock)
     def __update_lyrics(self, lyrics):
         if lyrics:
             self.__tb.insert_with_tags_by_name(self.__tb.get_iter_at_mark(
                     self.__tb.get_insert()), "\n\n%s\n" % lyrics, "color")
 
     @blautil.idle
-    @blautil.lock(__lock)
     def __update_biography(self, image, biography):
         iterator = self.__tb2.get_iter_at_mark(self.__tb2.get_insert())
 
@@ -369,7 +368,6 @@ class BlaSidePane(gtk.VBox):
                     "\n\n%s\n" % biography, "color")
 
     @blautil.idle
-    @blautil.lock(__lock)
     def __clear(self):
         self.__tb.delete(
                 self.__tb.get_start_iter(), self.__tb.get_end_iter())
@@ -408,6 +406,9 @@ class BlaSidePane(gtk.VBox):
     def update_track(self):
         def worker(track):
             self.__update_track(track)
+            # TODO: use the timestamp to make sure that old metadata requests
+            #       are ignored
+            type(self).timestamp = gobject.get_current_time()
             self.fetcher.start(track)
             return False
 
@@ -436,14 +437,12 @@ class BlaView(gtk.HPaned):
                 BlaEventBrowser(), BlaReleaseBrowser()]
         type(self).__container = gtk.Viewport()
         self.__container.set_shadow_type(gtk.SHADOW_NONE)
-        type(self).__side_pane = BlaSidePane()
+        type(self).__side_pane = BlaSidePane(self.views)
 
         player.connect(
                 "state_changed", lambda *x: self.__side_pane.update_track())
         [view.connect("count_changed", self.__side_pane.update_count)
                 for view in self.views]
-        filter(
-                lambda v: v != self.views[blaconst.VIEW_QUEUE], self.views)
         [view.restore() for view in self.views
                 if view != self.views[blaconst.VIEW_QUEUE]]
 

@@ -683,6 +683,8 @@ class BlaQueue(blaguiutils.BlaScrolledWindow):
 
     clipboard = []
 
+    name = property(lambda self: "Queue")
+
     def __init__(self):
         super(BlaQueue, self).__init__()
         type(self).__instance = self
@@ -1017,6 +1019,8 @@ class BlaPlaylist(gtk.Notebook):
     count = 0           # global counter used to define unique track ids
     uris = {}           # mapping between track ids and uris
     clipboard = []      # list of ids after a cut/copy operation
+
+    name = property(lambda self: "Playlists")
 
     class History(object):
         """

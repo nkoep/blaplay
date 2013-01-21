@@ -112,6 +112,8 @@ class BlaEventBrowser(blaguiutils.BlaScrolledWindow):
     __count_all = 0
     __lock = blautil.BlaLock(strict=True)
 
+    name = property(lambda self: "Events")
+
     def __init__(self):
         super(BlaEventBrowser, self).__init__()
         self.set_shadow_type(gtk.SHADOW_NONE)

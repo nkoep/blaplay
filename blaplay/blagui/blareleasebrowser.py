@@ -169,6 +169,8 @@ class BlaReleaseBrowser(blaguiutils.BlaScrolledWindow):
     __count_recommended = 0
     __lock = blautil.BlaLock(strict=True)
 
+    name = property(lambda self: "New Releases")
+
     def __init__(self):
         super(BlaReleaseBrowser, self).__init__()
         self.set_shadow_type(gtk.SHADOW_NONE)
