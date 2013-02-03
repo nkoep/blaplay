@@ -365,12 +365,14 @@ class BlaTreeViewBase(gtk.TreeView):
                         event.state & gtk.gdk.CONTROL_MASK):
                     return True
 
-        else: # event.button == 3
+        elif event.button == 3:
             if not selection.path_is_selected(path):
                 self.set_cursor(path, column, 0)
             else: column.focus_cell(column.get_cell_renderers()[0])
             self.emit("popup", event)
             return True
+
+        else: return True
 
     def __button_release_event(self, event):
         if self.__pending_event:
