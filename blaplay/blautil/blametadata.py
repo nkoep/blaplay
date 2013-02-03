@@ -138,7 +138,7 @@ class BlaFetcher(gobject.GObject):
         artist, title = [re_.sub(lambda m: m.group(1) + m.group(2).upper(), s)
                 for s in (artist, title)]
 
-        # FIXME: should this really be done for all search engines
+        # FIXME: should this really be done for all search engines?
 #        artist = artist.replace(".", separator)
 #        title = title.replace(".", separator)
 
@@ -181,17 +181,15 @@ class BlaFetcher(gobject.GObject):
         lyrics = None
 
         if not track or not track.get_lyrics_key():
-            gobject.idle_add(self.emit, "lyrics", lyrics)
+            self.emit("lyrics", lyrics)
             return
 
-        artist = track[ARTIST]
-        title = track[TITLE]
         lyrics_key = track.get_lyrics_key()
 
         # try locally stored lyrics first
         lyrics = metadata.get("lyrics", lyrics_key)
-        if lyrics and False:
-            gobject.idle_add(self.emit, "lyrics", lyrics)
+        if lyrics and False: # TODO: remove this after testing
+            self.emit("lyrics", lyrics)
             return
 
         # try to download lyrics
@@ -218,6 +216,8 @@ class BlaFetcher(gobject.GObject):
 #            )
         ]
 
+        artist = track[ARTIST]
+        title = track[TITLE]
         for (url, separator, erase, replace, safe, parser, tag, attr,
                 ignore) in resources:
             # TODO: songtextemania removes apostrophes
@@ -244,7 +244,7 @@ class BlaFetcher(gobject.GObject):
                 print_d("Failed to store lyrics")
             metadata.add("lyrics", lyrics_key, lyrics)
 
-        gobject.idle_add(self.emit, "lyrics", lyrics)
+        self.emit("lyrics", lyrics)
 
     @blautil.thread
     def __fetch_cover(self, force_download=False):
@@ -259,7 +259,7 @@ class BlaFetcher(gobject.GObject):
             elif os.path.isfile("%s.png" % image_base):
                 cover = "%s.png" % image_base
 
-        if cover: gobject.idle_add(self.emit, "cover", cover, force_download)
+        if cover: self.emit("cover", cover, force_download)
         else:
             def f():
                 gobject.idle_add(
@@ -291,7 +291,7 @@ class BlaFetcher(gobject.GObject):
 
             if cover:
                 gobject.source_remove(self.__tid)
-                gobject.idle_add(self.emit, "cover", cover, force_download)
+                self.emit("cover", cover, force_download)
 
     @blautil.thread
     def __fetch_biography(self):
@@ -314,7 +314,7 @@ class BlaFetcher(gobject.GObject):
                 if biography:
                     metadata.add("bio", track[ARTIST], biography)
 
-        gobject.idle_add(self.emit, "biography", image, biography)
+        self.emit("biography", image, biography)
 
     def start(self, track, cover_only=False):
         self.__track = track
