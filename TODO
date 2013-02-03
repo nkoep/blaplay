@@ -3,6 +3,10 @@
 
 0.2:
 - add acoustid support
+- add video support
+- add compact interface
+- add musicbrainz-ngs support (mainly for the lyrics (wikia) and cover
+  (coverartarchive.org) fetchers)
 - add iPod support, possibly other players, too
 - support for CUE sheets
 - gapless playback
@@ -13,17 +17,17 @@
 - implement peeking (tooltips for previous/next/random buttons showing which
   track would be played if button was clicked)
 - write up base class for visualization elements which exposes generic methods
-  for calculating fft, channel mean, etc.
+  for calculating FFT, channel mean, etc.
 - add spectrogram (+ 3D spectrogram) visualization(s) if feasible
 - parse tags from filename/rename files from tags
 - write up some crude unit/regression tests
+- capture button 4 and 5 events to go to the next/previous song in a playlist
 
 0.3+:
 - restore closed playlists
 - lower memory footprint
 - improve startup speed/reduce import overhead
-- Qt's QTableView clone in GTK+ to allow cells to span across multiple columns
-  in order to be able to group tracks in playlists
 - port to GI once stability/performance is satisfying
 - py3k port once all required modules are ported (the main requirement
   being mutagen as Gtk and Gst won't be a problem once we ported to GI)
+

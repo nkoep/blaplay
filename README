@@ -51,7 +51,7 @@ and run it, simply issue
 
 Note that the first line of script executables now reads:
 #!/usr/bin/env python2
-This conforms to the way Arch Linux treats different Python versions nowaydays:
+This conforms to the way Arch Linux treats different Python versions nowadays:
 python2 is symlinked to either python2.6 or python2.7, whereas python
 symlinks to python3.
 

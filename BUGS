@@ -1,46 +1,43 @@
 BUGS/KNOWN ISSUES
+=================
 
-- memory consumption is fairly high; this is due to the fact that we basically
-  read every available tag in a file; the exception being id3 tags where we
+- memory consumption is fairly high. this is due to the fact that we basically
+  read every available tag in a file. the exception being id3 tags where we
   read a fixed subset of standard tags as well as every included TXXX user tag.
   in the future we might limit this further
-- the library monitor might miss an event occasionally; additionally, adding
-  many files triggers many events that are processed in python threads which
-  can make things cripplingly slow; try moving the workload to separate
-  processes and add deferred handlers for events on files to avoid updating
-  one and the same file multiple times (we need to make sure to end up with the
-  correct mtime though)
+
+- adding many files to a monitored directory triggers many events that are
+  processed in python threads which can make things rather slow. we will try to
+  move the workload to separate processes and add deferred handlers for events
+  on files to avoid updating one and the same file multiple times (we need to
+  make sure to end up with the correct mtime though)
+
 - memory consumption seems to increase in certain situations where it
   shouldn't, e.g. sometimes when a playlist is removed (even if it's empty)
   or when creating a new model for the library. the garbage collector in debug
   mode doesn't report anything suspicious so it might just be that python
   allocates memory to create the model and doesn't return it to the OS again in
-  anticipation of needing the memory again at a later point
-- there are occasional segfaults due to invalidated textiters in the textviews
-  displaying lyrics and artist bios; previously the responsible methods were
-  protected by gtk.gdk.threads_enter/leave which avoided these scenarios.
-  however, due to the way new tracks are analyzed (using gtk.main_iteration to
-  drive generator functions in gobject.idle_add calls for performance reasons)
-  this can cause deadlocks; it might be solvable by using textmarks instead of
-  textiters as suggested by gtk's occasional assertion messages
-- switching between library views might cause playback stutters as creating and
+  anticipation of needing the memory again at a later point. since gtk's tree
+  models aren't serializable we can't push their creation to other processes
+  either. another possibility for the increase in memory might be the leaking
+  of references which pygtk does on purpose due to an implementation problem
+  related to python's and gobject's reference counting schemes.
+
+- switching between library views might cause GUI stutters as creating and
   adding the complete model to the treeview is performance-hungry. the problem
   might be relaxed by implementing a lazy model where contents of nested nodes
   are created at row-expansion time as opposed to creating everything
   beforehand as is the case now
+
 - occasionally exceptions are raised from threads during interpreter shutdown.
-  all threads are run in daemon mode so they don't prevent blaplay from
-  shutting down. additionally, our thread baseclass keeps references to all
-  threads and on shutdown is supposed to make sure all threads are terminated.
-  this doesn't seem to take however. this seems to be related to threads
-  placing last.fm api calls. also, on interpreter shutdown every variable in a
-  module is set to None. the threading module takes this into account in its
-  __bootstrap method and suppresses exceptions. still these exceptions occur
-  from time to time which means they're probably raised even before the _sys
-  module is set to None. it might be related to killing a thread while we're
-  trying to receive a reply from an httplib.HTTPConnection object. this might
-  be avoidable by catching all exceptions, not just httplib.BadStatusLine
-- the GUI occasionally deadlocks on start-up. this is most-likely caused by
-  functions/methods which call gtk functions without encapsulating calls in a
-  gtk_threads_enter ... gtk_threads_leave block when they actually should
+  most threads are run in daemon mode so they don't prevent blaplay from
+  shutting down. however, due to the way python shuts down (which includes
+  wiping clean the globals dict of every module) this is likely to cause
+  AttributeError exceptions when daemon threads wake up and try to use any
+  global variable. we try out best to avoid this by using a killable thread
+  class which uses a tracer to stop thread execution as soon as the kill
+  condition is set, and which keeps track of all thread instances so we can
+  kill them on shutdown. this avoids most but usually not all shutdown-related
+  exceptions. the situation is supposedly better in py3k since daemon threads
+  there are frozen on shutdown.
 
