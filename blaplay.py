@@ -87,12 +87,12 @@ def parse_args():
     )
     return vars(parser.parse_args())
 
-def init_logging(debug, quiet):
+def init_logging(args):
     import __builtin__
     import logging
 
     format_ = "*** %%(levelname)s%s: %%(message)s"
-    if debug:
+    if args["debug"]:
         format_ %= " (%(filename)s:%(lineno)d)"
         level = logging.DEBUG
     else:
@@ -147,6 +147,10 @@ def process_args(args):
     elif args["previous"]: bladbus.query_bus("previous")
 
 def force_singleton():
+    # TODO: do this via dbus once we ported to pygobject. in that case
+    #       python-dbus can be dropped as optional dependency as an
+    #       introspected dbus wrapper is accessible through glib/gio
+
     # set up user directories
     directories = [blaconst.CACHEDIR, blaconst.USERDIR, blaconst.COVERS,
             blaconst.ARTISTS, blaconst.RELEASES, blaconst.EVENTS]
@@ -181,7 +185,7 @@ def main():
 
     args = parse_args()
 
-    init_logging(args["debug"], args["quiet"])
+    init_logging(args)
 
     process_args(args)
 
@@ -189,7 +193,7 @@ def main():
 
     # finish startup
     import blaplay
-    blaplay.finalize()
+    blaplay.finish_startup()
 
     # clean up lock file
     fcntl.lockf(lock_file, fcntl.LOCK_UN)

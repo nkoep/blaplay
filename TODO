@@ -22,6 +22,9 @@
 - parse tags from filename/rename files from tags
 - write up some crude unit/regression tests
 - capture button 4 and 5 events to go to the next/previous song in a playlist
+- test if it's feasible to drop the mutagen dependency in favor of
+  GstDiscoverer/GstTagSetter. mutagen is currently the only module we use that
+  is not available for py3k yet
 
 0.3+:
 - restore closed playlists

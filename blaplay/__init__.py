@@ -23,7 +23,6 @@ import gtk
 
 from blaplay.blacore import blaconst
 
-blacfg = bladbus = blautil = None
 cli_queue = None
 
 
@@ -54,8 +53,7 @@ class Blaplay(object):
 bla = Blaplay()
 
 
-def finalize():
-    global blacfg, blautil
+def finish_startup():
     from blaplay.blacore import blacfg, bladb
     from blaplay import blautil
 
@@ -75,7 +73,6 @@ def finalize():
     bla.window.connect("destroy", shutdown)
 
     # set up the D-Bus interface and last.fm services
-    global bladbus
     try: from blaplay.blautil import bladbus
     except ImportError:
         # if the dbus module isn't available we just define a class which acts
@@ -121,10 +118,12 @@ def shutdown(window):
 
     bla.player.stop()
 
-    blautil.BlaThread.clean_up()
+    from blaplay import blautil
+    blautil.BlaThread.kill_threads()
 
     bla.shutdown()
 
+    from blaplay.blacore import blacfg
     blacfg.save()
 
     print_d("Stopping event loop")

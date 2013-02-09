@@ -133,6 +133,8 @@ class BlaVisualization(gtk.DrawingArea):
 
     @classmethod
     def flush_buffers(cls, *args):
+        # FIXME: remove this method and every call to it once the buffering
+        #        issue of the visualization base class has been worked out
         try: cls.__instance.__module.flush_buffers()
         except AttributeError: pass
 

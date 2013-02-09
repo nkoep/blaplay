@@ -20,7 +20,7 @@ import gobject
 
 import blaplay
 from blaplay import blautil
-from blaplay import blaconst, blacfg
+from blaplay.blacore import blaconst, blacfg
 
 PADDING_X, PADDING_Y, PADDING_WIDTH, PADDING_HEIGHT = -2, 0, 4, 0
 

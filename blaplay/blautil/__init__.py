@@ -248,7 +248,7 @@ class BlaThread(Thread):
         self.__killed = True
 
     @classmethod
-    def clean_up(cls):
+    def kill_threads(cls):
         map(cls.kill, cls.__threads)
 
     def __run(self):
@@ -261,14 +261,12 @@ class BlaThread(Thread):
         return None
 
     def __localtrace(self, frame, event, arg):
-        # avoid exceptions on shutdown when the BlaThread class itself has been
-        # destroyed
         try:
             if self.__killed and event == "line":
                 BlaThread.__threads.remove(self)
                 raise SystemExit
             return self.__localtrace
-        except AttributeError: SystemExit
+        except AttributeError: raise#SystemExit
 
 class BlaOrderedSet(collections.MutableSet):
     """

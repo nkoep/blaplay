@@ -5,8 +5,6 @@ import os
 import sys
 import shutil
 import subprocess
-try: import numpy as np
-except ImportError: pass
 from distutils.core import setup, Command, Distribution
 from distutils.command.clean import clean as d_clean
 from distutils.dep_util import newer
@@ -16,6 +14,9 @@ from distutils.command.build_scripts import build_scripts as d_build_scripts
 from distutils.command.install import install as d_install
 from distutils.extension import Extension
 from Cython.Distutils import build_ext
+
+try: import numpy as np
+except ImportError: pass
 
 from blaplay.blacore import blaconst
 from blaplay import blautil
@@ -191,7 +192,7 @@ class install_shortcuts(Command):
     def run(self):
         if not self.skip_build: self.run_command("build_shortcuts")
         basepath = os.path.join(self.prefix, "share", "applications")
-        if self.root != None: basepath = change_root(self.root, basepath)
+        if self.root is not None: basepath = change_root(self.root, basepath)
         srcpath = os.path.join(self.build_base, "share", "applications")
         self.mkpath(basepath)
         for shortcut in self.shortcuts:
