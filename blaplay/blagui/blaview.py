@@ -163,16 +163,13 @@ class BlaSidePane(gtk.VBox):
             # draw new cover
             cr.set_source_pixbuf(self.__pb, 0, 0)
             cr.paint_with_alpha(1.0 - self.__alpha)
+            self.__alpha -= 0.05
 
         @blautil.idle
         def update(self, cover, force_download):
             def crossfade():
-                repeat = False
-                if self.__alpha > 0.0:
-                    self.__alpha -= 0.05
-                    repeat = True
                 self.__da.queue_draw()
-                return repeat
+                return self.__alpha > 0
 
             if cover == self.__cover and not force_download: return
             if not self.__prepare_cover(cover): return
