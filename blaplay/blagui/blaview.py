@@ -29,7 +29,7 @@ from blaplay.blacore import blaconst, blacfg
 from blaplay import blautil, blagui
 from blaplay.blautil import blametadata
 from blaplay.blagui import blaguiutils
-from blaplaylist import BlaPlaylist, BlaQueue
+from blaplaylist import BlaPlaylistManager, BlaQueue
 from blastatusbar import BlaStatusbar
 from blaradio import BlaRadio
 from blaeventbrowser import BlaEventBrowser
@@ -433,7 +433,7 @@ class BlaSidePane(gtk.VBox):
 class BlaView(gtk.HPaned):
     def __init__(self):
         super(BlaView, self).__init__()
-        type(self).views = [BlaPlaylist(), BlaQueue(), BlaRadio(),
+        type(self).views = [BlaPlaylistManager(), BlaQueue(), BlaRadio(),
                 BlaEventBrowser(), BlaReleaseBrowser()]
         type(self).__container = gtk.Viewport()
         self.__container.set_shadow_type(gtk.SHADOW_NONE)

@@ -307,8 +307,8 @@ class BlaTagedit(blaguiutils.BlaWindow):
 
         self.__pb.set_visible(False)
         blaplay.bla.window.update_title()
-        from blaplay.blagui.blaplaylist import BlaPlaylist
-        BlaPlaylist.update_contents()
+        from blaplay.blagui.blaplaylist import BlaPlaylistManager
+        BlaPlaylistManager.update_contents()
         if ns["update_library"]: library.update_library()
         succeeded = ns["succeeded"]
         l = len(self.__tracks)
@@ -336,14 +336,6 @@ class BlaTagedit(blaguiutils.BlaWindow):
             try: track = self.__tracks[uri]
             except KeyError: track = library[uri]
             tracks.append(track)
-
-        # FIXME: we store multiple values of tags by joining strings with \n.
-        #        the __getitem__ method on BlaTrack, however, only returns the
-        #        first part of this string. if a tag stores lyrics there's
-        #        usually going to be \n characters which we intepret as
-        #        separators, only returning the first line of lyrics. should
-        #        lyrcis be handled separately or should we store tags as lists
-        #        instead? the latter might increase memory use again
 
         # the standard tags
         for identifier in IDENTIFIER_TAGS:

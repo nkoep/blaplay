@@ -140,9 +140,9 @@ class BlaDBus(dbus.service.Object):
             out_signature="")
     def parse_uris(self, action, uris):
         # FIXME: do this via blaplay.bla
-        from blaplay.blagui.blaplaylist import BlaPlaylist
-        if action == "append": f = BlaPlaylist.add_to_current_playlist
-        elif action == "new": f = BlaPlaylist.send_to_new_playlist
-        else: f = BlaPlaylist.send_to_current_playlist
+        from blaplay.blagui.blaplaylist import BlaPlaylistManager
+        if action == "append": f = BlaPlaylistManager.add_to_current_playlist
+        elif action == "new": f = BlaPlaylistManager.send_to_new_playlist
+        else: f = BlaPlaylistManager.send_to_current_playlist
         f("", uris, resolve=True)
 

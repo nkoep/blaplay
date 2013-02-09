@@ -42,7 +42,7 @@ def init():
     return window
 
 def update_menu(view):
-    from blaplaylist import BlaPlaylist, BlaQueue
+    from blaplaylist import BlaPlaylistManager, BlaQueue
 
     state = False
     if view == blaconst.VIEW_PLAYLISTS: state = True
@@ -51,8 +51,9 @@ def update_menu(view):
         uimanager.get_widget(entry).set_visible(state)
 
     if view in [blaconst.VIEW_PLAYLISTS, blaconst.VIEW_QUEUE]:
-        clipboard = (BlaPlaylist.clipboard if view == blaconst.VIEW_PLAYLISTS
-                else BlaQueue.clipboard)
+        clipboard = (BlaPlaylistManager.clipboard
+                     if view == blaconst.VIEW_PLAYLISTS
+                     else BlaQueue.clipboard)
         uimanager.get_widget("/Menu/Edit/Paste").set_sensitive(bool(clipboard))
         state = True
     else: state = False

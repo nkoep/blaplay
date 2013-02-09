@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# blaplay, Copyright (C) 2012  Niklas Koep
+# blaplay, Copyright (C) 2012-2013  Niklas Koep
 
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -40,7 +40,7 @@ EVENT_CREATED, EVENT_DELETED, EVENT_MOVED, EVENT_CHANGED = xrange(4)
 library = None
 pending_save = False
 extensions = None
-BlaPlaylist = None
+BlaPlaylistManager = None
 
 
 def init():
@@ -51,7 +51,7 @@ def update_library():
     global pending_save
     library.update_library()
     pending_save = False
-    BlaPlaylist.update_contents()
+    BlaPlaylistManager.update_contents()
     return False
 
 
@@ -222,7 +222,7 @@ class BlaLibraryMonitor(gobject.GObject):
 
                     self.remove_directories(path_from)
                     self.add_directory(path_to)
-                BlaPlaylist.update_uris(uris)
+                BlaPlaylistManager.update_uris(uris)
 
             # schedule an update for the library browser, etc. if there are
             # more items in the queue the timeout will be removed in the next
@@ -391,6 +391,12 @@ class BlaLibrary(gobject.GObject):
 
         @classmethod
         def __get_track_label(cls, track):
+            # FIXME: - get rid of the int() calls
+            #        - set the disc number prefix AFTER setting the track
+            #          number to make sure we don't get a label with a proper
+            #          disc number and a missing track number
+
+            # ValueError is raised if the int() call fails
             try: label = "%d." % int(track[DISC].split("/")[0])
             except ValueError: label = ""
             try: label += "%02d. " % int(track[TRACK].split("/")[0])
@@ -692,11 +698,9 @@ class BlaLibrary(gobject.GObject):
         return False
 
     def get_playlists(self):
-        # we need BlaPlaylist throughout this module, but we can't import it on
-        # module initialization as the class object isn't created at that time.
-        # when this method is called we can be sure the class exists
-        global BlaPlaylist
-        from blaplay.blagui.blaplaylist import BlaPlaylist
+        # FIXME: do we have to import this here?
+        global BlaPlaylistManager
+        from blaplay.blagui.blaplaylist import BlaPlaylistManager
 
         return self.__playlists, self.__queue
 

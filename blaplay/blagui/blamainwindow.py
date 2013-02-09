@@ -17,7 +17,6 @@
 
 import os
 
-import gobject
 import gtk
 
 import blaplay
@@ -30,7 +29,7 @@ from blaplay.blagui import blaguiutils, blapreferences
 from blakeys import BlaKeys
 from blatoolbar import BlaToolbar
 from blabrowsers import BlaBrowsers
-from blaplaylist import BlaPlaylist
+from blaplaylist import BlaPlaylistManager
 from blavisualization import BlaVisualization
 from blaview import BlaView
 from blastatusbar import BlaStatusbar
@@ -92,23 +91,23 @@ class BlaMainWindow(blaguiutils.BlaBaseWindow):
             ("Copy", None, "Copy", None, "", BlaView.copy),
             ("Remove", None, "Remove", None, "", BlaView.remove),
             ("PlaylistFromSelection", None, "Selection", None, "",
-                    lambda *x: BlaPlaylist.new_playlist(
+                    lambda *x: BlaPlaylistManager.new_playlist(
                     blaconst.PLAYLIST_FROM_SELECTION)
             ),
             ("PlaylistFromArtists", None, "Selected artist(s)", None, "",
-                    lambda *x: BlaPlaylist.new_playlist(
+                    lambda *x: BlaPlaylistManager.new_playlist(
                     blaconst.PLAYLIST_FROM_ARTISTS)
             ),
             ("PlaylistFromAlbums", None, "Selected album(s)", None, "",
-                    lambda *x: BlaPlaylist.new_playlist(
+                    lambda *x: BlaPlaylistManager.new_playlist(
                     blaconst.PLAYLIST_FROM_ALBUMS)
             ),
             ("PlaylistFromAlbumArtists", None, "Selected album artist(s)",
-                    None, "", lambda *x: BlaPlaylist.new_playlist(
+                    None, "", lambda *x: BlaPlaylistManager.new_playlist(
                     blaconst.PLAYLIST_FROM_ALBUM_ARTISTS)
             ),
             ("PlaylistFromGenre", None, "Selected genre(s)", None, "",
-                    lambda *x: BlaPlaylist.new_playlist(
+                    lambda *x: BlaPlaylistManager.new_playlist(
                     blaconst.PLAYLIST_FROM_GENRE)
             ),
             ("RemoveDuplicates", None, "Remove _duplicates", None, "",
@@ -116,10 +115,10 @@ class BlaMainWindow(blaguiutils.BlaBaseWindow):
             ("RemoveInvalidTracks", None, "Remove _invalid tracks", None, "",
              BlaView.remove_invalid_tracks),
             ("Search", None, "_Search...", "<Ctrl>F", "",
-             lambda *x: BlaPlaylist.enable_search()),
+             lambda *x: BlaPlaylistManager.enable_search()),
             ("Preferences", None, "Pre_ferences...", None, "", BlaPreferences),
             ("JumpToPlayingTrack", None, "_Jump to playing track", "<Ctrl>J",
-                    "", lambda *x: BlaPlaylist.jump_to_playing_track()),
+                    "", lambda *x: BlaPlaylistManager.jump_to_playing_track()),
             ("About", None, "_About...", None, "", BlaAbout)
         ]
         toggle_actions = [
@@ -315,7 +314,7 @@ class BlaMainWindow(blaguiutils.BlaBaseWindow):
 
         if response == gtk.RESPONSE_OK and path:
             path = path.strip()
-            if BlaPlaylist.open_playlist(path):
+            if BlaPlaylistManager.open_playlist(path):
                 BlaView.update_view(blaconst.VIEW_PLAYLISTS)
                 blacfg.set("general", "filechooser.directory",
                         os.path.dirname(path))
@@ -337,7 +336,8 @@ class BlaMainWindow(blaguiutils.BlaBaseWindow):
 
         if response == gtk.RESPONSE_OK and filenames:
             filenames = map(str.strip, filenames)
-            BlaPlaylist.add_to_current_playlist("", filenames, resolve=True)
+            BlaPlaylistManager.add_to_current_playlist(
+                    "", filenames, resolve=True)
             blacfg.set("general", "filechooser.directory",
                     os.path.dirname(filenames[0]))
 
@@ -388,7 +388,7 @@ class BlaMainWindow(blaguiutils.BlaBaseWindow):
             type_ = items[diag.list_filters().index(filt)][-1]
             path = path.strip()
             if type_ is None: type_ = blautil.get_extension(path)
-            BlaPlaylist.save(path, type_, cb.get_active() == 0)
+            BlaPlaylistManager.save(path, type_, cb.get_active() == 0)
             blacfg.set("general", "filechooser.directory",
                     os.path.dirname(path))
 

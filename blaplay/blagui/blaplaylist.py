@@ -34,7 +34,7 @@ import numpy as np
 import blaplay
 player = blaplay.bla.player
 library = blaplay.bla.library
-from blaplay import blaconst, blacfg
+from blaplay.blacore import blaconst, blacfg
 from blaplay import blautil, blagui
 from blaplay.blautil import blafm
 from blastatusbar import BlaStatusbar
@@ -161,7 +161,7 @@ def columns_changed(treeview, view_id):
     blacfg.set("general", "columns.%s" % view, ", ".join(map(str, columns)))
 
 def popup(treeview, event, view_id, catcher):
-    if view_id == blaconst.VIEW_PLAYLISTS: element = BlaPlaylist
+    if view_id == blaconst.VIEW_PLAYLISTS: element = BlaPlaylistManager
     elif view_id == blaconst.VIEW_QUEUE: element = BlaQueue
 
     path = None
@@ -189,7 +189,7 @@ def popup(treeview, event, view_id, catcher):
 
     paths = treeview.get_selection().get_selected_rows()[-1]
     model = treeview.get_model()
-    try: uri = BlaPlaylist.uris[model[path][0]]
+    try: uri = BlaPlaylistManager.uris[model[path][0]]
     except KeyError: uri = model[path][0]
 
     menu = gtk.Menu()
@@ -252,21 +252,21 @@ def popup(treeview, event, view_id, catcher):
         for label, type_ in items:
             m = gtk.MenuItem(label)
             m.connect("activate",
-                    lambda x, t=type_: BlaPlaylist.new_playlist(t))
+                    lambda x, t=type_: BlaPlaylistManager.new_playlist(t))
             submenu.append(m)
 
         m = gtk.MenuItem("New playlist from")
         m.set_submenu(submenu)
         menu.append(m)
 
-        if len(BlaPlaylist.pages) > 1:
+        if len(BlaPlaylistManager.playlists) > 1:
             # move to playlist
             submenu = gtk.Menu()
-            current_playlist = BlaPlaylist.get_current_playlist()
-            for playlist in BlaPlaylist.pages:
+            current_playlist = BlaPlaylistManager.get_current_playlist()
+            for playlist in BlaPlaylistManager.playlists:
                 try:
                     if playlist == current_playlist: raise AttributeError
-                    label = BlaPlaylist.get_playlist_name(playlist)
+                    label = BlaPlaylistManager.get_playlist_name(playlist)
                 except AttributeError: continue
                 m = gtk.MenuItem(label)
                 m.connect("activate", lambda x, p=playlist:
@@ -279,11 +279,11 @@ def popup(treeview, event, view_id, catcher):
 
             # add to playlist
             submenu = gtk.Menu()
-            current_playlist = BlaPlaylist.get_current_playlist()
-            for playlist in BlaPlaylist.pages:
+            current_playlist = BlaPlaylistManager.get_current_playlist()
+            for playlist in BlaPlaylistManager.playlists:
                 try:
                     if playlist == current_playlist: raise AttributeError
-                    label = BlaPlaylist.get_playlist_name(playlist)
+                    label = BlaPlaylistManager.get_playlist_name(playlist)
                 except AttributeError: continue
                 m = gtk.MenuItem(label)
                 m.connect("activate", lambda x, p=playlist:
@@ -313,7 +313,8 @@ def popup(treeview, event, view_id, catcher):
     menu.append(gtk.SeparatorMenuItem())
 
     identifier = treeview.get_model()[path][0]
-    submenu = blafm.get_popup_menu(BlaPlaylist.get_track_from_id(identifier))
+    submenu = blafm.get_popup_menu(
+            BlaPlaylistManager.get_track_from_id(identifier))
     if submenu:
         m = gtk.MenuItem("last.fm")
         m.set_submenu(submenu)
@@ -413,7 +414,7 @@ class BlaQuery(object):
         return []
 
     def query(self, identifier):
-        track = BlaPlaylist.get_track_from_id(identifier)
+        track = BlaPlaylistManager.get_track_from_id(identifier)
         for r in self.__res:
             search = r.search
             for identifier in self.__query_identifiers:
@@ -521,12 +522,6 @@ class BlaTreeView(blaguiutils.BlaTreeViewBase):
         self.set_fixed_height_mode(True)
         self.set_rubber_banding(True)
         self.set_property("rules_hint", True)
-
-        # in-treeview dnd
-        self.enable_model_drag_source(gtk.gdk.BUTTON1_MASK,
-                [("tracks/playlist", gtk.TARGET_SAME_WIDGET, 1)],
-                gtk.gdk.ACTION_MOVE
-        )
 
         self.connect("destroy", self.__destroy)
         self.connect_changed_signal()
@@ -654,7 +649,7 @@ class BlaColumn(gtk.TreeViewColumn):
         self.set_alignment(alignment)
 
     def __cell_data_func(self, column, renderer, model, iterator, column_id):
-        track = BlaPlaylist.get_track_from_id(model[iterator][0])
+        track = BlaPlaylistManager.get_track_from_id(model[iterator][0])
 
         if column_id == COLUMN_QUEUE_POSITION:
             text = "%02d" % (model.get_path(iterator)[0] + 1)
@@ -697,9 +692,9 @@ class BlaQueue(blaguiutils.BlaScrolledWindow):
         self.add(self.__treeview)
 
         self.__treeview.enable_model_drag_dest(
-                [("queue", 0, 3)], gtk.gdk.ACTION_MOVE)
+                [("queue", 0, 3)], gtk.gdk.ACTION_COPY)
         self.__treeview.enable_model_drag_source(gtk.gdk.BUTTON1_MASK,
-                [("queue", gtk.TARGET_SAME_WIDGET, 3)], gtk.gdk.ACTION_MOVE)
+                [("queue", gtk.TARGET_SAME_WIDGET, 3)], gtk.gdk.ACTION_COPY)
 
         self.__treeview.connect("popup", popup, blaconst.VIEW_QUEUE, self)
         self.__treeview.connect("row_activated", self.play_track)
@@ -721,13 +716,15 @@ class BlaQueue(blaguiutils.BlaScrolledWindow):
 
     def __drag_data_get(self, treeview, drag_context, selection_data, info,
             time):
-        self.__paths = treeview.get_selection().get_selected_rows()[-1]
-        selection_data.set("queue", 8, "")
+        data = pickle.dumps(treeview.get_selection().get_selected_rows()[-1],
+                            pickle.HIGHEST_PROTOCOL)
+        selection_data.set("", 8, data)
 
     def __drag_data_recv(self, treeview, drag_context, x, y, selection_data,
             info, time):
         drop_info = treeview.get_dest_row_at_pos(x, y)
         model = type(self).__queue
+        paths = pickle.loads(selection_data.data)
 
         if drop_info:
             path, pos = drop_info
@@ -740,16 +737,15 @@ class BlaQueue(blaguiutils.BlaScrolledWindow):
             else:
                 move_after = model.move_after
                 f = lambda it: move_after(it, iterator)
-                self.__paths.reverse()
+                paths.reverse()
         else:
             iterator = None
             move_before = model.move_before
             f = lambda it: move_before(it, iterator)
 
         get_iter = model.get_iter
-        iterators = map(get_iter, self.__paths)
+        iterators = map(get_iter, paths)
         map(f, iterators)
-        self.__paths = []
         self.update_queue_positions()
 
     @classmethod
@@ -800,7 +796,8 @@ class BlaQueue(blaguiutils.BlaScrolledWindow):
         cls.update_queue_positions()
 
     def play_track(self, treeview, path, column=None):
-        BlaPlaylist.play_from_playlist(*map(None, type(self).__queue[path]))
+        BlaPlaylistManager.play_from_playlist(
+                *map(None, type(self).__queue[path]))
         if blacfg.getboolean("general", "queue.remove.when.activated"):
             self.update_queue_positions([self.__queue.get_iter(path)])
 
@@ -834,7 +831,7 @@ class BlaQueue(blaguiutils.BlaScrolledWindow):
         uris = []
         for path in paths:
             x = cls.__queue[path][0]
-            try: uri = BlaPlaylist.uris[x]
+            try: uri = BlaPlaylistManager.uris[x]
             except KeyError: uri = x
             uris.append(uri)
         if uris: BlaTagedit(uris)
@@ -856,7 +853,7 @@ class BlaQueue(blaguiutils.BlaScrolledWindow):
             track, playlist = map(None, cls.__queue[iterator])
 
             if playlist:
-                pos = cls.__queue.get_path(iterator)[0]+1
+                pos = cls.__queue.get_path(iterator)[0] + 1
                 identifier = id(playlist)
                 playlists.add(playlist)
                 try: d = positions[identifier]
@@ -880,7 +877,7 @@ class BlaQueue(blaguiutils.BlaScrolledWindow):
                 try: playlist.update_queue_positions(items)
                 except TypeError: pass
 
-        # reset old positions and remove items if necessary
+        # reset old positions and remove items if iterators isn't empty
         playlists, positions = set(), {}
         cls.__queue.foreach(reset, (iterators, playlists, positions))
         update_models(playlists, positions)
@@ -896,30 +893,32 @@ class BlaQueue(blaguiutils.BlaScrolledWindow):
         cls.__size = cls.__length = 0
         for row in cls.__queue:
             identifier = row[0]
-            try: track = library[BlaPlaylist.uris[identifier]]
+            try: track = library[BlaPlaylistManager.uris[identifier]]
             except KeyError:
                 try: track = library[identifier]
                 except KeyError: track = None
             if track:
                 cls.__size += track[FILESIZE]
                 cls.__length += track[LENGTH]
-        cls.__instance.emit(
-                "count_changed", blaconst.VIEW_QUEUE, cls.get_queue_count())
+        cls.__instance.emit("count_changed",
+                            blaconst.VIEW_QUEUE, cls.queue_n_tracks())
         cls.__instance.update_statusbar()
 
     @classmethod
-    def get_queued_tracks(cls):
+    def get_queued_tracks(cls, return_ids_only=False):
         queue = []
         for row in cls.__queue:
-            track, playlist = map(None, row)
+            # identifier is either an integer or a uri
+            identifier, playlist = map(None, row)
             if playlist:
-                try: idx = BlaPlaylist.pages.index(playlist)
-                except ValueError:
-                    track = BlaPlaylist.uris[track]
-                    idx = -1
-                else: track = playlist.get_path_from_id(track)
-            else: idx = -1
-            queue.append((track, idx))
+                idx = BlaPlaylistManager.playlists.index(playlist)
+                identifier = (playlist.get_path_from_id(identifier) if
+                              not return_ids_only else identifier)
+            elif return_ids_only:
+                continue
+            else:
+                idx = -1
+            queue.append((identifier, idx))
         return queue
 
     @classmethod
@@ -927,9 +926,10 @@ class BlaQueue(blaguiutils.BlaScrolledWindow):
         items = []
         append = cls.__queue.append
         for track, idx in queue:
-            if idx == -1: playlist = None
+            if idx == -1:
+                playlist = None
             else:
-                playlist = BlaPlaylist.pages[idx]
+                playlist = BlaPlaylistManager.playlists[idx]
                 track = playlist.get_id_from_path(track)
             items.append([track, playlist])
         cls.__add_items(items=items, path="append")
@@ -948,6 +948,21 @@ class BlaQueue(blaguiutils.BlaScrolledWindow):
             if row[0] in tracks and row[1] == playlist:
                 iterators.append(row.iter)
         cls.update_queue_positions(iterators)
+
+    @classmethod
+    def replace_ids(cls, playlist, ids):
+        def update(model, path, iterator):
+            identifier = model[path][0]
+            for old_id, new_id in ids:
+                if old_id == identifier:
+                    model[path][0] = new_id
+                    model[path][1] = playlist
+
+        if not ids:
+            return
+
+        cls.__queue.foreach(update)
+        cls.update_queue_positions()
 
     @classmethod
     def cut(cls, *args):
@@ -973,7 +988,7 @@ class BlaQueue(blaguiutils.BlaScrolledWindow):
         iterators = []
         for row in cls.__queue:
             identifier = row[0]
-            try: uri = BlaPlaylist.uris[identifier]
+            try: uri = BlaPlaylistManager.uris[identifier]
             except KeyError: uri = identifier
             if uri not in unique: unique.add(uri)
             else: iterators.append(row.iter)
@@ -985,7 +1000,7 @@ class BlaQueue(blaguiutils.BlaScrolledWindow):
         iterators = []
         for row in cls.__queue:
             identifier = row[0]
-            try: uri = BlaPlaylist.uris[identifier]
+            try: uri = BlaPlaylistManager.uris[identifier]
             except KeyError: uri = identifier
             if not isfile(uri): iterators.append(row.iter)
         cls.update_queue_positions(iterators)
@@ -1004,30 +1019,23 @@ class BlaQueue(blaguiutils.BlaScrolledWindow):
         return None
 
     @classmethod
-    def get_queue_count(cls):
+    def queue_n_tracks(cls):
         return cls.__queue.iter_n_children(None)
 
-class BlaPlaylist(gtk.Notebook):
-    __gsignals__ = {
-        "play_track": blautil.signal(1),
-        "count_changed": blautil.signal(2)
-    }
+class BlaPlaylist(gtk.VBox):
+    # FIXME: first track played doesn't seem to be added to the history
 
-    pages = []          # list of playlists (needed for the queue)
-    __instance = None   # instance of BlaPlaylist needed for classmethods
-    active = None       # reference to the currently active playlist
-    count = 0           # global counter used to define unique track ids
-    uris = {}           # mapping between track ids and uris
-    clipboard = []      # list of ids after a cut/copy operation
+    __layout = [
+        gobject.TYPE_INT,       # unique identifier of playlist tracks
+        gobject.TYPE_STRING,    # stock icon
+        gobject.TYPE_PYOBJECT   # queue position(s)
+    ]
 
-    name = property(lambda self: "Playlists")
+    __current = None
+    __sort_parameters = None
+    __fid = -1
 
     class History(object):
-        """
-        History class which stores TreeRowReferences to previously played
-        tracks of a playlist.
-        """
-
         def __init__(self, playlist):
             super(BlaPlaylist.History, self).__init__()
             self.__playlist = playlist
@@ -1037,11 +1045,13 @@ class BlaPlaylist(gtk.Notebook):
         def add(self, identifier, choice):
             if choice == blaconst.TRACK_NEXT:
                 insert_func = self.__model.insert_after
-            else: insert_func = self.__model.insert_before
+            else:
+                insert_func = self.__model.insert_before
             self.__iterator = insert_func(self.__iterator, [identifier])
 
         def get(self, choice):
-            if choice == blaconst.TRACK_NEXT: f = self.__model.iter_next
+            if choice == blaconst.TRACK_NEXT:
+                f = self.__model.iter_next
             elif choice == blaconst.TRACK_PREVIOUS:
                 f = self.__iter_previous
 
@@ -1052,13 +1062,14 @@ class BlaPlaylist(gtk.Notebook):
                 except TypeError: iterator = None
 
                 if (iterator and
-                        not self.__playlist.get_path_from_id(
-                        self.__model[iterator][0], unfiltered=True)):
+                    not self.__playlist.get_path_from_id(
+                    self.__model[iterator][0], unfiltered=True)):
                     self.__model.remove(iterator)
                     continue
                 break
 
-            if not iterator: identifier = None
+            if not iterator:
+                identifier = None
             else:
                 identifier = self.__model[iterator][0]
                 self.__iterator = iterator
@@ -1074,155 +1085,410 @@ class BlaPlaylist(gtk.Notebook):
             if path[0] > 0: return self.__model.get_iter((path[0]-1,))
             return None
 
-    class Playlist(gtk.VBox):
-        __layout = [
-            gobject.TYPE_INT,       # unique identifier of playlist tracks
-            gobject.TYPE_STRING,    # stock icon
-            gobject.TYPE_PYOBJECT   # queue position(s)
-        ]
+    def __init__(self):
+        super(BlaPlaylist, self).__init__()
 
-        __current = None
-        __sort_parameters = None
-        __fid = -1
+        self.__history = BlaPlaylist.History(self)
+        self.__mode = MODE_NORMAL
 
-        def __init__(self):
-            super(BlaPlaylist.Playlist, self).__init__()
+        self.__entry = gtk.Entry()
+        self.__entry.set_icon_from_stock(
+                gtk.ENTRY_ICON_SECONDARY, gtk.STOCK_CANCEL)
+        self.__entry.connect(
+                "icon_release", lambda *x: self.disable_search())
+        def key_press_event(entry, event):
+            if blagui.is_accel(event, "Escape"): self.disable_search()
+            return False
+        self.__entry.connect("key_press_event", key_press_event)
 
-            self.__history = BlaPlaylist.History(self)
-            self.__mode = MODE_NORMAL
+        self.__regexp_button = gtk.ToggleButton(label="r\"\"")
+        self.__regexp_button.set_tooltip_text(
+                "Treat search string as regular expression")
 
-            self.__entry = gtk.Entry()
-            self.__entry.set_icon_from_stock(
-                    gtk.ENTRY_ICON_SECONDARY, gtk.STOCK_CANCEL)
-            self.__entry.connect(
-                    "icon_release", lambda *x: self.disable_search())
-            def key_press_event(entry, event):
-                if blagui.is_accel(event, "Escape"): self.disable_search()
+        button = gtk.Button()
+        button.add(gtk.image_new_from_stock(
+                gtk.STOCK_FIND, gtk.ICON_SIZE_BUTTON))
+        button.connect("clicked", self.__filter)
+
+        self.__hbox = gtk.HBox()
+        self.__hbox.pack_start(self.__regexp_button, expand=False)
+        self.__hbox.pack_start(self.__entry, expand=True)
+        self.__hbox.pack_start(button, expand=False)
+        self.__hbox.show_all()
+        self.__hbox.set_visible(False)
+
+        self.__treeview = BlaTreeView(view_id=blaconst.VIEW_PLAYLISTS)
+        self.__treeview.connect_object(
+                "sort_column", BlaPlaylist.sort, self)
+        self.__treeview.connect("row_activated", self.play_track)
+        self.__treeview.connect(
+                "popup", popup, blaconst.VIEW_PLAYLISTS, self)
+        self.__treeview.connect("key_press_event", self.__key_press_event)
+        self.__treeview.connect("drag_data_get", self.__drag_data_get)
+        self.__treeview.connect(
+                "drag_data_received", self.__drag_data_recv)
+
+        # DND between playlists (including one and the same playlist)
+        self.__treeview.enable_model_drag_source(gtk.gdk.BUTTON1_MASK,
+                [("tracks/playlist", gtk.TARGET_SAME_APP, 2)],
+                gtk.gdk.ACTION_COPY
+        )
+
+        # receive drag and drop
+        self.__treeview.enable_model_drag_dest([
+                ("tracks/library", gtk.TARGET_SAME_APP, 0),
+                ("tracks/filesystem", gtk.TARGET_SAME_APP, 1),
+                ("tracks/playlist", gtk.TARGET_SAME_APP, 2),
+                ("text/uri-list", gtk.TARGET_OTHER_APP, 3)],
+                gtk.gdk.ACTION_COPY
+        )
+
+        sw = blaguiutils.BlaScrolledWindow()
+        sw.add(self.__treeview)
+
+        self.clear()
+
+        self.pack_start(self.__hbox, expand=False)
+        self.pack_start(sw, expand=True)
+        sw.show_all()
+
+        update_columns(self.__treeview, view_id=blaconst.VIEW_PLAYLISTS)
+        self.show()
+        self.__entry.connect("activate", self.__filter)
+
+    def __getstate__(self):
+        return self.__dict__
+
+    def __setstate(self, state):
+        self.__dict__ = state
+
+    def __repopulate_model(self, ids, selected_ids):
+        row_align, selected_ids, scroll_identifier = \
+                self.__get_selection_and_row()
+
+        # determine new playlist metadata for the statusbar and update the
+        # appropriate id lists
+        tracks = map(BlaPlaylistManager.get_track_from_id, ids)
+        self.__length = sum([track[LENGTH] for track in tracks])
+        self.__size = sum([track[FILESIZE] for track in tracks])
+
+        if self.__mode & MODE_FILTERED:
+            removed_ids = set(self.__tracks).difference(ids)
+            map(self.__tracks.remove, removed_ids)
+            if self.__mode & MODE_SORTED: self.__sorted = list(ids)
+        else:
+            removed_ids = set(self.__all_tracks).difference(ids)
+            if self.__mode & MODE_SORTED: self.__all_sorted = list(ids)
+        map(self.__all_tracks.remove, removed_ids)
+
+        if self.__mode & MODE_SORTED or self.__sort_parameters:
+            # selection is handled in the sort method
+            selected_ids = None
+            try: self.sort(*self.__sort_parameters, scroll=True)
+            except TypeError: self.sort(-1, None)
+        else:
+            self.__freeze_treeview()
+            model = gtk.ListStore(*self.__layout)
+            append = model.append
+            [append([identifier, "", []]) for identifier in ids]
+            self.__treeview.set_model(model)
+            selected_ids = set(ids).intersection(selected_ids)
+            select_path = self.__treeview.get_selection().select_path
+            get_path_from_id = self.get_path_from_id
+            map(select_path, map(get_path_from_id, selected_ids))
+            self.__thaw_treeview()
+
+        # update the statusbar and the state icon in the playlist
+        self.__set_selection_and_row(
+                row_align, selected_ids, scroll_identifier)
+        self.update_state()
+        BlaPlaylistManager.update_statusbar()
+
+    def __freeze_treeview(self):
+        self.__treeview.freeze_notify()
+        self.__treeview.freeze_child_notify()
+        return self.__treeview.get_model()
+
+    def __thaw_treeview(self):
+        self.__treeview.thaw_child_notify()
+        self.__treeview.thaw_notify()
+
+    def __get_selection_and_row(self):
+        row_align = 0.0
+        selection = self.__treeview.get_selection()
+
+        # get id of the row to scroll to
+        try:
+            identifier = self.get_id_from_path(
+                    selection.get_selected_rows()[-1][0])
+        except IndexError:
+            try:
+                identifier = self.get_id_from_path(
+                        self.__treeview.get_visible_range()[0])
+            except (TypeError, IndexError): identifier = None
+        else:
+            column = self.__treeview.get_columns()[0]
+            height = self.__treeview.get_allocation().height
+
+            try:
+                low, high = self.__treeview.get_visible_range()
+                for path in selection.get_selected_rows()[-1]:
+                    if low <= path <= high: break
+            except TypeError: row_align = 0.5
+            else:
+                row_align = (self.__treeview.get_cell_area(
+                        path, column)[1] / float(height))
+
+        # get selected ids
+        try:
+            selected_ids = [self.get_id_from_path(p)
+                    for p in selection.get_selected_rows()[-1]]
+        except IndexError: selected_ids = None
+
+        if not (0.0 <= row_align <= 1.0): row_align = 0.0
+
+        return row_align, selected_ids, identifier
+
+    def __set_selection_and_row(self, row_align, selected_ids, identifier):
+        model = self.__treeview.get_model()
+        selection = self.__treeview.get_selection()
+
+        # select rows
+        if selected_ids is not None:
+            paths = filter(
+                    None, map(self.get_path_from_id, selected_ids))
+            select_path = selection.select_path
+            map(select_path, paths)
+
+        # scroll to row
+        path = self.get_path_from_id(identifier)
+        if path and model.get_iter_first():
+            self.set_row(path, row_align=row_align, keep_selection=True,
+                    set_cursor=False)
+
+    def __filter_parameters_changed(self, entry):
+        if blacfg.getboolean("general", "search.after.timeout"):
+            try: gobject.source_remove(self.__fid)
+            except AttributeError: pass
+            def activate():
+                self.__entry.activate()
                 return False
-            self.__entry.connect("key_press_event", key_press_event)
+            self.__fid = gobject.timeout_add(500, activate)
 
-            self.__regexp_button = gtk.ToggleButton(label="re")
-            self.__regexp_button.set_tooltip_text("Use regular expression")
+    def __filter(self, *args):
+        # FIXME: why don't we use the __repopulate_model method here?
 
-            button = gtk.Button()
-            button.add(gtk.image_new_from_stock(
-                    gtk.STOCK_FIND, gtk.ICON_SIZE_BUTTON))
-            button.connect("clicked", self.__filter)
+        filter_string = self.__entry.get_text().strip()
 
-            self.__hbox = gtk.HBox()
-            self.__hbox.pack_start(self.__regexp_button, expand=False)
-            self.__hbox.pack_start(self.__entry, expand=True)
-            self.__hbox.pack_start(button, expand=False)
-            self.__hbox.show_all()
-            self.__hbox.set_visible(False)
+        row_align, selected_ids, scroll_identifier = \
+                self.__get_selection_and_row()
 
-            self.__treeview = BlaTreeView(view_id=blaconst.VIEW_PLAYLISTS)
-            self.__treeview.connect_object(
-                    "sort_column", BlaPlaylist.Playlist.sort, self)
-            self.__treeview.connect("row_activated", self.play_track)
-            self.__treeview.connect(
-                    "popup", popup, blaconst.VIEW_PLAYLISTS, self)
-            self.__treeview.connect("key_press_event", self.__key_press_event)
-            self.__treeview.connect("drag_data_get", self.__drag_data_get)
+        if filter_string:
+            self.__mode |= MODE_FILTERED
+            query = BlaQuery(filter_string,
+                             self.__regexp_button.get_active()).query
+            self.__tracks = filter(query, self.__all_tracks)
+        else:
+            self.__mode ^= MODE_FILTERED
+            self.__tracks = list(self.__all_tracks)
 
-            # receive drag and drop
-            self.__treeview.enable_model_drag_dest([
-                    ("tracks/library", gtk.TARGET_SAME_APP, 0),
-                    ("tracks/filesystem", gtk.TARGET_SAME_APP, 1),
-                    ("tracks/playlist", gtk.TARGET_SAME_WIDGET, 2),
-                    ("text/uri-list", 0, 3)],
-                    gtk.gdk.ACTION_COPY
-            )
-            self.__treeview.connect(
-                    "drag_data_received", self.__drag_data_recv)
+        if self.__mode & MODE_SORTED or self.__sort_parameters:
+            # selection is handled in the sort method
+            selected_ids = None
+            try: self.sort(*self.__sort_parameters, scroll=True)
+            except TypeError: self.sort(-1, None)
+        else:
+            model = self.__freeze_treeview()
+            model.clear()
+            append = model.append
+            [append([identifier, "", []]) for identifier in self.__tracks]
+            self.__thaw_treeview()
 
-            sw = blaguiutils.BlaScrolledWindow()
-            sw.add(self.__treeview)
+        self.__set_selection_and_row(
+                row_align, selected_ids, scroll_identifier)
+        self.update_state()
+        BlaPlaylistManager.update_statusbar()
 
-            self.clear()
+    def __drag_data_get(self, treeview, drag_context, selection_data, info,
+            time):
+        idx = BlaPlaylistManager.playlists.index(self)
+        data = pickle.dumps((treeview.get_selection().get_selected_rows()[-1],
+                            idx), pickle.HIGHEST_PROTOCOL)
+        selection_data.set("", 8, data)
 
-            self.pack_start(self.__hbox, expand=False)
-            self.pack_start(sw, expand=True)
-            sw.show_all()
+    def __drag_data_recv(self, treeview, drag_context, x, y,
+            selection_data, info, time):
+        data = None
+        treeview.grab_focus()
+        drop_info = treeview.get_dest_row_at_pos(x, y)
 
-            update_columns(self.__treeview, view_id=blaconst.VIEW_PLAYLISTS)
-            self.show()
-            self.__entry.connect("activate", self.__filter)
+        # DND from the library browser
+        if info == 0:
+            data = pickle.loads(selection_data.data)
 
-        def clear(self):
-            self.__treeview.freeze_notify()
-            self.__treeview.freeze_child_notify()
-            model = self.__treeview.get_model()
-            self.disable_search()
+        # DND between playlists (including one and the same)
+        elif info == 2:
+            paths, idx = pickle.loads(selection_data.data)
 
-            self.__length = 0
-            self.__size = 0
-            self.__history.clear()
-            self.__current = None
-            self.__old_id = -1
-            self.__all_tracks = []  # unfiltered, unsorted tracks
-            self.__all_sorted = []  # unfiltered, sorted tracks
-            self.__tracks = []      # visible tracks when unsorted
-            self.__sorted = []      # visible tracks when sorted
-            self.__sort_parameters = None
-            [column.set_sort_indicator(False)
-                    for column in self.__treeview.get_columns()]
-            self.__mode = MODE_NORMAL
+            if drop_info:
+                path, pos = drop_info
+                identifier = self.get_id_from_path(path)
+                if (path in paths and
+                    idx == BlaPlaylistManager.playlists.index(self)):
+                    return
 
-            try: model.clear()
-            except AttributeError:
-                self.__treeview.set_model(gtk.ListStore(*self.__layout))
-            else: self.__treeview.set_model(model)
-            self.__treeview.thaw_child_notify()
-            self.__treeview.thaw_notify()
+            # TODO: update the queue if necessary
+            playlist = BlaPlaylistManager.playlists[idx]
+            moved_ids = playlist.get_tracks(paths=paths, remove=True)
+            if drop_info:
+                path = self.get_path_from_id(identifier)
+                drop_info = (path, pos)
+            uris = [BlaPlaylistManager.uris[identifier]
+                    for identifier in moved_ids]
+            self.add_tracks(drop_info=drop_info, uris=(moved_ids, uris),
+                            select_rows=True)
+            self.update_state()
+            return
 
-        def get_path_from_id(self, identifier, unfiltered=False):
-            if self.__mode & MODE_FILTERED and not unfiltered:
-                if self.__mode & MODE_SORTED: ids = self.__sorted
-                else: ids = self.__tracks
-            else:
-                if self.__mode & MODE_SORTED: ids = self.__all_sorted
-                else: ids = self.__all_tracks
+        # DND from an external location or the filesystem browser
+        elif info in [1, 3]:
+            uris = selection_data.data.strip("\n\r\x00")
+            resolve_uri = blautil.resolve_uri
+            uris = map(resolve_uri, uris.split())
+            data = library.parse_ool_uris(uris)
 
-            try: return (ids.index(identifier),)
-            except ValueError: return None
+        # FIXME: if data is empty gtk issues an assertion warning
 
-        def get_id_from_path(self, path):
-            if self.__mode & MODE_FILTERED:
-                if self.__mode & MODE_SORTED: ids = self.__sorted
-                else: ids = self.__tracks
-            else:
-                if self.__mode & MODE_SORTED: ids = self.__all_sorted
-                else: ids = self.__all_tracks
+        # if parsing didn't yield any tracks or the playlist was removed
+        # while parsing just return
+        if data and self in BlaPlaylistManager.playlists:
+            self.add_tracks(data, select_rows=True,
+                            drop_info=treeview.get_dest_row_at_pos(x, y))
 
-            try: return ids[path[0]]
-            except (TypeError, IndexError): return None
+    def __key_press_event(self, treeview, event):
+        is_accel = blagui.is_accel
+        accels = [
+            ("Delete", lambda: self.get_tracks(remove=True)),
+            ("Q", lambda: self.send_to_queue(self.__treeview)),
+            ("R", lambda: self.remove_from_queue(self.__treeview)),
+            ("Escape", self.disable_search),
+            ("<Alt>Return", self.show_properties)
+        ]
+        for accel, callback in accels:
+            if is_accel(event, accel):
+                callback()
+                break
+        return False
 
-        def select(self, type_):
-            selection = self.__treeview.get_selection()
+    def clear(self):
+        self.__treeview.freeze_notify()
+        self.__treeview.freeze_child_notify()
+        model = self.__treeview.get_model()
+        self.disable_search()
 
-            if type_ == blaconst.SELECT_ALL:
-                selection.select_all()
-                return
-            elif type_ == blaconst.SELECT_COMPLEMENT:
-                selected_paths = set(selection.get_selected_rows()[-1])
-                paths = set([(p,) for p in xrange(
-                        self.__treeview.get_model().iter_n_children(None))])
-                paths.difference_update(selected_paths)
-                selection.unselect_all()
-                select_path = selection.select_path
-                map(select_path, paths)
-                return
-            elif type_ == blaconst.SELECT_BY_ARTISTS: column_id = COLUMN_ARTIST
-            elif type_ == blaconst.SELECT_BY_ALBUMS: column_id = COLUMN_ALBUM
-            elif type_ == blaconst.SELECT_BY_ALBUM_ARTISTS:
+        self.__length = 0
+        self.__size = 0
+        self.__history.clear()
+        self.__current = None
+        self.__old_id = -1
+        self.__all_tracks = []  # unfiltered, unsorted tracks
+        self.__all_sorted = []  # unfiltered, sorted tracks
+        self.__tracks = []      # visible tracks when unsorted
+        self.__sorted = []      # visible tracks when sorted
+        self.__sort_parameters = None
+        [column.set_sort_indicator(False)
+                for column in self.__treeview.get_columns()]
+        self.__mode = MODE_NORMAL
+
+        try: model.clear()
+        except AttributeError:
+            self.__treeview.set_model(gtk.ListStore(*self.__layout))
+        else: self.__treeview.set_model(model)
+        self.__treeview.thaw_child_notify()
+        self.__treeview.thaw_notify()
+
+    def get_path_from_id(self, identifier, unfiltered=False):
+        if self.__mode & MODE_FILTERED and not unfiltered:
+            if self.__mode & MODE_SORTED: ids = self.__sorted
+            else: ids = self.__tracks
+        else:
+            if self.__mode & MODE_SORTED: ids = self.__all_sorted
+            else: ids = self.__all_tracks
+
+        try: return (ids.index(identifier),)
+        except ValueError: return None
+
+    def get_id_from_path(self, path):
+        if self.__mode & MODE_FILTERED:
+            if self.__mode & MODE_SORTED: ids = self.__sorted
+            else: ids = self.__tracks
+        else:
+            if self.__mode & MODE_SORTED: ids = self.__all_sorted
+            else: ids = self.__all_tracks
+
+        try: return ids[path[0]]
+        except (TypeError, IndexError): return None
+
+    def select(self, type_):
+        selection = self.__treeview.get_selection()
+
+        if type_ == blaconst.SELECT_ALL:
+            selection.select_all()
+            return
+        elif type_ == blaconst.SELECT_COMPLEMENT:
+            selected_paths = set(selection.get_selected_rows()[-1])
+            paths = set([(p,) for p in xrange(
+                    self.__treeview.get_model().iter_n_children(None))])
+            paths.difference_update(selected_paths)
+            selection.unselect_all()
+            select_path = selection.select_path
+            map(select_path, paths)
+            return
+        elif type_ == blaconst.SELECT_BY_ARTISTS: column_id = COLUMN_ARTIST
+        elif type_ == blaconst.SELECT_BY_ALBUMS: column_id = COLUMN_ALBUM
+        elif type_ == blaconst.SELECT_BY_ALBUM_ARTISTS:
+            column_id = COLUMN_ALBUM_ARTIST
+        else: column_id = COLUMN_GENRE
+
+        paths = selection.get_selected_rows()[-1]
+        ids = map(self.get_id_from_path, paths)
+        eval_ = BlaEval(column_id).eval
+        tracks = map(BlaPlaylistManager.get_track_from_id, ids)
+        values = set()
+        [values.add(eval_(track).lower()) for track in tracks]
+
+        if self.__mode & MODE_FILTERED:
+            if self.__mode & MODE_SORTED: ids = self.__sorted
+            else: ids = self.__tracks
+        else:
+            if self.__mode & MODE_SORTED: ids = self.__all_sorted
+            else: ids = self.__all_tracks
+
+        tracks = map(BlaPlaylistManager.get_track_from_id, ids)
+        ids = [identifier for identifier, track in zip(ids, tracks)
+                if eval_(track).lower() in values]
+
+        paths = map(self.get_path_from_id, ids)
+        selection.unselect_all()
+        select_path = selection.select_path
+        map(select_path, paths)
+
+    def new_playlist(self, type_):
+        paths = self.__treeview.get_selection().get_selected_rows()[-1]
+        ids = map(self.get_id_from_path, paths)
+
+        if type_ != blaconst.PLAYLIST_FROM_SELECTION:
+            if type_ == blaconst.PLAYLIST_FROM_ARTISTS:
+                column_id = COLUMN_ARTIST
+            elif type_ == blaconst.PLAYLIST_FROM_ALBUMS:
+                column_id = COLUMN_ALBUM
+            elif type_ == blaconst.PLAYLIST_FROM_ALBUM_ARTISTS:
                 column_id = COLUMN_ALBUM_ARTIST
-            else: column_id = COLUMN_GENRE
+            else:
+                column_id = COLUMN_GENRE
 
-            paths = selection.get_selected_rows()[-1]
-            ids = map(self.get_id_from_path, paths)
             eval_ = BlaEval(column_id).eval
-            tracks = map(BlaPlaylist.get_track_from_id, ids)
+            tracks = map(BlaPlaylistManager.get_track_from_id, ids)
             values = set()
             [values.add(eval_(track).lower()) for track in tracks]
 
@@ -1233,854 +1499,651 @@ class BlaPlaylist(gtk.Notebook):
                 if self.__mode & MODE_SORTED: ids = self.__all_sorted
                 else: ids = self.__all_tracks
 
-            tracks = map(BlaPlaylist.get_track_from_id, ids)
+            tracks = map(BlaPlaylistManager.get_track_from_id, ids)
             ids = [identifier for identifier, track in zip(ids, tracks)
                     if eval_(track).lower() in values]
 
-            paths = map(self.get_path_from_id, ids)
-            selection.unselect_all()
-            select_path = selection.select_path
-            map(select_path, paths)
+        uris = [BlaPlaylistManager.uris[identifier] for identifier in ids]
+        playlist = BlaPlaylistManager.add_playlist(focus=True)
+        playlist.add_tracks(uris=uris)
 
-        def new_playlist(self, type_):
+    def add_tracks(self, uris, drop_info=None, flush=False, current=None,
+            select_rows=False, restore=False):
+        if flush: self.clear()
+        if not uris: return []
+
+        added_rows = []
+        iterator = None
+
+        # we need a mutable type to update the iterator when calling
+        # `insert_func()' through `map()'. we use a dict for this
+        ns = {}.fromkeys(["iterator"])
+        model = self.__treeview.get_model()
+        ib = model.insert_before
+        ia = model.insert_after
+        iaa = model.append
+
+        def insert_before(ns, item):
+            ns["iterator"] = ib(ns["iterator"], item)
+        def insert_after(ns, item):
+            ns["iterator"] = ia(ns["iterator"], item)
+        def append(ns, item):
+            iaa(item)
+
+        if isinstance(uris, tuple):
+            ids, uris = uris
+        else:
+            ids = range(BlaPlaylistManager.track_count,
+                        BlaPlaylistManager.track_count + len(uris))
+            BlaPlaylistManager.track_count += len(uris)
+
+        reverse = False
+
+        if drop_info == "at_cursor":
             paths = self.__treeview.get_selection().get_selected_rows()[-1]
-            ids = map(self.get_id_from_path, paths)
-
-            if type_ != blaconst.PLAYLIST_FROM_SELECTION:
-                if type_ == blaconst.PLAYLIST_FROM_ARTISTS:
-                    column_id = COLUMN_ARTIST
-                elif type_ == blaconst.PLAYLIST_FROM_ALBUMS:
-                    column_id = COLUMN_ALBUM
-                elif type_ == blaconst.PLAYLIST_FROM_ALBUM_ARTISTS:
-                    column_id = COLUMN_ALBUM_ARTIST
-                else:
-                    column_id = COLUMN_GENRE
-
-                eval_ = BlaEval(column_id).eval
-                tracks = map(BlaPlaylist.get_track_from_id, ids)
-                values = set()
-                [values.add(eval_(track).lower()) for track in tracks]
-
-                if self.__mode & MODE_FILTERED:
-                    if self.__mode & MODE_SORTED: ids = self.__sorted
-                    else: ids = self.__tracks
-                else:
-                    if self.__mode & MODE_SORTED: ids = self.__all_sorted
-                    else: ids = self.__all_tracks
-
-                tracks = map(BlaPlaylist.get_track_from_id, ids)
-                ids = [identifier for identifier, track in zip(ids, tracks)
-                        if eval_(track).lower() in values]
-
-            uris = [BlaPlaylist.uris[identifier] for identifier in ids]
-            playlist = BlaPlaylist.add_playlist(focus=True)
-            playlist.add_tracks(uris=uris)
-
-        def add_tracks(self, uris, drop_info=None, flush=False, current=None,
-                select_rows=False, restore=False):
-            if flush: self.clear()
-            if not uris: return
-
-            added_rows = []
-            iterator = None
-
-            # we need a mutable type to update the iterator when calling
-            # `insert_func()' through `map()'. we use a dict for this
-            ns = {}.fromkeys(["iterator"])
-            model = self.__treeview.get_model()
-            ib = model.insert_before
-            ia = model.insert_after
-            iaa = model.append
-
-            def insert_before(ns, item):
-                ns["iterator"] = ib(ns["iterator"], item)
-            def insert_after(ns, item):
-                ns["iterator"] = ia(ns["iterator"], item)
-            def append(ns, item):
-                iaa(item)
-
-            if isinstance(uris, tuple): ids, uris = uris
-            else:
-                ids = range(BlaPlaylist.count, BlaPlaylist.count + len(uris))
-                BlaPlaylist.count += len(uris)
-
-            reverse = False
-
-            if drop_info == "at_cursor":
-                paths = self.__treeview.get_selection().get_selected_rows()[-1]
-                try:
-                    if not paths: raise TypeError
-                    path, colum = self.__treeview.get_cursor()
-                except TypeError: path = None
-                if path is None: drop_info = None
-                else: drop_info = (path, gtk.TREE_VIEW_DROP_BEFORE)
-
-            if drop_info:
-                path, pos = drop_info
-                ns["iterator"] = model.get_iter(path)
-
-                if (pos == gtk.TREE_VIEW_DROP_BEFORE or
-                        pos == gtk.TREE_VIEW_DROP_INTO_OR_BEFORE):
-                    insert_func = insert_before
-                    reverse = True
-                else:
-                    path = (path[0]+1,)
-                    insert_func = insert_after
-            else:
-                path = (model.iter_n_children(None),)
-                insert_func = append
-
-            # update mapping dictionary between ids and uris (ids are unique,
-            # so this call really just extends the dict)
-            BlaPlaylist.uris.update(dict(zip(ids, uris)))
-
-            self.insert(ids, path, restore=bool(restore))
-            try: query, regexp, sort_parameters = restore
-            except TypeError:
-                query = None
-                # preserve regexp button state when appending tracks
-                regexp = self.__regexp_button.get_active()
-                sort_parameters = None
-
-            self.__regexp_button.set_active(regexp)
-            self.__sort_parameters = sort_parameters
-            if not (restore and (query or sort_parameters)):
-                scroll_id = ids[-1]
-                if reverse: ids.reverse()
-                self.__freeze_treeview()
-                [insert_func(ns, [identifier, "", []]) for identifier in ids]
-                [column.set_sort_indicator(False)
-                        for column in self.__treeview.get_columns()]
-                self.__thaw_treeview()
-                if not restore: BlaPlaylist.update_statusbar()
-            elif query: self.enable_search(query)
-            elif sort_parameters: self.sort(*sort_parameters)
-            else: raise NotImplementedError("This shouldn't happen")
-
-            if current:
-                # when restoring a playlist, current (which usually is a
-                # playlist id) conincides with the path in the playlist
-                self.__current = (self.__all_sorted[current]
-                        if self.__mode & MODE_SORTED else
-                        self.__all_tracks[current]
-                )
-                self.set_row(self.get_path_from_id(self.__current))
-
-            if flush:
-                track = self.get_track(
-                        choice=blaconst.TRACK_PLAY, force_advance=True)
-                BlaPlaylist.play_track(track, self)
-
-            # select the added rows if requested
-            if select_rows:
-                self.__treeview.freeze_child_notify()
-                selection = self.__treeview.get_selection()
-                s = selection.unselect_path
-                map(s, selection.get_selected_rows()[-1])
-                s = selection.select_path
-                map(s, xrange(path[0], path[0] + len(uris)))
-                self.__treeview.thaw_child_notify()
-
-                path = self.get_path_from_id(scroll_id)
-                self.set_row(path=path, row_align=1.0, keep_selection=True)
-
-        def get_tracks(self, remove=False, paths=None):
-            ids = []
-            # if paths is not given return the selected rows
-            if paths is None:
-                paths = self.__treeview.get_selection().get_selected_rows()[-1]
-
-            if paths:
-                if isinstance(paths, tuple): ids, paths = paths
-                else:
-                    get_id_from_path = self.get_id_from_path
-                    ids = map(get_id_from_path, paths)
-                model = self.__treeview.get_model()
-
-                if (self.__current is not None and remove and
-                        self.get_path_from_id(self.__current) in paths):
-                    self.__old_id = self.__current
-                    self.__current = paths[0]
-
-                if remove:
-                    tracks = map(BlaPlaylist.get_track_from_id, ids)
-                    self.__length -= sum([track[LENGTH] for track in tracks])
-                    self.__size -= sum([track[FILESIZE] for track in tracks])
-
-                    # remove the rows from the model
-                    model = self.__freeze_treeview()
-                    iterators = map(model.get_iter, paths)
-                    remove = model.remove
-                    map(remove, iterators)
-                    self.__thaw_treeview()
-
-                    # remove the ids
-                    if self.__mode & MODE_FILTERED:
-                        map(self.__tracks.remove, ids)
-                        if self.__mode & MODE_SORTED:
-                            map(self.__sorted.remove, ids)
-                    if self.__mode & MODE_SORTED:
-                        map(self.__all_sorted.remove, ids)
-                    map(self.__all_tracks.remove, ids)
-
-                    BlaPlaylist.update_statusbar()
-            return ids
-
-        def insert(self, inserted_ids, path, restore=False):
-            if self.__old_id in inserted_ids: self.__current = self.__old_id
-
-            # due to the way playlist contents are handled to speed up
-            # filtering/sorting, dealing with track insertion is a rather
-            # fiddly task
-            if self.__mode & MODE_FILTERED or self.__mode & MODE_SORTED:
-                original_path = path
-
-                if self.__mode & MODE_FILTERED:
-                    ids = (self.__sorted if self.__mode & MODE_SORTED else
-                            self.__tracks)
-                else: ids = self.__all_sorted
-
-                offset = 1
-                try: identifier = ids[0]
-                except IndexError:
-                    identifier = self.__all_tracks[-1]
-                else:
-                    if path == (0,):
-                        identifier = ids[0]
-                        offset = 0
-                    else:
-                        try: identifier = ids[path[0]-1]
-                        except IndexError: identifier = ids[-1]
-
-                path = (self.__all_tracks.index(identifier)+offset,)
-
-                # insertion at this point needs to happen in-place so we don't
-                # lose the reference
-                [ids.insert(original_path[0]+idx, value)
-                        for idx, value in enumerate(inserted_ids)]
-
-            self.__all_tracks = (self.__all_tracks[0:path[0]] + inserted_ids +
-                    self.__all_tracks[path[0]:])
-            tracks = map(BlaPlaylist.get_track_from_id, inserted_ids)
-            self.__length += sum([track[LENGTH] for track in tracks])
-            self.__size += sum([track[FILESIZE] for track in tracks])
-
-        def remove_duplicates(self):
-            def remove_duplicates():
-                if self.__mode & MODE_FILTERED:
-                    if self.__mode & MODE_SORTED: ids = self.__sorted
-                    else: ids = self.__tracks
-                else:
-                    if self.__mode & MODE_SORTED: ids = self.__all_sorted
-                    else: ids = self.__all_tracks
-
-                unique_ids = blautil.BlaOrderedSet()
-                unique_uris = blautil.BlaOrderedSet()
-                uris = BlaPlaylist.uris
-
-                paths = self.__treeview.get_selection().get_selected_rows()[-1]
-                get_id_from_path = self.get_id_from_path
-                selected_ids = []
-                for idx, path in enumerate(paths):
-                    selected_ids.append(get_id_from_path(path))
-                    if idx % 25 == 0: yield True
-
-                # determine unique tracks
-                for identifier in ids:
-                    uri = uris[identifier]
-                    if uri not in unique_uris:
-                        unique_ids.add(identifier)
-                        unique_uris.add(uri)
-                unique_ids = list(unique_ids)
-                unique_uris = list(unique_uris)
-
-                # place __current at correct position in the list if possible
-                if self.__current is not None:
-                    uri = uris[self.__current]
-                    try: unique_ids[unique_uris.index(uri)] = self.__current
-                    except ValueError: pass
-                yield True
-
-                self.__repopulate_model(unique_ids, selected_ids)
-                self.__treeview.set_sensitive(True)
-                yield False
-
-            self.__treeview.set_sensitive(False)
-            p = remove_duplicates()
-            gobject.idle_add(p.next)
-
-        def remove_invalid_tracks(self):
-            def remove_invalid_tracks():
-                if self.__mode & MODE_FILTERED:
-                    if self.__mode & MODE_SORTED: ids = self.__sorted
-                    else: ids = self.__tracks
-                else:
-                    if self.__mode & MODE_SORTED: ids = self.__all_sorted
-                    else: ids = self.__all_tracks
-
-                # create a copy to leave the referenced list unchanged
-                ids_copy = list(ids)
-                uris = BlaPlaylist.uris
-
-                isfile = os.path.isfile
-                for idx, identifier in enumerate(ids):
-                    uri = uris[identifier]
-                    if not isfile(uri): ids_copy.remove(identifier)
-                    if idx % 25 == 0: yield True
-
-                paths = self.__treeview.get_selection().get_selected_rows()[-1]
-                get_id_from_path = self.get_id_from_path
-                selected_ids = []
-                for idx, path in enumerate(paths):
-                    selected_ids.append(get_id_from_path(path))
-                    if idx % 25 == 0: yield True
-
-                self.__repopulate_model(ids_copy, selected_ids)
-                self.__treeview.set_sensitive(True)
-                yield False
-
-            self.__treeview.set_sensitive(False)
-            p = remove_invalid_tracks()
-            gobject.idle_add(p.next)
-
-        def enable_search(self, text=""):
-            if text:
-                self.__entry.set_text(text)
-                self.__entry.activate()
-            else: self.__entry.grab_focus()
-            self.__cid = self.__entry.connect(
-                    "changed", self.__filter_parameters_changed)
-            self.__hbox.set_visible(True)
-
-        def disable_search(self):
-            self.__hbox.set_visible(False)
             try:
-                if self.__entry.handler_is_connected(self.__cid):
-                    self.__entry.disconnect(self.__cid)
-            except AttributeError: pass
-            text = self.__entry.get_text()
-            self.__entry.delete_text(0, -1)
-            if text: self.__entry.activate()
-
-        def sort(self, column_id, sort_order, scroll=False):
-            for column in self.__treeview.get_columns():
-                if column.id == column_id: break
-            else: sort_order = None
-
-            row_align, selected_ids, scroll_identifier = \
-                    self.__get_selection_and_row()
-            ids = (self.__tracks if self.__mode & MODE_FILTERED else
-                    self.__all_tracks)
-            if sort_order is None:
-                self.__mode ^= MODE_SORTED
-                sort_indicator = False
-            else:
-                self.__mode |= MODE_SORTED
-                sort_indicator = True
-
-                if sort_order == gtk.SORT_DESCENDING: reverse = True
-                elif sort_order == gtk.SORT_ASCENDING: reverse = False
-                eval_ = BlaEval(column_id).eval
-
-                self.__all_sorted = sorted(self.__all_tracks, key=lambda t:
-                        eval_(BlaPlaylist.get_track_from_id(t)).lower(),
-                        reverse=reverse
-                )
-                ids = sorted(ids, key=lambda t:
-                        eval_(BlaPlaylist.get_track_from_id(t)).lower(),
-                        reverse=reverse
-                )
-                self.__sorted = ids
-
-            self.__treeview.freeze_notify()
-            self.__treeview.freeze_child_notify()
-            model = self.__treeview.get_model()
-            self.__treeview.set_model(None)
-
-            model.clear()
-            append = model.append
-            [append([identifier, "", []]) for identifier in ids]
-
-            self.__treeview.set_model(model)
-
-            if sort_order is not None:
-                self.__sort_parameters = (column_id, sort_order)
-            else: self.__sort_parameters = None
-
-            column.set_sort_indicator(sort_indicator)
-            if sort_indicator: column.set_sort_order(sort_order)
-
-            self.__set_selection_and_row(row_align, selected_ids, None)
-            self.update_state()
-
-            self.__treeview.thaw_child_notify()
-            self.__treeview.thaw_notify()
-
-        def package_playlist(self):
-            try:
-                path = self.get_path_from_id(
-                        self.__current, unfiltered=True)[0]
+                if not paths: raise TypeError
+                path, colum = self.__treeview.get_cursor()
             except TypeError: path = None
+            if path is None: drop_info = None
+            else: drop_info = (path, gtk.TREE_VIEW_DROP_BEFORE)
 
-            # since we sort on startup anyway, just get the __all_tracks list
-            uris = [BlaPlaylist.uris[identifier]
-                    for identifier in self.__all_tracks]
-            playlist = [(self.__entry.get_text(),
-                         self.__regexp_button.get_active(),
-                         self.__sort_parameters), path, uris]
-            return playlist
+        if drop_info:
+            path, pos = drop_info
+            ns["iterator"] = model.get_iter(path)
 
-        def get_uris(self):
+            if (pos == gtk.TREE_VIEW_DROP_BEFORE or
+                    pos == gtk.TREE_VIEW_DROP_INTO_OR_BEFORE):
+                insert_func = insert_before
+                reverse = True
+            else:
+                path = (path[0]+1,)
+                insert_func = insert_after
+        else:
+            path = (model.iter_n_children(None),)
+            insert_func = append
+
+        # update mapping dictionary between ids and uris (ids are unique,
+        # so this call really just extends the dict)
+        BlaPlaylistManager.uris.update(dict(zip(ids, uris)))
+
+        self.insert(ids, path, restore=bool(restore))
+        try: query, regexp, sort_parameters = restore
+        except TypeError:
+            query = None
+            # preserve regexp button state when appending tracks
+            regexp = self.__regexp_button.get_active()
+            sort_parameters = None
+
+        self.__regexp_button.set_active(regexp)
+        self.__sort_parameters = sort_parameters
+        if not (restore and (query or sort_parameters)):
+            scroll_id = ids[-1]
+            if reverse: ids.reverse()
+            self.__freeze_treeview()
+            [insert_func(ns, [identifier, "", []]) for identifier in ids]
+            [column.set_sort_indicator(False)
+                    for column in self.__treeview.get_columns()]
+            self.__thaw_treeview()
+            if not restore: BlaPlaylistManager.update_statusbar()
+        elif query: self.enable_search(query)
+        elif sort_parameters: self.sort(*sort_parameters)
+        else: raise NotImplementedError("This shouldn't happen")
+
+        if current:
+            # when restoring a playlist, current (which usually is a
+            # playlist id) conincides with the path in the playlist
+            self.__current = (self.__all_sorted[current]
+                    if self.__mode & MODE_SORTED else
+                    self.__all_tracks[current]
+            )
+            self.set_row(self.get_path_from_id(self.__current))
+
+        if flush:
+            track = self.get_track(
+                    choice=blaconst.TRACK_PLAY, force_advance=True)
+            BlaPlaylistManager.play_track(track, self)
+
+        # select the added rows if requested
+        if select_rows:
+            self.__treeview.freeze_child_notify()
+            selection = self.__treeview.get_selection()
+            s = selection.unselect_path
+            map(s, selection.get_selected_rows()[-1])
+            s = selection.select_path
+            map(s, xrange(path[0], path[0] + len(uris)))
+            self.__treeview.thaw_child_notify()
+
+            path = self.get_path_from_id(scroll_id)
+            self.set_row(path=path, row_align=1.0, keep_selection=True)
+
+        return ids
+
+    def get_tracks(self, remove=False, paths=None):
+        ids = []
+        # if paths is not given return the selected rows
+        if paths is None:
+            paths = self.__treeview.get_selection().get_selected_rows()[-1]
+
+        if paths:
+            if isinstance(paths, tuple): ids, paths = paths
+            else:
+                get_id_from_path = self.get_id_from_path
+                ids = map(get_id_from_path, paths)
+            model = self.__treeview.get_model()
+
+            if (self.__current is not None and remove and
+                    self.get_path_from_id(self.__current) in paths):
+                self.__old_id = self.__current
+                self.__current = paths[0]
+
+            if remove:
+                tracks = map(BlaPlaylistManager.get_track_from_id, ids)
+                self.__length -= sum([track[LENGTH] for track in tracks])
+                self.__size -= sum([track[FILESIZE] for track in tracks])
+
+                # remove the rows from the model
+                model = self.__freeze_treeview()
+                iterators = map(model.get_iter, paths)
+                remove = model.remove
+                map(remove, iterators)
+                self.__thaw_treeview()
+
+                # remove the ids
+                if self.__mode & MODE_FILTERED:
+                    map(self.__tracks.remove, ids)
+                    if self.__mode & MODE_SORTED:
+                        map(self.__sorted.remove, ids)
+                if self.__mode & MODE_SORTED:
+                    map(self.__all_sorted.remove, ids)
+                map(self.__all_tracks.remove, ids)
+
+                BlaPlaylistManager.update_statusbar()
+        return ids
+
+    def insert(self, inserted_ids, path, restore=False):
+        if self.__old_id in inserted_ids: self.__current = self.__old_id
+
+        # due to the way playlist contents are handled to speed up
+        # filtering/sorting, dealing with track insertion is a rather
+        # fiddly task
+        if self.__mode & MODE_FILTERED or self.__mode & MODE_SORTED:
+            original_path = path
+
+            if self.__mode & MODE_FILTERED:
+                ids = (self.__sorted if self.__mode & MODE_SORTED else
+                        self.__tracks)
+            else: ids = self.__all_sorted
+
+            offset = 1
+            try: identifier = ids[0]
+            except IndexError:
+                identifier = self.__all_tracks[-1]
+            else:
+                if path == (0,):
+                    identifier = ids[0]
+                    offset = 0
+                else:
+                    try: identifier = ids[path[0]-1]
+                    except IndexError: identifier = ids[-1]
+
+            path = (self.__all_tracks.index(identifier)+offset,)
+
+            # insertion at this point needs to happen in-place so we don't
+            # lose the reference
+            [ids.insert(original_path[0]+idx, value)
+                    for idx, value in enumerate(inserted_ids)]
+
+        self.__all_tracks = (self.__all_tracks[0:path[0]] + inserted_ids +
+                self.__all_tracks[path[0]:])
+        tracks = map(BlaPlaylistManager.get_track_from_id, inserted_ids)
+        self.__length += sum([track[LENGTH] for track in tracks])
+        self.__size += sum([track[FILESIZE] for track in tracks])
+
+    def remove_duplicates(self):
+        def remove_duplicates():
             if self.__mode & MODE_FILTERED:
                 if self.__mode & MODE_SORTED: ids = self.__sorted
                 else: ids = self.__tracks
             else:
                 if self.__mode & MODE_SORTED: ids = self.__all_sorted
                 else: ids = self.__all_tracks
-            return [BlaPlaylist.uris[identifier] for identifier in ids]
 
-        def get_track(self, choice=blaconst.TRACK_PLAY, force_advance=True):
-            def get_random(old=None):
-                idx_max = model.iter_n_children(None)-1
-                if idx_max < 0: return None
-                identifier = model[randint(0, idx_max)][0]
-                if old is not None and idx_max > 0:
-                    while identifier == old:
-                        identifier = model[randint(0, idx_max)][0]
-                return identifier
+            unique_ids = blautil.BlaOrderedSet()
+            unique_uris = blautil.BlaOrderedSet()
+            uris = BlaPlaylistManager.uris
 
-            order = blacfg.getint("general", "play.order")
-            model = self.__treeview.get_model()
+            paths = self.__treeview.get_selection().get_selected_rows()[-1]
+            get_id_from_path = self.get_id_from_path
+            selected_ids = []
+            for idx, path in enumerate(paths):
+                selected_ids.append(get_id_from_path(path))
+                if idx % 25 == 0: yield True
 
-            # remove the playing icon from the old row
-            try: model[self.get_path_from_id(self.__current)][1] = None
-            except TypeError: pass
+            # determine unique tracks
+            for identifier in ids:
+                uri = uris[identifier]
+                if uri not in unique_uris:
+                    unique_ids.add(identifier)
+                    unique_uris.add(uri)
+            unique_ids = list(unique_ids)
+            unique_uris = list(unique_uris)
 
-            # if there are no tracks in the playlist, return
-            if not model.get_iter_first(): return None
-
-            identifier = None
-
-            # play the last active track (applies to ORDER_REPEAT, too)
-            if ((choice == blaconst.TRACK_PLAY or
-                    (order == blaconst.ORDER_REPEAT and not force_advance)) and
-                    self.__current is not None):
-                identifier = self.__current
-
-            # play, but we didn't play a track from this playlist yet
-            elif choice == blaconst.TRACK_PLAY:
-                if order == blaconst.ORDER_SHUFFLE:
-                    identifier = get_random()
-                    self.__history.add(identifier, choice)
-                else: identifier = model[0][0]
-
-            elif choice == blaconst.TRACK_RANDOM:
-                identifier = get_random()
-                self.__history.add(identifier, blaconst.TRACK_NEXT)
-
-            # this is either TRACK_NEXT or TRACK_PREVIOUS with ORDER_SHUFFLE
-            elif order == blaconst.ORDER_SHUFFLE:
-                identifier = self.__history.get(choice)
-                if identifier is None:
-                    identifier = get_random(self.__current)
-                    self.__history.add(identifier, choice)
-
-            # this is either TRACK_NEXT or TRACK_PREVIOUS with ORDER_NORMAL
-            else:
-                if (not isinstance(self.__current, int) and
-                        self.__current is not None):
-                    try: model[self.__current]
-                    except IndexError:
-                        count = model.iter_n_children(None)
-                        if count: path = (count-1,)
-                        else: path = None
-                    else: path = self.__current
-                else:
-                    path = self.get_path_from_id(self.__current)
-                    if path is None: path = (0,)
-                    else:
-                        if choice == blaconst.TRACK_NEXT: path = (path[0]+1,)
-                        else: path = (path[0]-1,) if path[0] > 0 else None
-
-                identifier = self.get_id_from_path(path)
-
-            track = None
-            if identifier is not None:
-                self.__current = identifier
-                path = self.get_path_from_id(self.__current)
-                if blacfg.getboolean("general", "cursor.follows.playback"):
-                    self.set_row(path)
-                track = BlaPlaylist.uris[self.__current]
-                try: model[path][1] = gtk.STOCK_MEDIA_PLAY
-                except TypeError: pass
-
-            return track
-
-        def get_playlist_info(self):
-            ids = (self.__tracks if self.__mode & MODE_FILTERED else
-                    self.__all_tracks)
-            return (len(ids), self.__size, self.__length)
-
-        def update_state(self):
-            if self.__current is None: return
-            model = self.__treeview.get_model()
-            path = self.get_path_from_id(self.__current)
-            if None in [model, path]: return
-
-            if player.radio:
-                try: model[self.get_path_from_id(self.__current)][1] = None
-                except TypeError: pass
-                else: return
-
-            # only update the icon in the playlist if it currently has one.
-            # this ensures the icon is only updated on tracks in a playlist,
-            # but not on any from the library
-            state = player.get_state()
-            if model[path][1] != None and BlaPlaylist.active == self:
-                stock = None
-                if state == blaconst.STATE_PLAYING:
-                    stock = gtk.STOCK_MEDIA_PLAY
-                elif state == blaconst.STATE_PAUSED:
-                    stock = gtk.STOCK_MEDIA_PAUSE
-                model[path][1] = stock
-
-            BlaQueue.update_queue_positions()
-
-        def update_queue_positions(self, items):
-            model = self.__treeview.get_model()
-            for identifier, positions in items:
-                try: model[self.get_path_from_id(identifier)][2] = positions
-                except ValueError: pass
-
-        def update_contents(self):
-            try: low, high = self.__treeview.get_visible_range()
-            except TypeError: pass
-            else:
-                model = self.__treeview.get_model()
-                get_iter = model.get_iter
-                row_changed = model.row_changed
-                [row_changed(path, get_iter(path)) for path
-                        in xrange(low[0], high[0]+1)]
-
-        def play_track(self, treeview, path, column=None):
-            model = self.__treeview.get_model()
-
+            # place __current at correct position in the list if possible
             if self.__current is not None:
-                try: model[self.get_path_from_id(self.__current)][1] = None
-                except TypeError: pass
+                uri = uris[self.__current]
+                try: unique_ids[unique_uris.index(uri)] = self.__current
+                except ValueError: pass
+            yield True
+
+            self.__repopulate_model(unique_ids, selected_ids)
+            self.__treeview.set_sensitive(True)
+            yield False
+
+        self.__treeview.set_sensitive(False)
+        p = remove_duplicates()
+        gobject.idle_add(p.next)
+
+    def remove_invalid_tracks(self):
+        def remove_invalid_tracks():
+            if self.__mode & MODE_FILTERED:
+                if self.__mode & MODE_SORTED: ids = self.__sorted
+                else: ids = self.__tracks
+            else:
+                if self.__mode & MODE_SORTED: ids = self.__all_sorted
+                else: ids = self.__all_tracks
+
+            # create a copy to leave the referenced list unchanged
+            ids_copy = list(ids)
+            uris = BlaPlaylistManager.uris
+
+            isfile = os.path.isfile
+            for idx, identifier in enumerate(ids):
+                uri = uris[identifier]
+                if not isfile(uri): ids_copy.remove(identifier)
+                if idx % 25 == 0: yield True
+
+            paths = self.__treeview.get_selection().get_selected_rows()[-1]
+            get_id_from_path = self.get_id_from_path
+            selected_ids = []
+            for idx, path in enumerate(paths):
+                selected_ids.append(get_id_from_path(path))
+                if idx % 25 == 0: yield True
+
+            self.__repopulate_model(ids_copy, selected_ids)
+            self.__treeview.set_sensitive(True)
+            yield False
+
+        self.__treeview.set_sensitive(False)
+        p = remove_invalid_tracks()
+        gobject.idle_add(p.next)
+
+    def enable_search(self, text=""):
+        if text:
+            self.__entry.set_text(text)
+            self.__entry.activate()
+        else: self.__entry.grab_focus()
+        self.__cid = self.__entry.connect(
+                "changed", self.__filter_parameters_changed)
+        self.__hbox.set_visible(True)
+
+    def disable_search(self):
+        self.__hbox.set_visible(False)
+        try:
+            if self.__entry.handler_is_connected(self.__cid):
+                self.__entry.disconnect(self.__cid)
+        except AttributeError: pass
+        text = self.__entry.get_text()
+        self.__entry.delete_text(0, -1)
+        if text: self.__entry.activate()
+
+    def sort(self, column_id, sort_order, scroll=False):
+        for column in self.__treeview.get_columns():
+            if column.id == column_id: break
+        else: sort_order = None
+
+        row_align, selected_ids, scroll_identifier = \
+                self.__get_selection_and_row()
+        ids = (self.__tracks if self.__mode & MODE_FILTERED else
+                self.__all_tracks)
+        if sort_order is None:
+            self.__mode ^= MODE_SORTED
+            sort_indicator = False
+        else:
+            self.__mode |= MODE_SORTED
+            sort_indicator = True
+
+            if sort_order == gtk.SORT_DESCENDING: reverse = True
+            elif sort_order == gtk.SORT_ASCENDING: reverse = False
+            eval_ = BlaEval(column_id).eval
+
+            self.__all_sorted = sorted(self.__all_tracks, key=lambda t:
+                    eval_(BlaPlaylistManager.get_track_from_id(t)).lower(),
+                    reverse=reverse
+            )
+            ids = sorted(ids, key=lambda t:
+                    eval_(BlaPlaylistManager.get_track_from_id(t)).lower(),
+                    reverse=reverse
+            )
+            self.__sorted = ids
+
+        self.__treeview.freeze_notify()
+        self.__treeview.freeze_child_notify()
+        model = self.__treeview.get_model()
+        self.__treeview.set_model(None)
+
+        model.clear()
+        append = model.append
+        [append([identifier, "", []]) for identifier in ids]
+
+        self.__treeview.set_model(model)
+
+        if sort_order is not None:
+            self.__sort_parameters = (column_id, sort_order)
+        else: self.__sort_parameters = None
+
+        column.set_sort_indicator(sort_indicator)
+        if sort_indicator: column.set_sort_order(sort_order)
+
+        self.__set_selection_and_row(row_align, selected_ids, None)
+        self.update_state()
+
+        self.__treeview.thaw_child_notify()
+        self.__treeview.thaw_notify()
+
+    def package_playlist(self):
+        try:
+            path = self.get_path_from_id(
+                    self.__current, unfiltered=True)[0]
+        except TypeError: path = None
+
+        # since we sort on startup anyway, just get the __all_tracks list
+        uris = [BlaPlaylistManager.uris[identifier]
+                for identifier in self.__all_tracks]
+        playlist = [(self.__entry.get_text(),
+                     self.__regexp_button.get_active(),
+                     self.__sort_parameters), path, uris]
+        return playlist
+
+    def get_uris(self):
+        if self.__mode & MODE_FILTERED:
+            if self.__mode & MODE_SORTED: ids = self.__sorted
+            else: ids = self.__tracks
+        else:
+            if self.__mode & MODE_SORTED: ids = self.__all_sorted
+            else: ids = self.__all_tracks
+        return [BlaPlaylistManager.uris[identifier] for identifier in ids]
+
+    def get_track(self, choice=blaconst.TRACK_PLAY, force_advance=True):
+        def get_random(old=None):
+            idx_max = model.iter_n_children(None)-1
+            if idx_max < 0: return None
+            identifier = model[randint(0, idx_max)][0]
+            if old is not None and idx_max > 0:
+                while identifier == old:
+                    identifier = model[randint(0, idx_max)][0]
+            return identifier
+
+        order = blacfg.getint("general", "play.order")
+        model = self.__treeview.get_model()
+
+        # remove the playing icon from the old row
+        try: model[self.get_path_from_id(self.__current)][1] = None
+        except TypeError: pass
+
+        # if there are no tracks in the playlist, return
+        if not model.get_iter_first(): return None
+
+        identifier = None
+
+        # play the last active track (applies to ORDER_REPEAT, too)
+        if ((choice == blaconst.TRACK_PLAY or
+                (order == blaconst.ORDER_REPEAT and not force_advance)) and
+                self.__current is not None):
+            identifier = self.__current
+
+        # play, but we didn't play a track from this playlist yet
+        elif choice == blaconst.TRACK_PLAY:
+            if order == blaconst.ORDER_SHUFFLE:
+                identifier = get_random()
+                self.__history.add(identifier, choice)
+            else: identifier = model[0][0]
+
+        elif choice == blaconst.TRACK_RANDOM:
+            identifier = get_random()
+            self.__history.add(identifier, blaconst.TRACK_NEXT)
+
+        # this is either TRACK_NEXT or TRACK_PREVIOUS with ORDER_SHUFFLE
+        elif order == blaconst.ORDER_SHUFFLE:
+            identifier = self.__history.get(choice)
+            if identifier is None:
+                identifier = get_random(self.__current)
+                self.__history.add(identifier, choice)
+
+        # this is either TRACK_NEXT or TRACK_PREVIOUS with ORDER_NORMAL
+        else:
+            if (not isinstance(self.__current, int) and
+                    self.__current is not None):
+                try: model[self.__current]
+                except IndexError:
+                    count = model.iter_n_children(None)
+                    if count: path = (count-1,)
+                    else: path = None
+                else: path = self.__current
+            else:
+                path = self.get_path_from_id(self.__current)
+                if path is None: path = (0,)
+                else:
+                    if choice == blaconst.TRACK_NEXT: path = (path[0]+1,)
+                    else: path = (path[0]-1,) if path[0] > 0 else None
+
             identifier = self.get_id_from_path(path)
 
-            order = blacfg.getint("general", "play.order")
-            if (order == blaconst.ORDER_SHUFFLE and
-                    self.__current != identifier and self.__current != None):
-                self.__history.add(identifier, blaconst.TRACK_NEXT)
+        track = None
+        if identifier is not None:
             self.__current = identifier
             path = self.get_path_from_id(self.__current)
             if blacfg.getboolean("general", "cursor.follows.playback"):
                 self.set_row(path)
-            track = BlaPlaylist.uris[self.__current]
+            track = BlaPlaylistManager.uris[self.__current]
+            try: model[path][1] = gtk.STOCK_MEDIA_PLAY
+            except TypeError: pass
 
-            model[path][1] = gtk.STOCK_MEDIA_PLAY
-            BlaPlaylist.play_track(track, self)
+        return track
 
-        def add_selection_to_playlist(self, playlist, move=False):
-            ids = self.get_tracks(remove=move)
-            if not ids: return
-            uris = [BlaPlaylist.uris[identifier] for identifier in ids]
-            playlist.add_tracks(uris=uris, select_rows=True)
-            BlaPlaylist.focus_playlist(playlist)
+    def get_playlist_info(self):
+        ids = (self.__tracks if self.__mode & MODE_FILTERED else
+                self.__all_tracks)
+        return (len(ids), self.__size, self.__length)
 
-        def deactivate(self, clear_history=True):
-            model = self.__treeview.get_model()
-            self.__treeview.get_selection().unselect_all()
+    def update_state(self):
+        if self.__current is None: return
+        model = self.__treeview.get_model()
+        path = self.get_path_from_id(self.__current)
+        if None in [model, path]: return
+
+        if player.radio:
             try: model[self.get_path_from_id(self.__current)][1] = None
             except TypeError: pass
-            if clear_history: self.__history.clear()
+            else: return
 
-        def send_to_queue(self, treeview):
-            queue_count = BlaQueue.get_queue_count()
-            if queue_count >= blaconst.QUEUE_MAX_ITEMS: return
-            count = blaconst.QUEUE_MAX_ITEMS - queue_count
+        # only update the icon in the playlist if it currently has one.
+        # this ensures the icon is only updated on tracks in a playlist,
+        # but not on any from the library
+        state = player.get_state()
+        if model[path][1] is not None and BlaPlaylistManager.active == self:
+            stock = None
+            if state == blaconst.STATE_PLAYING:
+                stock = gtk.STOCK_MEDIA_PLAY
+            elif state == blaconst.STATE_PAUSED:
+                stock = gtk.STOCK_MEDIA_PAUSE
+            model[path][1] = stock
 
-            selection = treeview.get_selection().get_selected_rows()[-1]
+        BlaQueue.update_queue_positions()
+
+    def update_queue_positions(self, items):
+        model = self.__treeview.get_model()
+        for identifier, positions in items:
+            try: model[self.get_path_from_id(identifier)][2] = positions
+            except ValueError: pass
+
+    def update_contents(self):
+        try: low, high = self.__treeview.get_visible_range()
+        except TypeError: pass
+        else:
             model = self.__treeview.get_model()
+            get_iter = model.get_iter
+            row_changed = model.row_changed
+            [row_changed(path, get_iter(path)) for path
+                    in xrange(low[0], high[0]+1)]
 
-            tracks = [model[p][0] for p in selection[:count]]
-            BlaQueue.queue_tracks(tracks, self)
+    def play_track(self, treeview, path, column=None):
+        model = self.__treeview.get_model()
 
-        def remove_from_queue(self, treeview):
-            selection = treeview.get_selection().get_selected_rows()[-1]
-            model = self.__treeview.get_model()
-            tracks = [model[p][0] for p in selection]
-            BlaQueue.remove_tracks(tracks, self)
+        if self.__current is not None:
+            try: model[self.get_path_from_id(self.__current)][1] = None
+            except TypeError: pass
+        identifier = self.get_id_from_path(path)
 
-        def jump_to_playing_track(self):
-            try:
-                if self.__current is None: raise KeyError
-                track = BlaPlaylist.uris[self.__current]
-                if track != player.get_track().uri: raise KeyError
-            except KeyError: return
-            self.set_row(self.get_path_from_id(self.__current))
+        order = blacfg.getint("general", "play.order")
+        if (order == blaconst.ORDER_SHUFFLE and
+            self.__current != identifier and self.__current is not None):
+            self.__history.add(identifier, blaconst.TRACK_NEXT)
+        self.__current = identifier
+        path = self.get_path_from_id(self.__current)
+        if blacfg.getboolean("general", "cursor.follows.playback"):
+            self.set_row(path)
+        track = BlaPlaylistManager.uris[self.__current]
 
-        def set_row(self, path, row_align=0.5, keep_selection=False,
-                set_cursor=True):
-            if not path: return
+        model[path][1] = gtk.STOCK_MEDIA_PLAY
+        BlaPlaylistManager.play_track(track, self)
 
-            selection = self.__treeview.get_selection()
-            if keep_selection:
-                selected_rows = selection.get_selected_rows()[-1]
-            else: selected_rows = []
+    def add_selection_to_playlist(self, playlist, move=False):
+        old_idx = BlaPlaylistManager.playlists.index(self)
+        queued_ids = [id_ for id_, playlist_idx in
+                      BlaQueue.get_queued_tracks(return_ids_only=True) if
+                      playlist_idx == old_idx]
 
-            try: low, high = self.__treeview.get_visible_range()
-            except TypeError: low, high = None, None
+        ids = self.get_tracks(remove=move)
+        if not ids:
+            return
 
-            if low is None or not (low <= path <= high):
-                self.__treeview.scroll_to_cell(
-                        path, use_align=True, row_align=row_align)
+        queued_ids = [id_ if id_ else None for id_ in ids]
 
-            if set_cursor:
-                gobject.idle_add(self.__treeview.set_cursor, path,
-                        priority=gobject.PRIORITY_HIGH)
-            if selected_rows:
-                def f():
-                    select_path = selection.select_path
-                    map(select_path, selected_rows)
-                    return False
-                gobject.idle_add(f)
+        uris = [BlaPlaylistManager.uris[identifier] for identifier in ids]
+        new_ids = playlist.add_tracks(uris=uris, select_rows=True)
 
-        def show_properties(self):
-            uris = [BlaPlaylist.uris[identifier] for identifier
-                    in self.get_tracks(remove=False)]
-            if uris: BlaTagedit(uris)
+        if move:
+            queued_ids = [e for e in zip(queued_ids, new_ids)
+                          if e[0] is not None]
+            BlaQueue.replace_ids(playlist, queued_ids)
 
-        def __repopulate_model(self, ids, selected_ids):
-            row_align, selected_ids, scroll_identifier = \
-                    self.__get_selection_and_row()
+        BlaPlaylistManager.focus_playlist(playlist)
 
-            # determine new playlist metadata for the statusbar and update the
-            # appropriate id lists
-            tracks = map(BlaPlaylist.get_track_from_id, ids)
-            self.__length = sum([track[LENGTH] for track in tracks])
-            self.__size = sum([track[FILESIZE] for track in tracks])
+    def deactivate(self, clear_history=True):
+        model = self.__treeview.get_model()
+        self.__treeview.get_selection().unselect_all()
+        try: model[self.get_path_from_id(self.__current)][1] = None
+        except TypeError: pass
+        if clear_history: self.__history.clear()
 
-            if self.__mode & MODE_FILTERED:
-                removed_ids = set(self.__tracks).difference(ids)
-                map(self.__tracks.remove, removed_ids)
-                if self.__mode & MODE_SORTED: self.__sorted = list(ids)
-            else:
-                removed_ids = set(self.__all_tracks).difference(ids)
-                if self.__mode & MODE_SORTED: self.__all_sorted = list(ids)
-            map(self.__all_tracks.remove, removed_ids)
+    def send_to_queue(self, treeview):
+        n_queued_tracks = BlaQueue.queue_n_tracks()
+        if n_queued_tracks >= blaconst.QUEUE_MAX_ITEMS: return
+        count = blaconst.QUEUE_MAX_ITEMS - n_queued_tracks
 
-            if self.__mode & MODE_SORTED or self.__sort_parameters:
-                # selection is handled in the sort method
-                selected_ids = None
-                try: self.sort(*self.__sort_parameters, scroll=True)
-                except TypeError: self.sort(-1, None)
-            else:
-                self.__freeze_treeview()
-                model = gtk.ListStore(*self.__layout)
-                append = model.append
-                [append([identifier, "", []]) for identifier in ids]
-                self.__treeview.set_model(model)
-                selected_ids = set(ids).intersection(selected_ids)
-                select_path = self.__treeview.get_selection().select_path
-                get_path_from_id = self.get_path_from_id
-                map(select_path, map(get_path_from_id, selected_ids))
-                self.__thaw_treeview()
+        selection = treeview.get_selection().get_selected_rows()[-1]
+        model = self.__treeview.get_model()
 
-            # update the statusbar and the state icon in the playlist
-            self.__set_selection_and_row(
-                    row_align, selected_ids, scroll_identifier)
-            self.update_state()
-            BlaPlaylist.update_statusbar()
+        tracks = [model[p][0] for p in selection[:count]]
+        BlaQueue.queue_tracks(tracks, self)
 
-        def __freeze_treeview(self):
-            self.__treeview.freeze_notify()
-            self.__treeview.freeze_child_notify()
-            return self.__treeview.get_model()
+    def remove_from_queue(self, treeview):
+        selection = treeview.get_selection().get_selected_rows()[-1]
+        model = self.__treeview.get_model()
+        tracks = [model[p][0] for p in selection]
+        BlaQueue.remove_tracks(tracks, self)
 
-        def __thaw_treeview(self):
-            self.__treeview.thaw_child_notify()
-            self.__treeview.thaw_notify()
+    def jump_to_playing_track(self):
+        try:
+            if self.__current is None: raise KeyError
+            track = BlaPlaylistManager.uris[self.__current]
+            if track != player.get_track().uri: raise KeyError
+        except KeyError: return
+        self.set_row(self.get_path_from_id(self.__current))
 
-        def __get_selection_and_row(self):
-            row_align = 0.0
-            selection = self.__treeview.get_selection()
+    def set_row(self, path, row_align=0.5, keep_selection=False,
+            set_cursor=True):
+        if not path: return
 
-            # get id of the row to scroll to
-            try:
-                identifier = self.get_id_from_path(
-                        selection.get_selected_rows()[-1][0])
-            except IndexError:
-                try:
-                    identifier = self.get_id_from_path(
-                            self.__treeview.get_visible_range()[0])
-                except (TypeError, IndexError): identifier = None
-            else:
-                column = self.__treeview.get_columns()[0]
-                height = self.__treeview.get_allocation().height
+        selection = self.__treeview.get_selection()
+        if keep_selection:
+            selected_rows = selection.get_selected_rows()[-1]
+        else: selected_rows = []
 
-                try:
-                    low, high = self.__treeview.get_visible_range()
-                    for path in selection.get_selected_rows()[-1]:
-                        if low <= path <= high: break
-                except TypeError: row_align = 0.5
-                else:
-                    row_align = (self.__treeview.get_cell_area(
-                            path, column)[1] / float(height))
+        try: low, high = self.__treeview.get_visible_range()
+        except TypeError: low, high = None, None
 
-            # get selected ids
-            try:
-                selected_ids = [self.get_id_from_path(p)
-                        for p in selection.get_selected_rows()[-1]]
-            except IndexError: selected_ids = None
+        if low is None or not (low <= path <= high):
+            self.__treeview.scroll_to_cell(
+                    path, use_align=True, row_align=row_align)
 
-            if not (0.0 <= row_align <= 1.0): row_align = 0.0
-
-            return row_align, selected_ids, identifier
-
-        def __set_selection_and_row(self, row_align, selected_ids, identifier):
-            model = self.__treeview.get_model()
-            selection = self.__treeview.get_selection()
-
-            # select rows
-            if selected_ids is not None:
-                paths = filter(
-                        None, map(self.get_path_from_id, selected_ids))
+        if set_cursor:
+            gobject.idle_add(self.__treeview.set_cursor, path,
+                    priority=gobject.PRIORITY_HIGH)
+        if selected_rows:
+            def f():
                 select_path = selection.select_path
-                map(select_path, paths)
+                map(select_path, selected_rows)
+                return False
+            gobject.idle_add(f)
 
-            # scroll to row
-            path = self.get_path_from_id(identifier)
-            if path and model.get_iter_first():
-                self.set_row(path, row_align=row_align, keep_selection=True,
-                        set_cursor=False)
+    def show_properties(self):
+        uris = [BlaPlaylistManager.uris[identifier] for identifier
+                in self.get_tracks(remove=False)]
+        if uris: BlaTagedit(uris)
 
-        def __filter_parameters_changed(self, entry):
-            if blacfg.getboolean("general", "search.after.timeout"):
-                try: gobject.source_remove(self.__fid)
-                except AttributeError: pass
-                def activate():
-                    self.__entry.activate()
-                    return False
-                self.__fid = gobject.timeout_add(500, activate)
+class BlaPlaylistManager(gtk.Notebook):
+    __gsignals__ = {
+        "play_track": blautil.signal(1),
+        "count_changed": blautil.signal(2)
+    }
 
-        def __filter(self, *args):
-            filter_string = self.__entry.get_text().strip()
+    __instance = None   # instance of BlaPlaylist needed for classmethods
 
-            row_align, selected_ids, scroll_identifier = \
-                    self.__get_selection_and_row()
+    playlists = []      # list of playlists (needed for the queue)
+    active = None       # reference to the currently active playlist
+    track_count = 0     # global counter used to define unique track ids
+    uris = {}           # mapping between track ids and uris
+    clipboard = []      # list of ids after a cut/copy operation
 
-            if filter_string:
-                self.__mode |= MODE_FILTERED
-                query = BlaQuery(filter_string,
-                                 self.__regexp_button.get_active()).query
-                self.__tracks = filter(query, self.__all_tracks)
-            else:
-                self.__mode ^= MODE_FILTERED
-                self.__tracks = list(self.__all_tracks)
-
-            if self.__mode & MODE_SORTED or self.__sort_parameters:
-                # selection is handled in the sort method
-                selected_ids = None
-                try: self.sort(*self.__sort_parameters, scroll=True)
-                except TypeError: self.sort(-1, None)
-            else:
-                model = self.__freeze_treeview()
-                model.clear()
-                append = model.append
-                [append([identifier, "", []]) for identifier in self.__tracks]
-                self.__thaw_treeview()
-
-            self.__set_selection_and_row(
-                    row_align, selected_ids, scroll_identifier)
-            self.update_state()
-            BlaPlaylist.update_statusbar()
-
-        def __drag_data_get(self, treeview, drag_context, selection_data, info,
-                time):
-            self.__paths = treeview.get_selection().get_selected_rows()[-1]
-            selection_data.set("tracks", 8, "")
-
-        def __drag_data_recv(self, treeview, drag_context, x, y,
-                selection_data, info, time):
-            treeview.grab_focus()
-            drop_info = treeview.get_dest_row_at_pos(x, y)
-
-            # DND from the library browser
-            if info == 0: data = pickle.loads(selection_data.data)
-
-            # in-playlist DND
-            elif info == 2:
-                if drop_info:
-                    path, pos = drop_info
-                    identifier = self.get_id_from_path(path)
-                    if path in self.__paths: return
-                moved_ids = self.get_tracks(paths=self.__paths, remove=True)
-                if drop_info:
-                    path = self.get_path_from_id(identifier)
-                    drop_info = (path, pos)
-                uris = [BlaPlaylist.uris[identifier]
-                        for identifier in moved_ids]
-                self.add_tracks(drop_info=drop_info, uris=(moved_ids, uris),
-                        select_rows=True)
-                self.update_state()
-                return
-
-            # DND from an external location or the filesystem browser
-            elif info in [1, 3]:
-                uris = selection_data.data.strip("\n\r\x00")
-                resolve_uri = blautil.resolve_uri
-                uris = map(resolve_uri, uris.split())
-                data = library.parse_ool_uris(uris)
-
-            # FIXME: if data is empty gtk issues an assertion warning
-
-            # if parsing didn't yield any tracks or the playlist was removed
-            # while parsing just return
-            if data and self in BlaPlaylist.pages:
-                self.add_tracks(data, select_rows=True,
-                        drop_info=treeview.get_dest_row_at_pos(x, y))
-
-        def __key_press_event(self, treeview, event):
-            is_accel = blagui.is_accel
-            accels = [
-                ("Delete", lambda: self.get_tracks(remove=True)),
-                ("Q", lambda: self.send_to_queue(self.__treeview)),
-                ("R", lambda: self.remove_from_queue(self.__treeview)),
-                ("Escape", self.disable_search),
-                ("<Alt>Return", self.show_properties)
-            ]
-            for accel, callback in accels:
-                if is_accel(event, accel):
-                    callback()
-                    break
-            return False
+    name = property(lambda self: "Playlists")
 
     def __init__(self):
-        super(BlaPlaylist, self).__init__()
+        super(BlaPlaylistManager, self).__init__()
         type(self).__instance = self
 
         self.set_scrollable(True)
         targets = [
             ("tracks/library", gtk.TARGET_SAME_APP, 0),
             ("tracks/filesystem", gtk.TARGET_SAME_APP, 1),
-            ("text/uri-list", 0, 3)
+            ("tracks/playlist", gtk.TARGET_SAME_APP, 2),
+            ("text/uri-list", gtk.TARGET_SAME_APP, 3)
+
         ]
-        self.drag_dest_set(gtk.DEST_DEFAULT_MOTION|gtk.DEST_DEFAULT_DROP,
-                targets, gtk.gdk.ACTION_COPY)
+        self.drag_dest_set(gtk.DEST_DEFAULT_MOTION | gtk.DEST_DEFAULT_DROP,
+                           targets, gtk.gdk.ACTION_COPY)
 
         # hook up signals
         self.connect("switch_page",
                 lambda *x: self.update_statusbar(self.get_nth_page(x[-1])))
         self.connect_object(
-                "page_reordered", BlaPlaylist.__page_reordered, self)
+                "page_reordered", BlaPlaylistManager.__page_reordered, self)
         self.connect("button_press_event", self.__button_press_event)
         self.connect("key_press_event", self.__key_press_event)
         self.connect("play_track", player.play_track)
-        self.connect_object(
-                "drag_data_received", BlaPlaylist.__drag_data_recv, self)
+        self.connect_object("drag_data_received",
+                            BlaPlaylistManager.__drag_data_recv, self)
 
         player.connect("state_changed", lambda *x: self.active.update_state())
         player.connect("get_track", self.get_track)
@@ -2094,22 +2157,39 @@ class BlaPlaylist(gtk.Notebook):
         self.save()
 
     def __drag_data_recv(self, drag_context, x, y, selection_data, info, time):
-        # TODO: accept DND from other playlists as well
+        uris = None
+        resolve = False
+        queued_ids = []
+
         if info == 0:
             uris = pickle.loads(selection_data.data)
             resolve = False
+
+        elif info == 2:
+            paths, old_idx = pickle.loads(selection_data.data)
+            queued_ids = [id_ for id_, playlist_idx in
+                          BlaQueue.get_queued_tracks(return_ids_only=True) if
+                          playlist_idx == old_idx]
+            playlist = self.playlists[old_idx]
+            moved_ids = playlist.get_tracks(paths=paths, remove=True)
+            queued_ids = [id_ if id_ else None for id_ in moved_ids]
+            uris = [BlaPlaylistManager.uris[identifier]
+                    for identifier in moved_ids]
+            resolve = False
+
         elif info in [1, 3]:
             uris = selection_data.data.strip("\n\r\x00")
             resolve_uri = blautil.resolve_uri
             uris = map(resolve_uri, uris.split())
             resolve = True
-        self.send_to_new_playlist("", uris, resolve=resolve)
+
+        self.send_to_new_playlist("", uris, resolve=resolve,
+                                  queued_ids=queued_ids)
 
     def __query_name(self, title, default=""):
-        diag = gtk.Dialog(title=title, buttons=(gtk.STOCK_CANCEL,
-                gtk.RESPONSE_CANCEL, gtk.STOCK_OK, gtk.RESPONSE_OK),
-                flags=gtk.DIALOG_DESTROY_WITH_PARENT|gtk.DIALOG_MODAL
-        )
+        diag = gtk.Dialog(title=title, flags=gtk.DIALOG_DESTROY_WITH_PARENT |
+                          gtk.DIALOG_MODAL, buttons=(gtk.STOCK_CANCEL,
+                          gtk.RESPONSE_CANCEL, gtk.STOCK_OK, gtk.RESPONSE_OK))
         diag.set_resizable(False)
 
         vbox = gtk.VBox(spacing=5)
@@ -2387,11 +2467,15 @@ class BlaPlaylist(gtk.Notebook):
         try:
             action, uris = blaplay.cli_queue
             blaplay.cli_queue = None
-        except TypeError: pass
+        except TypeError:
+            pass
         else:
-            if action == "append": f = BlaPlaylist.add_to_current_playlist
-            elif action == "new": f = BlaPlaylist.send_to_new_playlist
-            else: f = BlaPlaylist.send_to_current_playlist
+            if action == "append":
+                f = BlaPlaylistManager.add_to_current_playlist
+            elif action == "new":
+                f = BlaPlaylistManager.send_to_new_playlist
+            else:
+                f = BlaPlaylistManager.send_to_current_playlist
             f("", uris, resolve=True)
 
     @classmethod
@@ -2428,8 +2512,8 @@ class BlaPlaylist(gtk.Notebook):
 
                 if not list_name: list_name = "bla (%d)" % (len(indices)+1)
 
-        playlist = BlaPlaylist.Playlist()
-        BlaPlaylist.pages.append(playlist)
+        playlist = BlaPlaylist()
+        BlaPlaylistManager.playlists.append(playlist)
         page_num = cls.__instance.append_page(playlist, gtk.Label(list_name))
         cls.__instance.child_set_property(playlist, "reorderable", True)
 
@@ -2456,7 +2540,7 @@ class BlaPlaylist(gtk.Notebook):
 
         if page_num != -1:
             cls.__instance.remove_page(page_num)
-            BlaPlaylist.pages.remove(playlist)
+            BlaPlaylistManager.playlists.remove(playlist)
             playlist.destroy()
             del playlist
 
@@ -2531,18 +2615,21 @@ class BlaPlaylist(gtk.Notebook):
         force_view()
 
     @classmethod
-    def send_to_new_playlist(cls, name, uris, resolve=False):
-        if resolve: uris = library.parse_ool_uris(uris)
-        if not uris: return
+    def send_to_new_playlist(cls, name, uris, resolve=False, queued_ids=[]):
+        if resolve:
+            uris = library.parse_ool_uris(uris)
+        if not uris:
+            return
 
         playlist = cls.__instance.add_playlist(name=name, focus=True)
-        playlist.add_tracks(uris)
+        new_ids = playlist.add_tracks(uris)
+        queued_ids = [e for e in zip(queued_ids, new_ids) if e[0] is not None]
+        BlaQueue.replace_ids(playlist, queued_ids)
         force_view()
 
     @classmethod
     def update_statusbar(cls, playlist=None):
-        # this is called by BlaPlaylist.Playlist instances to make the playlist
-        # wrapper update the statusbar
+        # this is called by BlaPlaylist instances to update the statusbar
 
         if playlist is None: playlist = cls.get_current_playlist()
         try: count, size, length_seconds = playlist.get_playlist_info()
@@ -2557,11 +2644,11 @@ class BlaPlaylist(gtk.Notebook):
         # sort of a weird use of numpy, but since we depend on it anyway we
         # might as well use some of its nice matlab-inspired array manipulation
         # features
-        ids = BlaPlaylist.uris.keys()
-        old_uris = np.array(BlaPlaylist.uris.values())
+        ids = BlaPlaylistManager.uris.keys()
+        old_uris = np.array(BlaPlaylistManager.uris.values())
         for old_uri, new_uri in uris:
             old_uris[np.where(old_uris == old_uri)] = new_uri
-        BlaPlaylist.uris = dict(zip(ids, old_uris))
+        BlaPlaylistManager.uris = dict(zip(ids, old_uris))
 
     @classmethod
     def update_contents(cls):
@@ -2600,7 +2687,7 @@ class BlaPlaylist(gtk.Notebook):
                 self.play_from_playlist(track, playlist)
             else:
                 if self.active: self.active.deactivate()
-                try: uri = BlaPlaylist.uris[track]
+                try: uri = BlaPlaylistManager.uris[track]
                 except KeyError:
                     if isinstance(track, str): uri = track
                     else: raise ValueError("Invalid identifier: %r" % track)
@@ -2622,8 +2709,8 @@ class BlaPlaylist(gtk.Notebook):
             cls.active.jump_to_playing_track()
 
     def __page_reordered(self, page, page_num):
-        BlaPlaylist.pages.remove(page)
-        BlaPlaylist.pages.insert(page_num, page)
+        BlaPlaylistManager.playlists.remove(page)
+        BlaPlaylistManager.playlists.insert(page_num, page)
 
     def __button_press_event(self, notebook, event):
         for child in notebook.get_children():
@@ -2639,15 +2726,13 @@ class BlaPlaylist(gtk.Notebook):
             y_max = y0 + y + h + 2 * yp
 
             if (event.x_root >= x_min and event.x_root <= x_max and
-                    event.y_root >= y_min and event.y_root <= y_max):
+                event.y_root >= y_min and event.y_root <= y_max):
                 if (event.button == 2 and
-                        not event.type == gtk.gdk._2BUTTON_PRESS and
-                        not event.type == gtk.gdk._3BUTTON_PRESS):
+                    not event.type == gtk.gdk._2BUTTON_PRESS and
+                    not event.type == gtk.gdk._3BUTTON_PRESS):
                     self.remove_playlist(child)
-
                 elif event.button == 3:
                     self.__open_popup(child, event.button, event.time)
-
                 return False
 
         if ((event.button == 2 and

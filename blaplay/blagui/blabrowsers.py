@@ -32,7 +32,7 @@ import blaplay
 library = blaplay.bla.library
 from blaplay.blacore import blaconst, blacfg
 from blaplay import blautil, blagui
-from blaplaylist import BlaPlaylist, BlaQueue
+from blaplaylist import BlaPlaylistManager, BlaQueue
 from blavisualization import BlaVisualization
 from blatagedit import BlaTagedit
 from blaplay.blagui import blaguiutils
@@ -143,7 +143,7 @@ class BlaTreeView(blaguiutils.BlaTreeViewBase):
         self.connect_object("popup", BlaTreeView.__popup_menu, self)
 
     def __send_to_queue(self):
-        count = blaconst.QUEUE_MAX_ITEMS - BlaQueue.get_queue_count()
+        count = blaconst.QUEUE_MAX_ITEMS - BlaQueue.queue_n_tracks()
         tracks = self.get_tracks(count=count)
         BlaQueue.queue_tracks(tracks, None)
 
@@ -194,11 +194,11 @@ class BlaTreeView(blaguiutils.BlaTreeViewBase):
             tracks = self.get_tracks()
 
             if action == blaconst.ACTION_SEND_TO_CURRENT:
-                f = BlaPlaylist.send_to_current_playlist
+                f = BlaPlaylistManager.send_to_current_playlist
             elif action == blaconst.ACTION_ADD_TO_CURRENT:
-                f = BlaPlaylist.add_to_current_playlist
+                f = BlaPlaylistManager.add_to_current_playlist
             elif action == blaconst.ACTION_SEND_TO_NEW:
-                f = BlaPlaylist.send_to_new_playlist
+                f = BlaPlaylistManager.send_to_new_playlist
             f(name, tracks)
 
         return False
@@ -238,11 +238,11 @@ class BlaTreeView(blaguiutils.BlaTreeViewBase):
         tracks = self.get_tracks()
 
         if action == blaconst.ACTION_SEND_TO_CURRENT:
-            f = BlaPlaylist.send_to_current_playlist
+            f = BlaPlaylistManager.send_to_current_playlist
         elif action == blaconst.ACTION_ADD_TO_CURRENT:
-            f = BlaPlaylist.add_to_current_playlist
+            f = BlaPlaylistManager.add_to_current_playlist
         elif action == blaconst.ACTION_SEND_TO_CURRENT:
-            f = BlaPlaylist.send_to_new_playlist
+            f = BlaPlaylistManager.send_to_new_playlist
         f(name, tracks)
 
         return False
@@ -268,10 +268,10 @@ class BlaTreeView(blaguiutils.BlaTreeViewBase):
 
         items = [
             ("Send to current playlist", None,
-                    BlaPlaylist.send_to_current_playlist, True),
+                    BlaPlaylistManager.send_to_current_playlist, True),
             ("Add to current playlist", None,
-                    BlaPlaylist.add_to_current_playlist, True),
-            ("Send to new playlist", None, BlaPlaylist.send_to_new_playlist,
+                    BlaPlaylistManager.add_to_current_playlist, True),
+            ("Send to new playlist", None, BlaPlaylistManager.send_to_new_playlist,
                     True),
             None
         ]
@@ -418,7 +418,7 @@ class BlaLibraryBrowser(gtk.VBox):
     def __drag_data_get(self, drag_context, selection_data, info, timestamp):
         data = self.__treeview.get_tracks()
         data = pickle.dumps(data, protocol=pickle.HIGHEST_PROTOCOL)
-        selection_data.set("tracks", 8, data)
+        selection_data.set("", 8, data)
 
     def __row_collapsed(self, treeview, iterator, path):
         try: self.__expanded_rows.remove(path)
@@ -433,7 +433,7 @@ class BlaLibraryBrowser(gtk.VBox):
         if not path in self.__expanded_rows: self.__expanded_rows.append(path)
 
     def __update_library_contents(self, library, model):
-        print_i("Updating library browser")
+        print_d("Updating library browser")
         self.__expanded_rows = []
         self.__model = model
         self.__update_treeview()
