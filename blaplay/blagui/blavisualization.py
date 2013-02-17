@@ -28,15 +28,16 @@ visualizations.init()
 
 
 class BlaVisualization(gtk.DrawingArea):
-    __tid = -1
-    __rate = 35
+    __tid = __tid2 = -1
+    __rate = 35 # frames per second
 
     def __init__(self, viewport):
+        super(BlaVisualization, self).__init__()
+
+        type(self).__instance = self
         self.__viewport = viewport
         self.__viewport.connect_object("button_press_event",
                 BlaVisualization.__button_press_event, self)
-        super(BlaVisualization, self).__init__()
-        type(self).__instance = self
 
         player.connect("track_changed", self.flush_buffers)
         player.connect("seek", self.flush_buffers)
@@ -53,6 +54,7 @@ class BlaVisualization(gtk.DrawingArea):
         try: player.disconnect(self.__cid)
         except AttributeError: pass
         gobject.source_remove(self.__tid)
+        gobject.source_remove(self.__tid2)
         try: del self.__module
         except AttributeError: pass
         self.__module = None
@@ -61,13 +63,15 @@ class BlaVisualization(gtk.DrawingArea):
         # the callback for the CheckMenuItem's activate signal only fires if
         # the value actually changes
         blagui.uimanager.get_widget(
-                "/Menu/View/Visualization").set_active(False)
+            "/Menu/View/Visualization").set_active(False)
 
     def __initialize_module(self, identifier, quiet=False):
         try:
+            # TODO: move these checks to the visualizations initialization code
             # get module class and check if necessary attributes are present
             module = visualizations.modules[identifier]
-            for method in ["set_width", "new_buffer", "flush_buffers", "draw"]:
+            for method in ["set_width", "new_buffer", "consume_buffer",
+                           "flush_buffers", "draw"]:
                 method = getattr(module, method)
                 if not callable(method): raise AttributeError
             if not hasattr(module, "height"): raise AttributeError
@@ -81,8 +85,11 @@ class BlaVisualization(gtk.DrawingArea):
             self.__module = module()
             self.__module.set_width(self.get_allocation().width)
             self.set_size_request(-1, self.__module.height)
-            try: player.disconnect(self.__cid)
-            except AttributeError: pass
+            try:
+                if player.handler_is_connected(self.__cid):
+                    player.disconnect(self.__cid)
+            except AttributeError:
+                pass
             self.__viewport.set_visible(True)
             self.__cid = player.connect_object(
                     "new_buffer", module.new_buffer, self.__module)
@@ -93,11 +100,13 @@ class BlaVisualization(gtk.DrawingArea):
             self.queue_draw()
             return True
         gobject.source_remove(self.__tid)
-        self.__tid = gobject.timeout_add(int(1000/self.__rate), queue_draw)
+        self.__tid = gobject.timeout_add(int(1000 / self.__rate), queue_draw)
+        self.__tid2 = gobject.timeout_add(int(1000 / self.__rate),
+                                          self.__module.consume_buffer)
 
     def __button_press_event(self, event):
         if (event.button != 3 or event.type in [gtk.gdk._2BUTTON_PRESS,
-                gtk.gdk._3BUTTON_PRESS]):
+                                                gtk.gdk._3BUTTON_PRESS]):
             return False
 
         def activate(item, identifier):

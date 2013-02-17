@@ -30,6 +30,9 @@ from time import time
 import ctypes
 import ctypes.util
 
+from time import time
+time_ = -1
+
 import gtk
 import gst
 import cairo
@@ -45,6 +48,7 @@ cdef extern from "math.h":
     float logf(float)
     float log10f(float)
     float expf(float)
+    float cosf(float)
     float powf(float, float)
     float ceilf(float)
     float floorf(float)
@@ -97,12 +101,12 @@ except IOError:
             "This may take a moment...")
 
 
-cdef np.ndarray[f32_t, ndim=1] gauss_window(int n):
+cdef np.ndarray[f32_t, ndim=1] get_window(int n):
     cdef int i
     cdef float sigma = 0.4, c = (n-1) / 2.0
     cdef np.ndarray[dtype=f32_t, ndim=1] window = np.zeros(n, dtype=f32)
     for i in xrange(n):
-        window[i] = expf(-0.5 * powf((i - c) / (sigma * c), 2.0))
+        window[i] = 0.54 - 0.46 * cosf(2 * np.pi * i / (n - 1))
     return window
 
 cdef inline float cubic_interpolate(float y0, float y1, float y2, float y3,
@@ -135,6 +139,7 @@ cdef class Spectrum(object):
     cdef int __bands
     cdef fftwf_plan __plan
     cdef np.ndarray __window
+    cdef np.ndarray __np_buf
     cdef float *__in, *__buf, *__old, *__log_freq
     cdef fftwf_complex *__out
 
@@ -145,6 +150,8 @@ cdef class Spectrum(object):
     cdef object __color_highlight
     cdef object __color_bg
     cdef object __gradient
+
+    cdef int __counter
 
     def __cinit__(self):
         self.__in = NULL
@@ -164,8 +171,10 @@ cdef class Spectrum(object):
         self.__margin = self.__padding / 2
 
         # get window and scale it such that it doesn't change the signal power
-        self.__window = gauss_window(NFFT)
+        self.__window = get_window(NFFT)
         self.__window *= 0.5 * powf(NFFT / np.sum(self.__window ** 2), 0.5)
+
+        self.__np_buf = np.zeros(NFFT * 2, f32)
 
         cdef int i
         self.__adapter = gst.Adapter()
@@ -265,8 +274,14 @@ cdef class Spectrum(object):
 
     @cython.boundscheck(False)
     cpdef new_buffer(self, object buf):
+#        st = buf.get_caps()
+#        print st
+#        st = st.get_structure(0)
+#        print st
+#        print st["rate"]
         # buffers are added and consumed in different threads so we need to
         # protect modifications of the GstAdapter as it's not thread-safe
+
         cdef int l
         with self.__lock:
 #            self.__adapter.flush(self.__adapter.available())
@@ -275,15 +290,34 @@ cdef class Spectrum(object):
             self.__adapter.push(buf)
 
     @cython.boundscheck(False)
+    cpdef consume_buffer(self):
+        global time_
+        self.__counter += 1
+        time_t = time()
+        if time_t > time_ + 1.0:
+#            print "fps: %.2f" % (self.__counter / (time_t - time_))
+            time_ = time_t
+            self.__counter = 0
+
+        with self.__lock:
+            if self.__adapter.available() > 0:
+                # 44100 / 35 = 1260
+                self.__np_buf = np.frombuffer(self.__adapter.take_buffer(min(
+                        self.__adapter.available(), 1260 * 2 * 4)), dtype=f32)
+            else:
+                self.__np_buf = np.zeros(NFFT * 2, f32)
+        return True
+
+    @cython.boundscheck(False)
     cpdef flush_buffers(self):
-        with self.__lock: self.__adapter.flush(self.__adapter.available())
+        with self.__lock:
+            self.__adapter.flush(self.__adapter.available())
 
     @cython.cdivision(True)
     @cython.boundscheck(False)
     cpdef draw(self, object cr, object pc, object style):
-        # attribute look-ups on the instance make the following loops
-        # cripplingly slow. therefore we just assign everything to local
-        # variables
+        # Attribute look-ups in "hot" loops below make the following section
+        # very slow. To remedy this we just assign everything to locals.
         cdef int i, l
         cdef int bands = self.__bands
         cdef float *buf = self.__buf, *in_ = self.__in, *old_ = self.__old
@@ -294,16 +328,17 @@ cdef class Spectrum(object):
         cdef float offset = OFFSET
 
         # get buffers from the adapter
-        cdef np.ndarray[f32_t, ndim=1] np_buf
-        with self.__lock:
-            if self.__adapter.available() > 0:
-                # 44100 / 35 = 1260
-                np_buf = np.frombuffer(self.__adapter.take_buffer(min(
-                        self.__adapter.available(), 1260 * 2 * 4)), dtype=f32)
-            else: np_buf = np.zeros(NFFT * 2, f32)
+#        cdef np.ndarray[f32_t, ndim=1] np_buf
+#        with self.__lock:
+#            if self.__adapter.available() > 0:
+#                # 44100 / 35 = 1260
+#                np_buf = np.frombuffer(self.__adapter.take_buffer(min(
+#                        self.__adapter.available(), 1260 * 2 * 4)), dtype=f32)
+#            else: np_buf = np.zeros(NFFT * 2, f32)
 
-        _buf = <float*> np_buf.data
-        l = min(len(np_buf), NFFT * 2)
+        with self.__lock:
+            _buf = <float*> self.__np_buf.data
+        l = min(len(self.__np_buf), NFFT * 2)
         for i in xrange(l, NFFT * 2): buf[i-l] = buf[i]
         for i in xrange(l): buf[NFFT * 2 - l + i] = _buf[i]
 
