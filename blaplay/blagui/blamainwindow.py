@@ -17,6 +17,7 @@
 
 import os
 
+import gobject
 import gtk
 
 import blaplay
@@ -44,6 +45,14 @@ class BlaMainWindow(blaguiutils.BlaBaseWindow):
         gtk.window_set_default_icon_name(blaconst.APPNAME)
         self.set_resizable(True)
         self.connect("delete_event", self.__delete_event)
+        def button_press_hook(receiver, event):
+            if event.button == 8:
+                player.previous()
+            elif event.button == 9:
+                player.next()
+            return True
+        gobject.add_emission_hook(self, "button_press_event",
+                                  button_press_hook)
         self.enable_tracking(is_main_window=True)
 
         # mainmenu
