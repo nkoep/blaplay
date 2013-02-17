@@ -45,7 +45,7 @@ def init_signals():
     # startup
     r, w = os.pipe()
     gobject.io_add_watch(r, gobject.IO_IN, main_quit)
-    for sig in (signal.SIGTERM, signal.SIGINT):
+    for sig in (signal.SIGTERM, signal.SIGINT, signal.SIGHUP):
         signal.signal(sig, lambda *x: os.write(w, "bla"))
 
 def parse_args():
@@ -101,8 +101,8 @@ def init_logging(args):
     logging.basicConfig(format=format_, level=level)
 
     colors = [
-        (logging.INFO, "34"), (logging.DEBUG, "35"),
-        (logging.WARNING, "32"), (logging.CRITICAL, "31")
+        (logging.INFO, "32"), (logging.DEBUG, "34"),
+        (logging.WARNING, "35"), (logging.CRITICAL, "31")
     ]
     for level, color in colors:
         logging.addLevelName(level, "\033[1;%sm%s\033[1;m"
