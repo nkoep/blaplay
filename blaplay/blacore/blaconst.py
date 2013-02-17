@@ -20,7 +20,7 @@ import os
 VERSION = "0.1"
 APPNAME = "blaplay"
 COMMENT = "A bla that plays"
-WEB = "https://nkoep.github.com/blaplay"
+WEB = "http://nkoep.github.com/blaplay"
 AUTHOR = "Niklas Koep"
 AUTHORS = sorted([
     AUTHOR
@@ -43,6 +43,7 @@ EVENTS = os.path.join(CACHEDIR, "events")
 CFG_PATH = os.path.join(USERDIR, "config")
 PIDFILE = os.path.join(USERDIR, "pid")
 LIBRARY_PATH = os.path.join(USERDIR, "library")
+OOL_PATH = os.path.join(USERDIR, "ool")
 PLAYLISTS_PATH = os.path.join(USERDIR, "playlists")
 METADATA_PATH = os.path.join(USERDIR, "metadata")
 SCROBBLES_PATH = os.path.join(USERDIR, "scrobbles")
@@ -137,13 +138,13 @@ MENU_PLAYLISTS = map(lambda entry: "/Menu/%s" % entry,
         ["File/AddFiles", "File/AddDirectories", "File/SavePlaylist",
          "Edit/NewPlaylistFrom", "Edit/Search", "View/PlaylistTabs",
          "View/JumpToPlayingTrack"]
-         + map(lambda entry: "Edit/Select/Select%s" % entry,
-         ["All", "ByArtist", "ByAlbum", "ByAlbumArtist", "ByGenre"])
 )
 MENU_EDIT = map(lambda entry: "/Menu/Edit/%s" % entry,
         ["Paste", "Clear", "Select", "Select/SelectAll",
          "Select/SelectComplement", "Selection/Cut", "Selection/Copy",
          "Selection/Remove", "RemoveDuplicates", "RemoveInvalidTracks"]
+         + map(lambda entry: "Select/Select%s" % entry,
+         ["All", "ByArtist", "ByAlbum", "ByAlbumArtist", "ByGenre"])
 )
 MENU_ORDER = map(lambda entry: "/Menu/PlayOrder/%s" % entry,
         ["OrderNormal", "OrderRepeat", "OrderShuffle"])

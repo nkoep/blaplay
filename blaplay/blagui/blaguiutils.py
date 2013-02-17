@@ -19,8 +19,8 @@ import gtk
 import gobject
 
 import blaplay
-from blaplay import blautil
 from blaplay.blacore import blaconst, blacfg
+from blaplay import blautil
 
 PADDING_X, PADDING_Y, PADDING_WIDTH, PADDING_HEIGHT = -2, 0, 4, 0
 
@@ -68,6 +68,7 @@ def set_visible(state):
     else: f = gtk.Window.hide
     map(f, BlaWindow.instances)
 
+
 class BlaScrolledWindow(gtk.ScrolledWindow):
     def __init__(self):
         super(BlaScrolledWindow, self).__init__()
@@ -81,9 +82,9 @@ class BlaCellRendererBase(gtk.GenericCellRenderer):
     def update_colors(self):
         self._text_color = blacfg.getstring("colors", "text")
         self._active_text_color = blacfg.getstring(
-                "colors", "active.text")
+            "colors", "active.text")
         self._selected_row_color = blacfg.getstring(
-                "colors", "selected.rows")
+            "colors", "selected.rows")
         self._background_color = blacfg.getstring("colors", "background")
 
     def do_set_property(self, prop, value):
@@ -347,7 +348,6 @@ class BlaTreeViewBase(gtk.TreeView):
         else: check_expander = False
         if not self.__accept_button_event(column, path, event, check_expander):
             unselect_all(selection)
-            return True
 
         self.grab_focus()
         if event.button in [1, 2]:
@@ -356,23 +356,20 @@ class BlaTreeViewBase(gtk.TreeView):
                     (gtk.gdk.CONTROL_MASK | gtk.gdk.SHIFT_MASK)))):
                 self.__pending_event = [x, y]
                 selection.set_select_function(lambda *args: False)
+                return False
             elif event.type == gtk.gdk.BUTTON_PRESS:
                 if self.__allow_no_selection:
                     self.__pending_event = None
                     selection.set_select_function(lambda *args: True)
-                elif (selection.path_is_selected(path) and
-                        selection.count_selected_rows() == 1 and
-                        event.state & gtk.gdk.CONTROL_MASK):
-                    return True
+                    return False
 
         elif event.button == 3:
             if not selection.path_is_selected(path):
                 self.set_cursor(path, column, 0)
             else: column.focus_cell(column.get_cell_renderers()[0])
             self.emit("popup", event)
-            return True
 
-        else: return True
+        return True
 
     def __button_release_event(self, event):
         if self.__pending_event:

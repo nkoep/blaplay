@@ -245,10 +245,9 @@ class BlaPreferences(blaguiutils.BlaUniqueWindow):
                 cb.connect("changed", cb_changed, key)
                 comboboxes.append(cb)
 
-            widgets = ([restrictto_entry, exclude_entry] +
-                    comboboxes)
+            widgets = [restrictto_entry, exclude_entry] + comboboxes
             labels = ["Restrict to", "Exclude", "Double-click", "Middle-click",
-                    "Return"]
+                      "Return"]
 
             action_table = gtk.Table(rows=len(labels), columns=2,
                     homogeneous=False)

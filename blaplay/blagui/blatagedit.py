@@ -308,7 +308,7 @@ class BlaTagedit(blaguiutils.BlaWindow):
         self.__pb.set_visible(False)
         blaplay.bla.window.update_title()
         from blaplay.blagui.blaplaylist import BlaPlaylistManager
-        BlaPlaylistManager.update_contents()
+        BlaPlaylistManager.invalidate_visible_rows()
         if ns["update_library"]: library.update_library()
         succeeded = ns["succeeded"]
         l = len(self.__tracks)

@@ -21,6 +21,7 @@ locale.setlocale(locale.LC_ALL, "")
 import shutil
 import time
 import re
+import threading
 import Queue
 import multiprocessing
 
@@ -51,7 +52,7 @@ def update_library():
     global pending_save
     library.update_library()
     pending_save = False
-    BlaPlaylistManager.update_contents()
+    BlaPlaylistManager.invalidate_visible_rows()
     return False
 
 
@@ -149,7 +150,9 @@ class BlaLibraryMonitor(gobject.GObject):
             EVENT_MOVED: "EVENT_MOVED"
         }
 
+        global BlaPlaylistManager
         tid = -1
+
         while True:
             event, path_from, path_to = self.__queue.get(block=True)
             print_d("New event of type `%s' for file %s (%r)" %
@@ -158,6 +161,9 @@ class BlaLibraryMonitor(gobject.GObject):
             update_track = library.update_track
             update = True
             gobject.source_remove(tid)
+
+            if BlaPlaylistManager is None:
+                from blaplay.blagui.blaplaylist import BlaPlaylistManager
 
             if event == EVENT_CREATED:
                 if path_from in BlaLibraryMonitor.ignore:
@@ -208,17 +214,17 @@ class BlaLibraryMonitor(gobject.GObject):
                     self.remove_directories(path_from)
 
             else: # event == EVENT_MOVED
-                uris = []
+                uris = {}
                 if os.path.isfile(path_to):
                     library.move_track(path_from, path_to)
-                    uris.append((path_from, path_to))
+                    uris[path_from] = path_to
                 else:
                     for uri in library:
                         if uri.startswith(path_from):
                             new_path = os.path.join(
                                     path_to, uri[len(path_from)+1:])
                             library.move_track(uri, new_path)
-                            uris.append((uri, new_path))
+                            uris[uri] = new_path
 
                     self.remove_directories(path_from)
                     self.add_directory(path_to)
@@ -249,7 +255,8 @@ class BlaLibraryMonitor(gobject.GObject):
                 directories = list(
                         discover(directories, directories_only=True))
                 conn.send(directories)
-            except KeyboardInterrupt: pass
+            except KeyboardInterrupt:
+                pass
 
         conn1, conn2 = multiprocessing.Pipe(duplex=False)
         p = multiprocessing.Process(
@@ -319,7 +326,6 @@ class BlaLibrary(gobject.GObject):
     __tracks = {}
     __tracks_ool = {}
     __playlists = []
-    __queue = []
     __lock = blautil.BlaLock(strict=True)
 
     class BlaLibraryModel(object):
@@ -329,6 +335,10 @@ class BlaLibrary(gobject.GObject):
         #        synthesizing nodes on row expansion? this could suffer from
         #        performance issues. one way to fix it might be pushing the
         #        tree creation to cpython using cython
+
+        # TODO: move this to blabrowser. it really doesn't make much sense to
+        #       create the model in the library context as the model should
+        #       only make sense to anything gtk related anyway
 
         __layout = [
             gobject.TYPE_STRING,    # uri
@@ -401,8 +411,8 @@ class BlaLibrary(gobject.GObject):
             except ValueError: label = ""
             try: label += "%02d. " % int(track[TRACK].split("/")[0])
             except ValueError: pass
-            artist = (track[ALBUM_ARTIST] or track[ARTIST] or
-                    track[PERFORMER] or track[COMPOSER])
+            artist = (track[ALBUM_ARTIST] or track[PERFORMER] or
+                      track[ARTIST] or track[COMPOSER])
             if track[ARTIST] and artist != track[ARTIST]:
                 label += "%s - " % track[ARTIST]
             return "%s%s" % (label, track[TITLE] or track.basename)
@@ -448,6 +458,7 @@ class BlaLibrary(gobject.GObject):
     def __init__(self):
         super(BlaLibrary, self).__init__()
 
+        # TODO: init formats when importing the module
         global library, extensions
         library = self
 
@@ -458,35 +469,40 @@ class BlaLibrary(gobject.GObject):
 
         # restore the library
         tracks = blautil.deserialize_from_file(blaconst.LIBRARY_PATH)
-        if tracks is not None: self.__tracks = tracks
-        else: blacfg.set("library", "directories", "")
+        if tracks is None:
+            blacfg.set("library", "directories", "")
+        else:
+            self.__tracks = tracks
 
-        self.__monitored_directories = map(os.path.realpath,
-                blacfg.getdotliststr("library", "directories"))
-
-        # restore playlists and OOL tracks
-        try:
-            self.__tracks_ool, self.__playlists, self.__queue = \
-                    blautil.deserialize_from_file(blaconst.PLAYLISTS_PATH)
-        except TypeError: pass
+        # restore ool tracks
+        tracks = blautil.deserialize_from_file(blaconst.OOL_PATH)
+        if tracks is not None:
+            self.__tracks_ool = tracks
 
         print_d("Restoring library: %d tracks in the library, %d additional "
                 "tracks" % (len(self.__tracks), len(self.__tracks_ool)))
 
+        self.__monitored_directories = map(os.path.realpath,
+                blacfg.getdotliststr("library", "directories"))
+
+        @blautil.idle
         def initialized(library_monitor, directories):
-            p = self.__detect_changes(directories)
-            gobject.idle_add(p.next)
+            if blacfg.getboolean("library", "update.on.startup"):
+                p = self.__detect_changes(directories)
+                gobject.idle_add(p.next)
+                # TODO: this seems more efficient
+#                for md in self.__monitored_directories:
+#                    self.scan_directory(md)
             self.__library_monitor.disconnect(cid)
         self.__library_monitor = BlaLibraryMonitor()
-        if blacfg.getboolean("library", "update.on.startup"):
-            cid = self.__library_monitor.connect("initialized", initialized)
+        cid = self.__library_monitor.connect("initialized", initialized)
         self.__library_monitor.update_directories()
 
         blaplay.bla.register_for_cleanup(self)
 
     def __call__(self):
+        print_i("Saving pending library changes")
         if pending_save:
-            print_i("Saving pending library changes")
             self.__save_library()
 
     def __getitem__(self, key):
@@ -506,7 +522,29 @@ class BlaLibrary(gobject.GObject):
     def next(self):
         for uri in self.__tracks.keys(): yield uri
 
+    def __save_library(self):
+        # Pickling a large dict causes quite an increase in memory use as the
+        # module basically creates an exact copy of the object in memory. To
+        # combat the problem we offload the serialization of the library to
+        # another process. We join the process in a separate thread to avoid
+        # that the process turns into a zombie process after it terminates.
+        # If the process itself is spawned from a thread this seems to deadlock
+        # occasionally.
+        p = multiprocessing.Process(
+            target=blautil.serialize_to_file,
+            args=(self.__tracks, blaconst.LIBRARY_PATH))
+        p.start()
+
+        @blautil.thread_nondaemonic
+        def join():
+            p.join()
+        join()
+
     def __detect_changes(self, directories):
+        # FIXME: this is insanely slow
+
+        # TODO: looks like it's faster to just rescan all monitored directories
+
         # this method does not perform any write operations on files. it
         # merely updates our metadata of tracks in directories we're monitoring
         yield_interval = 25
@@ -579,16 +617,6 @@ class BlaLibrary(gobject.GObject):
             filt = lambda s: restrict_re.match(s) and not exclude_re.match(s)
         else: filt = restrict_re.match
         return filt
-
-    @blautil.thread_nondaemonic
-    def __save_library(self):
-        # this thread spawns a new process which then writes the library to
-        # disk. we start it in a thread so we can join the process to avoid
-        # that it turns into a zombie process after it finishes execution
-        p = multiprocessing.Process(target=blautil.serialize_to_file,
-                args=(self.__tracks, blaconst.LIBRARY_PATH))
-        p.start()
-        p.join()
 
     def add_tracks(self, uris):
         count = 0
@@ -688,46 +716,36 @@ class BlaLibrary(gobject.GObject):
         )
         self.emit("update_library_browser", model)
 
-        # pickling a large dict causes quite an increase in memory use as the
-        # module basically creates an exact copy of the object in RAM. to
-        # combat the problem we offload the serialization of the library to
-        # another process
         self.__save_library()
         self.__monitored_directories = map(os.path.realpath,
                 blacfg.getdotliststr("library", "directories"))
         return False
 
-    def get_playlists(self):
-        # FIXME: do we have to import this here?
-        global BlaPlaylistManager
-        from blaplay.blagui.blaplaylist import BlaPlaylistManager
+    def save_ool_tracks(self, uris):
+        print_d("Saving out-of-library tracks")
 
-        return self.__playlists, self.__queue
-
-    def save_playlists(self, playlists, queue):
-        def remove_track_ool(uri): self.__tracks_ool.pop(uri, None)
-
-        # create a set of all OOL uris. then we take the difference between
-        # this set and the set of URIs for each playlist. the remainder will be
-        # a set of URIs that weren't referenced in any playlist so we just
-        # remove them
+        # We create a set of all OOL uris. Then we take the difference between
+        # this set and the set of URIs for each playlist. The remainder will be
+        # a set of URIs that weren't referenced by any playlist so we just get
+        # rid of them.
         ool_uris = set(self.__tracks_ool.keys())
-        for playlist in playlists:
-            ool_uris.difference_update(set(playlist[-1]))
-        map(remove_track_ool, ool_uris)
+        for uri in ool_uris.difference(uris):
+            self.__tracks_ool.pop(uri)
 
-        blautil.serialize_to_file(
-                (self.__tracks_ool, playlists, queue), blaconst.PLAYLISTS_PATH)
+        p = multiprocessing.Process(
+            target=blautil.serialize_to_file,
+            args=(self.__tracks_ool, blaconst.OOL_PATH))
+        p.start()
+
+        @blautil.thread_nondaemonic
+        def join():
+            p.join()
+        join()
 
     def parse_ool_uris(self, uris):
-        # FIXME: the performance of the application suffers quite a bit from
-        #        these controlled mainloops. it would be nice if parsing could
-        #        be done in a separate process. the problem is that moving
-        #        contents in the library won't work as a process only gets a
-        #        copy of the library. we would have to replace self once the
-        #        process returns or we could retrieve the updated track dicts
+        # FIXME: move this to a separate process maybe?
 
-        def process(ns, uris, pb):
+        def process(namespace, uris, pb):
             # update every 40 ms (25 fps)
             tid = gobject.timeout_add(40, pb.pulse)
 
@@ -759,20 +777,20 @@ class BlaLibrary(gobject.GObject):
                 except KeyError:
                     track = get_track(uri)
                     self.__tracks_ool[uri] = track
-                if track: ns["uris"].append(uri)
+                if track: namespace["uris"].append(uri)
 
             pb.set_fraction(1.0)
             pb.hide()
             pb.destroy()
-            ns["wait"] = False
-            ns["done"] = True
+            namespace["wait"] = False
+            namespace["done"] = True
             yield False
 
-        def cancel(ns): ns["wait"] = False
+        def cancel(namespace): namespace["wait"] = False
         pb = BlaProgress(title="Scanning files...")
-        pb.connect("destroy", lambda *x: cancel(ns))
-        ns = {"uris": [], "wait": True, "done": False}
-        p = process(ns, uris, pb)
+        pb.connect("destroy", lambda *x: cancel(namespace))
+        namespace = {"uris": [], "wait": True, "done": False}
+        p = process(namespace, uris, pb)
         gobject.idle_add(p.next)
 
         # FIXME: gtk.main_iteration() always returns True when it's called
@@ -781,9 +799,9 @@ class BlaLibrary(gobject.GObject):
 
         # this guarantees that we don't return before all URIs have been
         # checked, but normal event-processing still commences
-        while ns["wait"]:
+        while namespace["wait"]:
             if gtk.events_pending() and gtk.main_iteration(): return
-        return ns["uris"] if ns["done"] else None
+        return namespace["uris"] if namespace["done"] else None
 
     def scan_directory(self, directory):
         def scan(directory):
@@ -802,7 +820,7 @@ class BlaLibrary(gobject.GObject):
                 if self.__aborted:
                     self.emit("progress", "abort")
                     self.__currently_scanning = None
-                    ns["wait"] = False
+                    namespace["wait"] = False
                     yield False
                 yield True
 
@@ -815,7 +833,7 @@ class BlaLibrary(gobject.GObject):
                 if self.__aborted:
                     self.emit("progress", "abort")
                     self.__currently_scanning = None
-                    ns["wait"] = False
+                    namespace["wait"] = False
                     yield False
 
                 try: track = self.__tracks[path]
@@ -838,7 +856,7 @@ class BlaLibrary(gobject.GObject):
             print_d("Finished parsing of %d files after %.2f seconds"
                     % (len(files), (time.time() - t)))
 
-            ns["wait"] = False
+            namespace["wait"] = False
             self.__currently_scanning = None
             yield False
 
@@ -848,12 +866,12 @@ class BlaLibrary(gobject.GObject):
                 try: directory = self.__scan_queue.pop(0)
                 except IndexError: break
 
-                ns = {"wait": True}
+                namespace = {"wait": True}
                 directory = os.path.realpath(directory)
                 self.__currently_scanning = directory
                 p = scan(directory)
                 gobject.idle_add(p.next)
-                while ns["wait"]:
+                while namespace["wait"]:
                     if gtk.events_pending() and gtk.main_iteration(): return
 
     @blautil.thread

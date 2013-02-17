@@ -143,9 +143,9 @@ class BlaTreeView(blaguiutils.BlaTreeViewBase):
         self.connect_object("popup", BlaTreeView.__popup_menu, self)
 
     def __send_to_queue(self):
-        count = blaconst.QUEUE_MAX_ITEMS - BlaQueue.queue_n_tracks()
+        count = blaconst.QUEUE_MAX_ITEMS - BlaQueue.queue_n_items()
         tracks = self.get_tracks(count=count)
-        BlaQueue.queue_tracks(tracks, None)
+        BlaQueue.queue_items(tracks)
 
     def get_tracks(self, count=-1):
         def get_children(model, iterator):
@@ -189,17 +189,17 @@ class BlaTreeView(blaguiutils.BlaTreeViewBase):
             action = blacfg.getint("library", "return.action")
 
             selections = self.get_selection().get_selected_rows()[-1]
-            if not selections: return True
+            if not selections:
+                return True
             name = self.get_model()[selections[0]][2]
             tracks = self.get_tracks()
 
             if action == blaconst.ACTION_SEND_TO_CURRENT:
-                f = BlaPlaylistManager.send_to_current_playlist
+                BlaPlaylistManager.send_to_current_playlist(tracks)
             elif action == blaconst.ACTION_ADD_TO_CURRENT:
-                f = BlaPlaylistManager.add_to_current_playlist
+                BlaPlaylistManager.add_to_current_playlist(tracks)
             elif action == blaconst.ACTION_SEND_TO_NEW:
-                f = BlaPlaylistManager.send_to_new_playlist
-            f(name, tracks)
+                BlaPlaylistManager.send_to_new_playlist(tracks, name)
 
         return False
 
@@ -238,12 +238,11 @@ class BlaTreeView(blaguiutils.BlaTreeViewBase):
         tracks = self.get_tracks()
 
         if action == blaconst.ACTION_SEND_TO_CURRENT:
-            f = BlaPlaylistManager.send_to_current_playlist
+            BlaPlaylistManager.send_to_current_playlist(tracks)
         elif action == blaconst.ACTION_ADD_TO_CURRENT:
-            f = BlaPlaylistManager.add_to_current_playlist
-        elif action == blaconst.ACTION_SEND_TO_CURRENT:
-            f = BlaPlaylistManager.send_to_new_playlist
-        f(name, tracks)
+            BlaPlaylistManager.add_to_current_playlist(tracks)
+        elif action == blaconst.ACTION_SEND_TO_NEW:
+            BlaPlaylistManager.send_to_new_playlist(tracks, name)
 
         return False
 
@@ -253,7 +252,8 @@ class BlaTreeView(blaguiutils.BlaTreeViewBase):
         except TypeError: return
 
         if self.__browser_id == blaconst.BROWSER_FILESYSTEM:
-            dirname = lambda s: s if os.path.isdir(s) else os.path.dirname(s)
+            def dirname(s):
+                return s if os.path.isdir(s) else os.path.dirname(s)
             resolve = True
         else:
             dirname = os.path.dirname
@@ -264,26 +264,30 @@ class BlaTreeView(blaguiutils.BlaTreeViewBase):
         directory = list(set(map(dirname, tracks)))
         if len(directory) == 1 and os.path.isdir(directory[0]):
             directory = directory[0]
-        else: directory = None
+        else:
+            directory = None
 
         items = [
             ("Send to current playlist", None,
-                    BlaPlaylistManager.send_to_current_playlist, True),
+             lambda *x: BlaPlaylistManager.send_to_current_playlist(
+                 tracks, resolve), True),
             ("Add to current playlist", None,
-                    BlaPlaylistManager.add_to_current_playlist, True),
-            ("Send to new playlist", None, BlaPlaylistManager.send_to_new_playlist,
-                    True),
+             lambda *x: BlaPlaylistManager.add_to_current_playlist(
+                 tracks, resolve), True),
+            ("Send to new playlist", None,
+             lambda *x: BlaPlaylistManager.send_to_new_playlist(
+                 tracks, name, resolve), True),
             None
         ]
         if self.__browser_id == blaconst.BROWSER_LIBRARY:
-            items.extend([
-                ("Add to playback queue", "Q", lambda *x:
-                        self.__send_to_queue(), True),
-                ("Open containing directory", None, lambda *x:
-                        blautil.open_directory(directory), bool(directory)),
-                None,
-                ("Properties", "<Alt>Return", lambda *x:
-                        BlaTagedit(tracks) if tracks else True, True)
+            items.extend(
+                [("Add to playback queue", "Q",
+                  lambda *x: self.__send_to_queue(), True),
+                 ("Open containing directory", None, lambda *x:
+                  blautil.open_directory(directory), bool(directory)),
+                 None,
+                 ("Properties", "<Alt>Return",
+                  lambda *x: BlaTagedit(tracks) if tracks else True, True)
             ])
         else:
             items.extend([("Open containing directory", None, lambda *x:
@@ -291,16 +295,17 @@ class BlaTreeView(blaguiutils.BlaTreeViewBase):
 
         menu = gtk.Menu()
         for item in items:
-            if item is None: m = gtk.SeparatorMenuItem()
+            if item is None:
+                m = gtk.SeparatorMenuItem()
             else:
                 label, accel, callback, sensitive = item
                 m = gtk.MenuItem(label)
                 if accel is not None:
                     mod, key = gtk.accelerator_parse(accel)
-                    m.add_accelerator("activate",
-                            blagui.accelgroup, mod, key, gtk.ACCEL_VISIBLE)
-                m.connect("activate",
-                        lambda x, c=callback: c(name, tracks, resolve))
+                    m.add_accelerator("activate", blagui.accelgroup, mod, key,
+                                      gtk.ACCEL_VISIBLE)
+                # FIXME: not all methods have the same signature anymore
+                m.connect("activate", callback)
                 m.set_sensitive(sensitive)
             menu.append(m)
 
