@@ -38,16 +38,20 @@ class BlaTrack(dict):
         return self.items()
 
     def __setstate__(self, state):
-        for item, value in state: self[item] = value
+        for item, value in state:
+            self[item] = value
 
     def __delitem__(self, key):
         # tags that are specifically removed in the tag editor are removed and
         # then added to a special set that we check when writing tags to file.
         # by default, if we have a key in our dict with an empty value we just
         # ignore the tag instead of deleting it
-        try: dict.__delitem__(self, key)
-        except KeyError: pass
-        if not hasattr(self, "_deleted_tags"): self._deleted_tags = set()
+        try:
+            dict.__delitem__(self, key)
+        except KeyError:
+            pass
+        if not hasattr(self, "_deleted_tags"):
+            self._deleted_tags = set()
         self._deleted_tags.add(key)
 
     def __getitem__(self, key):
@@ -55,12 +59,16 @@ class BlaTrack(dict):
         # a tag which might have been constructed from multiple values. for
         # actually writing tags back to a file the `get()' method should be
         # used
-        try: item = dict.__getitem__(self, key)
-        except KeyError: return ""
         try:
-            if not isinstance(item, list): raise IndexError
+            item = dict.__getitem__(self, key)
+        except KeyError:
+            return ""
+        try:
+            if not isinstance(item, list):
+                raise IndexError
             return item[0]
-        except IndexError: return item
+        except IndexError:
+            return item
 
     def _parse_info(self, info):
         self[SAMPLING_RATE] = info.sample_rate
@@ -69,20 +77,28 @@ class BlaTrack(dict):
         # bitrate attributes
         try:
             self[BITRATE] = info.bitrate
-        except AttributeError: self[BITRATE] = 0
+        except AttributeError:
+            self[BITRATE] = 0
 
-        try: mode = info.mode
+        try:
+            mode = info.mode
         except AttributeError:
             channels = info.channels
-            if channels == 0: mode = channels = ""
-            else: mode = "Mono" if channels == 1 else "Stereo"
+            if channels == 0:
+                mode = channels = ""
+            else:
+                mode = "Mono" if channels == 1 else "Stereo"
         else:
             # MPEGInfo has a mode attribute to specify the number of channels
             channels = 2 if 0 <= mode <= 2 else 1
-            if mode == 0: mode = "Stereo"
-            elif mode == 1: mode = "Joint-stereo"
-            elif mode == 2: mode = "Dual channel"
-            else: mode = "Mono" # mode == 3
+            if mode == 0:
+                mode = "Stereo"
+            elif mode == 1:
+                mode = "Joint-stereo"
+            elif mode == 2:
+                mode = "Dual channel"
+            else: # mode == 3
+                mode = "Mono"
 
         self[CHANNELS] = channels
         self[CHANNEL_MODE] = mode
@@ -107,23 +123,25 @@ class BlaTrack(dict):
         return list(set(self.keys()).difference(xrange(N_IDENTIFIERS)))
 
     def get_cover_basepath(self):
-        if "" in [self[ARTIST], self[ALBUM]]: return ""
-        base = "%s-%s" % (self[ARTIST].replace(" ", "_"),
-                self[ALBUM].replace(" ", "_"))
+        if "" in [self[ARTIST], self[ALBUM]]:
+            return ""
+        base = "%s-%s" % (
+            self[ARTIST].replace(" ", "_"), self[ALBUM].replace(" ", "_"))
         base = base.replace("/", "_")
         return os.path.join(blaconst.COVERS, base)
 
     def get_lyrics_key(self):
-        if "" in [self[ARTIST], self[TITLE]]: return ""
+        if "" in [self[ARTIST], self[TITLE]]:
+            return ""
         lyrics_key = "%s-%s" % (
-                self[ARTIST].replace(" ", "_").replace("/", "_"),
-                self[TITLE].replace(" ", "_").replace("/", "_")
-        )
+            self[ARTIST].replace(" ", "_").replace("/", "_"),
+            self[TITLE].replace(" ", "_").replace("/", "_"))
         return lyrics_key
 
     def get_filesize(self, short=False):
         filesize = "%.2f MB" % float(self[FILESIZE] / (1024. ** 2))
-        if not short: filesize += " (%d bytes)" % self[FILESIZE]
+        if not short:
+            filesize += " (%d bytes)" % self[FILESIZE]
         return filesize
 
     @property
@@ -132,11 +150,19 @@ class BlaTrack(dict):
         h, x = divmod(m, 60)
         return "%d:%02d:%02d" % (h, m, s) if h else "%d:%02d" % (m, s)
 
-    uri = property(lambda self: self[URI])
-    basename = property(lambda self: os.path.basename(
-            blautil.toss_extension(self.uri)))
-    bitrate = property(lambda self: "%d kbps" % (self[BITRATE] / 1000)
-            if self[BITRATE] else "")
-    sampling_rate = property(lambda self: "%d Hz" % self[SAMPLING_RATE]
-            if self[SAMPLING_RATE] else "")
+    @property
+    def uri(self):
+        return self[URI]
+
+    @property
+    def basename(self):
+        return os.path.basename(blautil.toss_extension(self.uri))
+
+    @property
+    def bitrate(self):
+        return "%d kbps" % (self[BITRATE] / 1000) if self[BITRATE] else ""
+
+    @property
+    def sampling_rate(self):
+        return "%d Hz" % self[SAMPLING_RATE] if self[SAMPLING_RATE] else ""
 

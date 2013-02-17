@@ -58,6 +58,7 @@ def thread_nondaemonic(f):
         return t
     return wrapper
 
+# TODO: add optional argument to adjust the priority
 def idle(f):
     @functools.wraps(f)
     def wrapper(*args):
@@ -123,7 +124,8 @@ def open_with_filehandler(f, msg):
 
 def discover(d, directories_only=False):
     checked_directories = []
-    if not hasattr(d, "__iter__"): d = [d]
+    if not hasattr(d, "__iter__"):
+        d = [d]
 
     realpath = os.path.realpath
     walk = os.walk
@@ -226,8 +228,8 @@ class BlaThread(Thread):
     handled by threading.Thread. However, instead of suppressing exceptions
     from daemon threads on interpreter shutdown the Thread class tries to
     reconstruct the backtrace of the exception and prints it to stderr (which
-    we can't catch). Those are (almost) always AttributeError exceptions caused
-    by accessing a member of the globals dict which gets wiped clean by CPython
+    we can't catch). Those are (almost surely) AttributeError exceptions caused
+    by accessing a member of a globals() dict which gets wiped clean by CPython
     on shutdown.
     """
 
@@ -266,7 +268,8 @@ class BlaThread(Thread):
                 BlaThread.__threads.remove(self)
                 raise SystemExit
             return self.__localtrace
-        except AttributeError: raise#SystemExit
+        except AttributeError:
+            raise SystemExit
 
 class BlaOrderedSet(collections.MutableSet):
     """

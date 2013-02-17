@@ -1,6 +1,3 @@
-0.1:
-- add DND support from playlists/browsers to other applications
-
 0.2:
 - add acoustid support
 - add video support
@@ -25,6 +22,7 @@
 - test if it's feasible to drop the mutagen dependency in favor of
   GstDiscoverer/GstTagSetter. mutagen is currently the only module we use that
   is not available for py3k yet
+- add customizable paned view to playlists
 
 0.3+:
 - restore closed playlists

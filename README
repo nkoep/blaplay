@@ -17,13 +17,13 @@ conventions we only list Debian package names.
 Build dependencies:
     * python-dev (>= 2.6)
     * Cython (>= 0.15.1)
-    * python-numpy
     * libfftw3-dev (>= 3.2.2)
 
 Runtime dependencies:
     * python (>= 2.6)
     * python-gtk2 (>= 2.22)
     * python-gst0.10
+    * python-numpy
     * python-mutagen (>= 1.19)
     * python-gobject (>= 2.21)
     * libfftw3-3 (>= 3.2.2)
@@ -49,9 +49,9 @@ and run it, simply issue
   $ ./setup.py install
   $ blaplay
 
-Note that the first line of script executables now reads:
+Note that the shebang of script executables reads:
 #!/usr/bin/env python2
-This conforms to the way Arch Linux treats different Python versions nowadays:
-python2 is symlinked to either python2.6 or python2.7, whereas python
-symlinks to python3.
+This conforms to the way Arch Linux (among others) treats different Python
+versions nowadays: python2 is symlinked to either python2.6 or python2.7,
+whereas python symlinks to python3.
 
