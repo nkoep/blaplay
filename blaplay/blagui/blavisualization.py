@@ -23,8 +23,6 @@ from blaplay.blacore import blaconst, blacfg
 from blaplay import blautil, blagui, visualizations
 from blaplay.blagui import blaguiutils
 
-visualizations.init()
-
 
 class BlaVisualization(gtk.DrawingArea):
     __tid = __tid2 = -1
@@ -35,50 +33,51 @@ class BlaVisualization(gtk.DrawingArea):
 
         type(self).__instance = self
         self.__viewport = viewport
-        self.__viewport.connect_object("button_press_event",
-                BlaVisualization.__button_press_event, self)
+        self.__viewport.connect_object(
+            "button_press_event", BlaVisualization.__button_press_event,
+            self)
 
         player.connect("track_changed", self.flush_buffers)
         player.connect("seek", self.flush_buffers)
         self.connect("expose_event", self.__expose)
         def size_allocate(drawingarea, allocation):
-            try: self.__module.set_width(allocation.width)
-            except AttributeError: pass
+            try:
+                self.__module.set_width(allocation.width)
+            except AttributeError:
+                pass
         self.connect("size_allocate", size_allocate)
         self.set_visibility(blacfg.getboolean("general", "show.visualization"),
-                quiet=True)
+                            quiet=True)
         self.show_all()
 
     def __disable(self):
-        try: player.disconnect(self.__cid)
-        except AttributeError: pass
-        gobject.source_remove(self.__tid)
-        gobject.source_remove(self.__tid2)
-        try: del self.__module
-        except AttributeError: pass
+        try:
+            player.disconnect(self.__cid)
+        except AttributeError:
+            pass
+        map(gobject.source_remove, [self.__tid, self.__tid2])
+        try:
+            del self.__module
+        except AttributeError:
+            pass
+
         self.__module = None
         self.__viewport.set_visible(False)
-        # set the menu item to inactive. this will not create circular calls as
+
+        # Set the menu item to inactive. This will not create circular calls as
         # the callback for the CheckMenuItem's activate signal only fires if
-        # the value actually changes
+        # the value actually changes.
         blagui.uimanager.get_widget(
             "/Menu/View/Visualization").set_active(False)
 
     def __initialize_module(self, identifier, quiet=False):
         try:
-            # TODO: move these checks to the visualizations initialization code
-            # get module class and check if necessary attributes are present
             module = visualizations.modules[identifier]
-            for method in ["set_width", "new_buffer", "consume_buffer",
-                           "flush_buffers", "draw"]:
-                method = getattr(module, method)
-                if not callable(method): raise AttributeError
-            if not hasattr(module, "height"): raise AttributeError
-        except (KeyError, AttributeError):
-            if not visualizations.modules: msg = "No visualizations available."
-            else:
-                msg = "Failed to initialize \"%s\" visualization." % identifier
-            if not quiet: blaguiutils.error_dialog(msg)
+        except KeyError:
+            if not visualizations.modules:
+                msg = "No visualizations available."
+                if not quiet:
+                    blaguiutils.error_dialog(msg)
             self.__disable()
         else:
             self.__module = module()
@@ -91,7 +90,7 @@ class BlaVisualization(gtk.DrawingArea):
                 pass
             self.__viewport.set_visible(True)
             self.__cid = player.connect_object(
-                    "new_buffer", module.new_buffer, self.__module)
+                "new_buffer", module.new_buffer, self.__module)
             self.__set_timer()
 
     def __set_timer(self):
@@ -120,43 +119,43 @@ class BlaVisualization(gtk.DrawingArea):
             m.set_draw_as_radio(True)
             m.connect("activate", activate, module)
             menu.append(m)
-            if module == identifier: m.set_active(True)
+            if module == identifier:
+                m.set_active(True)
 
         menu.show_all()
         menu.popup(None, None, None, event.button, event.time)
 
     def __expose(self, drawingarea, event):
-        # FIXME: we need to make sure that buffers are only extracted from the
-        #        adapter when the "expose_event" callback actually fired due to
-        #        the queue_draw call in our timer callback. otherwise we'll
-        #        prematurely consume buffers when we deiconify the mainwindow,
-        #        etc.
-
-        # this callback does not fire if the main window is hidden which means
+        # This callback does not fire if the main window is hidden which means
         # that nothing is actually calculated in a visualization element which
-        # saves some CPU time. this is not the case if the window is just
-        # obscured by another one
+        # saves some CPU time. This is not the case if the window is just
+        # obscured by another one.
         self.__module.draw(self.window.cairo_create(),
-                self.get_pango_context(), self.get_style())
+                           self.get_pango_context(), self.get_style())
 
     @classmethod
     def flush_buffers(cls, *args):
         # FIXME: remove this method and every call to it once the buffering
         #        issue of the visualization base class has been worked out
-        try: cls.__instance.__module.flush_buffers()
-        except AttributeError: pass
+        try:
+            cls.__instance.__module.flush_buffers()
+        except AttributeError:
+            pass
 
     @classmethod
     def set_visibility(cls, state, quiet=False):
         blacfg.setboolean("general", "show.visualization", state)
-        if not state: return cls.__instance.__disable()
+        if not state:
+            return cls.__instance.__disable()
 
         identifier = blacfg.getstring("general", "visualization")
         if not identifier:
             try:
                 identifier = sorted(
-                        visualizations.modules.keys(), key=str.lower)[0]
+                    visualizations.modules.keys(), key=str.lower)[0]
+            except IndexError:
+                pass
+            else:
                 blacfg.set("general", "visualization", identifier)
-            except IndexError: pass
         cls.__instance.__initialize_module(identifier, quiet=quiet)
 
