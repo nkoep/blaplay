@@ -83,6 +83,8 @@ class BlaMainWindow(blaguiutils.BlaBaseWindow):
             ("Quit", gtk.STOCK_QUIT, "_Quit", "<Ctrl>Q", "", self.quit),
             ("Paste", None, "Paste", None, "", BlaView.paste),
             ("Clear", None, "_Clear", None, "", BlaView.clear),
+            ("LockUnlockPlaylist", None, "Lock/Unlock playlist", None, "",
+             BlaPlaylistManager.toggle_lock_playlist),
             ("SelectAll", None, "All", None, "",
              lambda *x: BlaView.select(blaconst.SELECT_ALL)),
             ("SelectComplement", None, "Complement", None, "",

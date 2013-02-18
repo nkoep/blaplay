@@ -1099,10 +1099,14 @@ class BlaPlaylist(gtk.VBox):
                 return self.__model.get_iter((path[0]-1,))
             return None
 
-    def __init__(self, name=""):
+    def __init__(self, name="bla"):
         super(BlaPlaylist, self).__init__()
 
-        self.name_ = name
+        self.__name = gtk.HBox()
+        self.__name.pack_start(gtk.Label(name))
+        self.__name.show_all()
+
+        self.__lock = blautil.BlaLock()
 
         self.__history = BlaPlaylist.History(self)
         self.__mode = MODE_NORMAL
@@ -1176,7 +1180,8 @@ class BlaPlaylist(gtk.VBox):
 
     def __getstate__(self):
         state = {
-            "name": self.name_,
+            "name": self.__name.children()[0].get_text(),
+            "locked": self.__lock.locked(),
             "all_items": self.__all_items,
             "items": self.__items,
             "all_sorted": self.__all_sorted,
@@ -1189,7 +1194,11 @@ class BlaPlaylist(gtk.VBox):
         return state
 
     def __setstate__(self, state):
-        self.name_ = state.get("name", "")
+        name = state.get("name", "")
+        if name:
+            self.set_name(name)
+        if state.get("locked", False):
+            self.toggle_lock()
         self.__all_items = state.get("all_items", [])
         self.__items = state.get("items", [])
         self.__all_sorted = state.get("all_sorted", [])
@@ -1364,7 +1373,7 @@ class BlaPlaylist(gtk.VBox):
 
     def __drag_data_recv(self, treeview, drag_context, x, y, selection_data,
                          info, time):
-        if not self.item_insertion_allowed():
+        if not self.modification_allowed():
             return
 
         data = None
@@ -1425,19 +1434,30 @@ class BlaPlaylist(gtk.VBox):
                 break
         return False
 
-    def item_insertion_allowed(self, check_filter_state=True):
-        # TODO: add check for locked state of the playlist
-        if check_filter_state and self.__mode & MODE_FILTERED:
-            msg = "Modification of a filtered playlist is not supported."
-        else:
-            msg = ""
+    def get_name(self, as_text=False):
+        if not as_text:
+            return self.__name
+        return self.__name.children()[0].get_text()
 
-        if msg:
+    def set_name(self, name):
+        self.__name.children()[0].set_text(name)
+
+    def modification_allowed(self, check_filter_state=True):
+        if self.__lock.locked():
+            text = "The playlist is locked"
+            secondary_text = "Unlock it first to modify its contents."
+        elif check_filter_state and self.__mode & MODE_FILTERED:
+            text = "Error"
+            secondary_text = "Cannot modify filtered playlists."
+        else:
+            text = secondary_text = ""
+
+        if text and secondary_text:
             # Opening an error dialog after a double-click onto a row in the
             # library browser has a weird effect in that the treeview will
             # initiate a DND operation of the row once the dialog is destroyed.
             # Handling the dialog with gobject.idle_add resolves the issue.
-            gobject.idle_add(blaguiutils.error_dialog, "Error", msg)
+            gobject.idle_add(blaguiutils.error_dialog, text, secondary_text)
             return False
         return True
 
@@ -1706,6 +1726,9 @@ class BlaPlaylist(gtk.VBox):
             [item.track[FILESIZE] for item in items])
 
     def get_items(self, remove=False, paths=None):
+        if remove and not self.modification_allowed():
+            return []
+
         items = []
 
         # if paths is not given return the selected rows
@@ -1824,6 +1847,30 @@ class BlaPlaylist(gtk.VBox):
         self.__treeview.set_sensitive(False)
         p = remove_invalid_tracks()
         gobject.idle_add(p.next)
+
+    def toggle_lock(self):
+        if self.__lock.locked():
+            self.__lock.release()
+            self.__name.remove(self.__name.children()[-1])
+        else:
+            self.__lock.acquire()
+
+            # Create a lock image and resize it so it fits the text size.
+            label = self.__name.children()[0]
+            width, height = label.create_pango_layout(
+                label.get_text()).get_pixel_size()
+            pixbuf = self.render_icon(
+                gtk.STOCK_DIALOG_AUTHENTICATION, gtk.ICON_SIZE_MENU)
+            pixbuf = pixbuf.scale_simple(
+                width, height, gtk.gdk.INTERP_BILINEAR)
+            image = gtk.image_new_from_pixbuf(pixbuf)
+            self.__name.pack_start(image)
+            self.__name.show_all()
+
+        BlaPlaylistManager.update_lock_button_state()
+
+    def locked(self):
+        return self.__lock.locked()
 
     def enable_search(self):
         self.__entry.grab_focus()
@@ -2018,7 +2065,7 @@ class BlaPlaylist(gtk.VBox):
         BlaPlaylistManager.play_item(item)
 
     def add_selection_to_playlist(self, playlist, move):
-        if not playlist.item_insertion_allowed():
+        if not playlist.modification_allowed():
             return
 
         items = self.get_items(remove=move)
@@ -2111,19 +2158,34 @@ class BlaPlaylistManager(gtk.Notebook):
             ("tracks/filesystem", gtk.TARGET_SAME_APP, 1),
             ("tracks/playlist", gtk.TARGET_SAME_APP, 2),
             ("text/uri-list", gtk.TARGET_SAME_APP, 3)
-
         ]
         self.drag_dest_set(gtk.DEST_DEFAULT_MOTION | gtk.DEST_DEFAULT_DROP,
                            targets, gtk.gdk.ACTION_COPY)
+
+        # lock/unlock playlist
+        self.__lock_button = gtk.Button()
+        self.__lock_button.set_relief(gtk.RELIEF_NONE)
+        self.__lock_button.set_focus_on_click(False)
+        self.__lock_button.add(
+            gtk.image_new_from_stock(gtk.STOCK_DIALOG_AUTHENTICATION,
+            gtk.ICON_SIZE_MENU))
+        style = gtk.RcStyle()
+        style.xthickness = style.ythickness = 0
+        self.__lock_button.modify_style(style)
+        self.__lock_button.connect("clicked", self.toggle_lock_playlist)
+        self.__lock_button.show_all()
+        self.set_action_widget(self.__lock_button, gtk.PACK_END)
 
         def page_num_changed(*args):
             self.emit("count_changed", blaconst.VIEW_PLAYLISTS,
                       self.get_n_pages())
         self.connect("page_added", page_num_changed)
         self.connect("page_removed", page_num_changed)
-        self.connect(
-            "switch_page",
-            lambda *x: self.update_statusbar(self.get_nth_page(x[-1])))
+        def switch_page(*args):
+            playlist = self.get_nth_page(args[-1])
+            self.update_lock_button_state()
+            self.update_statusbar(playlist)
+        self.connect_after("switch_page", switch_page)
 
         self.connect("button_press_event", self.__button_press_event)
         self.connect("key_press_event", self.__key_press_event)
@@ -2257,11 +2319,10 @@ class BlaPlaylistManager(gtk.Notebook):
         return name
 
     def __rename_playlist(self, playlist):
-        label = self.get_tab_label(playlist)
-        new_name = self.__query_name("Rename playlist", label.get_text())
+        name = playlist.get_name(as_text=True)
+        new_name = self.__query_name("Rename playlist", name)
         if new_name:
-            label.set_text(new_name)
-            playlist.name_ = new_name
+            playlist.set_name(new_name)
 
     def __open_popup(self, playlist, button, time, all_options=True):
         menu = gtk.Menu()
@@ -2280,6 +2341,17 @@ class BlaPlaylistManager(gtk.Notebook):
             menu.append(m)
 
         menu.append(gtk.SeparatorMenuItem())
+
+        try:
+            label = "%s playlist" % ("Unlock" if playlist.locked() else "Lock")
+        except AttributeError:
+            pass
+        else:
+            m = gtk.MenuItem(label)
+            m.connect("activate", lambda *x: playlist.toggle_lock())
+            menu.append(m)
+
+            menu.append(gtk.SeparatorMenuItem())
 
         m = gtk.MenuItem("Add new playlist...")
         m.connect("activate",
@@ -2418,6 +2490,15 @@ class BlaPlaylistManager(gtk.Notebook):
         return name, uris
 
     @classmethod
+    def update_lock_button_state(cls):
+        playlist = cls.get_current_playlist()
+        try:
+            label = "%s playlist" % ("Unlock" if playlist.locked() else "Lock")
+        except AttributeError:
+            return
+        cls.__instance.__lock_button.set_tooltip_text(label)
+
+    @classmethod
     def get_active_playlist(cls):
         try:
             playlist = cls.current.playlist
@@ -2516,7 +2597,7 @@ class BlaPlaylistManager(gtk.Notebook):
             self.add_playlist()
         else:
             for playlist in playlists:
-                self.append_page(playlist, gtk.Label(playlist.name_))
+                self.append_page(playlist, playlist.get_name())
 
             if active_playlist is not None:
                 self.set_current_page(active_playlist)
@@ -2552,7 +2633,7 @@ class BlaPlaylistManager(gtk.Notebook):
             indices = set()
             r = re.compile(r"(^bla \()([0-9]+)\)")
             for playlist in cls.__instance:
-                label = cls.__instance.get_tab_label_text(playlist)
+                label = playlist.get_name(as_text=True)
 
                 if label == "bla":
                     indices.add(0)
@@ -2577,8 +2658,7 @@ class BlaPlaylistManager(gtk.Notebook):
                 list_name += " (%d)" % idx
 
         playlist = BlaPlaylist(list_name)
-        page_num = cls.__instance.append_page(
-            playlist, gtk.Label(playlist.name_))
+        page_num = cls.__instance.append_page(playlist, playlist.get_name())
         cls.__instance.child_set_property(playlist, "reorderable", True)
 
         if focus:
@@ -2604,6 +2684,8 @@ class BlaPlaylistManager(gtk.Notebook):
 
     @classmethod
     def remove_playlist(cls, playlist):
+        if not playlist.modification_allowed(check_filter_state=False):
+            return
         if not playlist:
             return False
 
@@ -2642,7 +2724,7 @@ class BlaPlaylistManager(gtk.Notebook):
     @classmethod
     def paste(cls, *args, **kwargs):
         playlist = cls.get_current_playlist()
-        if not playlist.item_insertion_allowed():
+        if not playlist.modification_allowed():
             return
         playlist.add_items(items=cls.clipboard, drop_info=-1, select_rows=True)
 
@@ -2654,6 +2736,11 @@ class BlaPlaylistManager(gtk.Notebook):
     @classmethod
     def clear(cls, *args):
         cls.get_current_playlist().clear()
+
+    @classmethod
+    def toggle_lock_playlist(cls, *args):
+        playlist = cls.get_current_playlist()
+        playlist.toggle_lock()
 
     @classmethod
     def new_playlist(cls, type_):
@@ -2670,7 +2757,8 @@ class BlaPlaylistManager(gtk.Notebook):
     @classmethod
     def send_to_current_playlist(cls, uris, resolve=False):
         playlist = cls.get_current_playlist()
-        playlist.item_insertion_allowed(check_filter_state=False)
+        if not playlist.modification_allowed(check_filter_state=False):
+            return
 
         if resolve:
             uris = library.parse_ool_uris(uris)
@@ -2692,7 +2780,7 @@ class BlaPlaylistManager(gtk.Notebook):
     @classmethod
     def add_to_current_playlist(cls, uris, resolve=False):
         playlist = cls.get_current_playlist()
-        if not playlist.item_insertion_allowed():
+        if not playlist.modification_allowed():
             return
 
         if resolve:

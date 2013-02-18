@@ -194,15 +194,17 @@ class BlaLock(object):
     strict=True.
     """
 
-    def __init__(self, strict=False):
+    def __init__(self, strict=False, blocking=True):
         self.__strict = strict
+        self.__blocking = blocking
         self.__lock = Lock()
 
     def acquire(self):
-        self.__lock.acquire()
+        self.__lock.acquire(self.__blocking)
 
     def release(self):
-        try: self.__lock.release()
+        try:
+            self.__lock.release()
         except ThreadError:
             if self.__strict: raise
 

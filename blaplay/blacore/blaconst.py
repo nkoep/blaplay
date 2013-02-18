@@ -26,7 +26,7 @@ AUTHORS = sorted([
     AUTHOR
 ])
 EMAIL = "niklas.koep@gmail.com"
-COPYRIGHT = "Copyright © 2012 %s\n<%s>" % (AUTHOR, EMAIL)
+COPYRIGHT = "Copyright © 2012-2013 %s\n<%s>" % (AUTHOR, EMAIL)
 CFG_TIMEOUT = 30
 
 # dirs
@@ -81,6 +81,7 @@ MENU = """
             <menu action="Edit">
                 <menuitem action="Paste"/>
                 <menuitem action="Clear"/>
+                <menuitem action="LockUnlockPlaylist"/>
                 <menu action="Select">
                     <menuitem action="SelectAll"/>
                     <menuitem action="SelectComplement"/>
@@ -136,8 +137,8 @@ MENU = """
 """
 MENU_PLAYLISTS = map(lambda entry: "/Menu/%s" % entry,
         ["File/AddFiles", "File/AddDirectories", "File/SavePlaylist",
-         "Edit/NewPlaylistFrom", "Edit/Search", "View/PlaylistTabs",
-         "View/JumpToPlayingTrack"]
+         "Edit/LockUnlockPlaylist", "Edit/NewPlaylistFrom", "Edit/Search",
+         "View/PlaylistTabs", "View/JumpToPlayingTrack"]
 )
 MENU_EDIT = map(lambda entry: "/Menu/Edit/%s" % entry,
         ["Paste", "Clear", "Select", "Select/SelectAll",
