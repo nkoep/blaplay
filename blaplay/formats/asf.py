@@ -1,4 +1,4 @@
-# blaplay, Copyright (C) 2012  Niklas Koep
+# blaplay, Copyright (C) 2012-2013  Niklas Koep
 
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -41,7 +41,7 @@ class Asf(BlaTrack):
         "WM/AuthorURL": "website"
     }
     __literal_to_tag = dict(
-            zip(__tag_to_literal.values(), __tag_to_literal.keys()))
+        zip(__tag_to_literal.values(), __tag_to_literal.keys()))
 
     def _read_tags(self):
         audio = _ASF(self.uri)
@@ -50,8 +50,10 @@ class Asf(BlaTrack):
             try:
                 values = map(unicode, values)
                 self[self.__tag_to_literal[key]] = values
-            except UnicodeDecodeError: pass
-            except KeyError: self[key] = values
+            except UnicodeDecodeError:
+                pass
+            except KeyError:
+                self[key] = values
 
         self._parse_info(audio.info)
         self[FORMAT] = "WMA"
@@ -61,23 +63,31 @@ class Asf(BlaTrack):
         try:
             audio = _ASF(self.uri)
             tags = audio.tags
-        except IOError: return False
+        except IOError:
+            return False
 
         try:
             for tag in self._deleted_tags:
-                try: del audio[tag]
-                except KeyError: pass
+                try:
+                    del audio[tag]
+                except KeyError:
+                    pass
             self._deleted_tags.clear()
-        except AttributeError: pass
+        except AttributeError:
+            pass
 
         for identifier in self.keys_tags():
             try:
                 values = self.get(identifier)
-                if not values: raise KeyError
-            except KeyError: continue
+                if not values:
+                    raise KeyError
+            except KeyError:
+                continue
 
-            try: tag = self.__literal_to_tag[identifier]
-            except KeyError: tag = identifier
+            try:
+                tag = self.__literal_to_tag[identifier]
+            except KeyError:
+                tag = identifier
             tags[tag] = values
 
         audio.save()

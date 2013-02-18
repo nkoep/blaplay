@@ -49,7 +49,7 @@ class Xiph(BlaTrack):
         "copyright": "copyright"
     }
     __literal_to_tag = dict(
-            zip(__tag_to_literal.values(), __tag_to_literal.keys()))
+        zip(__tag_to_literal.values(), __tag_to_literal.keys()))
     __split_keys = {
         TRACK: ("tracknumber", "totaltracks"),
         DISC: ("discnumber", "totaldiscs")
@@ -57,18 +57,20 @@ class Xiph(BlaTrack):
 
     def _read_tags(self):
         uri = self.uri
-        baseclass, format, encoding = self.__ext_to_format[
-                blautil.get_extension(uri)]
+        baseclass, format_, encoding = self.__ext_to_format[
+            blautil.get_extension(uri)]
         audio = baseclass(uri)
 
         for key, values in (audio.tags or {}).iteritems():
-            try: identifier = self.__tag_to_literal[key]
-            except KeyError: identifier = key
+            try:
+                identifier = self.__tag_to_literal[key]
+            except KeyError:
+                identifier = key
             self[identifier] = map(unicode, values)
 
-        # in vorbis comments tracknumber and number of total tracks are stored
-        # in different keys. the same goes for discs. we construct the form we
-        # normally work with here
+        # In vorbis comments tracknumber and number of total tracks are stored
+        # in different keys. The same goes for discs. We construct the form we
+        # normally work with here.
         for identifier, (num, total) in self.__split_keys.iteritems():
             if num in self.keys_tags():
                 self[identifier] = self.pop(num)
@@ -76,15 +78,18 @@ class Xiph(BlaTrack):
                 self[identifier] += "/" + self.pop(total)
 
         self._parse_info(audio.info)
-        self[FORMAT] = format
+        self[FORMAT] = format_
         self[ENCODING] = encoding
 
     def _save(self):
         uri = self.uri
-        baseclass, format, encoding = self.__ext_to_format[
-                blautil.get_extension(uri)]
-        try: audio = baseclass(uri)
-        except IOError: return False
+        baseclass, format_, encoding = self.__ext_to_format[
+            blautil.get_extension(uri)]
+        try:
+            audio = baseclass(uri)
+        except IOError:
+            return False
+
         tags = audio.tags
         if tags is None:
             audio.add_tags()
@@ -92,28 +97,35 @@ class Xiph(BlaTrack):
 
         try:
             for tag in self._deleted_tags:
-                try: del tags[tag]
-                except KeyError: pass
+                try:
+                    del tags[tag]
+                except KeyError:
+                    pass
             self._deleted_tags.clear()
-        except AttributeError: pass
+        except AttributeError:
+            pass
 
         for identifier in self.keys_tags():
             try:
                 values = self.get(identifier)
-                if not values: raise KeyError
-            except KeyError: continue
+                if not values:
+                    raise KeyError
+            except KeyError:
+                continue
 
-            try: tag = self.__literal_to_tag[identifier]
-            except KeyError: tag = identifier
+            try:
+                tag = self.__literal_to_tag[identifier]
+            except KeyError:
+                tag = identifier
 
             if identifier in self.__split_keys:
                 num, total = self.__split_keys[identifier]
                 values = values.split("/", 1)
                 tags[num] = values[0]
-                if (len(values) > 1 and
-                        total not in self.keys_tags()):
+                if len(values) > 1 and total not in self.keys_tags():
                     tags[total] = values[1]
-            else: tags[tag] = values
+            else:
+                tags[tag] = values
 
         audio.save()
         return True

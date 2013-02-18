@@ -1,4 +1,4 @@
-# blaplay, Copyright (C) 2012  Niklas Koep
+# blaplay, Copyright (C) 2012-2013  Niklas Koep
 
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -16,10 +16,8 @@
 
 import os
 
-from blaplay.blacore import blacfg, blaconst, bladb
+from blaplay.blacore import blacfg, blaconst
 from blaplay import blautil
-ignore = bladb.BlaLibraryMonitor.ignore
-from blaplay.formats import TagParseError
 from _identifiers import *
 
 
@@ -41,10 +39,11 @@ class BlaTrack(dict):
             self[item] = value
 
     def __delitem__(self, key):
-        # tags that are specifically removed in the tag editor are removed and
+        # Tags that are specifically removed in the tag editor are removed and
         # then added to a special set that we check when writing tags to file.
-        # by default, if we have a key in our dict with an empty value we just
-        # ignore the tag instead of deleting it
+        # By default, if we have a key in our dict with an empty value we just
+        # ignore the tag instead of deleting it to leave tags as much unchanged
+        # as possible upon saving unless explicitly requested.
         try:
             dict.__delitem__(self, key)
         except KeyError:
@@ -54,10 +53,12 @@ class BlaTrack(dict):
         self._deleted_tags.add(key)
 
     def __getitem__(self, key):
-        # we overwrite the default getter to only return the first entry from
-        # a tag which might have been constructed from multiple values. for
+        # We overwrite the default getter to only return the first entry from
+        # a tag which might have been constructed from multiple values. For
         # actually writing tags back to a file the `get()' method should be
-        # used
+        # used to avoid losing values. This is really just a nicety. We don't
+        # care about optional values (we don't support writing them, either),
+        # but we don't want to enforce their removal, either.
         try:
             item = dict.__getitem__(self, key)
         except KeyError:
@@ -72,8 +73,8 @@ class BlaTrack(dict):
     def _parse_info(self, info):
         self[SAMPLING_RATE] = info.sample_rate
 
-        # info classes of lossless formats (usually/probably) don't define
-        # bitrate attributes
+        # Info classes of lossless formats (usually/probably) don't define any
+        # bitrate attributes.
         try:
             self[BITRATE] = info.bitrate
         except AttributeError:
@@ -88,7 +89,7 @@ class BlaTrack(dict):
             else:
                 mode = "Mono" if channels == 1 else "Stereo"
         else:
-            # MPEGInfo has a mode attribute to specify the number of channels
+            # MPEGInfo has a mode attribute to specify the number of channels.
             channels = 2 if 0 <= mode <= 2 else 1
             if mode == 0:
                 mode = "Stereo"
@@ -104,21 +105,24 @@ class BlaTrack(dict):
         self[LENGTH] = int(info.length)
 
     def save(self):
-        # this makes sure the next EVENT_CHANGED event for this file is ignored
-        # by the library monitor as otherwise we'd update everything twice
+        from blaplay.blacore import bladb
+        ignore = bladb.BlaLibraryMonitor.ignore
+
+        # This makes sure the next EVENT_CHANGED event for this file is ignored
+        # by the library monitor as otherwise we'd update everything twice.
         ignore.add(self[URI])
         status = self._save()
         self[MTIME] = os.path.getmtime(self[URI])
         return status
 
     def keys_tags(self):
-        # this returns every key that corresponds to a tag as opposed to an
+        # This returns every key that corresponds to a tag as opposed to an
         # attribute like filesize, etc.
         return list(set(self.keys()).difference(IDENTIFIER_PROPERTIES))
 
     def keys_additional_tags(self):
-        # this returns every key that corresponds to a tag that does not have
-        # a numeric identifier as defined in formats._identifiers
+        # This returns every key that corresponds to a tag that does not have
+        # a numerical identifier as defined in formats._identifiers.
         return list(set(self.keys()).difference(xrange(N_IDENTIFIERS)))
 
     def get_cover_basepath(self):

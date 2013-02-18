@@ -16,8 +16,8 @@
 
 import wave as _wave
 
-from blaplay.formats import TagParseError
 from _blatrack import BlaTrack
+from blaplay.formats import TagParseError
 from _identifiers import *
 
 
@@ -26,20 +26,22 @@ class Wav(BlaTrack):
     extensions = ["wav"]
 
     def _read_tags(self):
-        # the wave module uses fixed sampling rates. custom sampling rates are
-        # therefore mapped to commonly used ones. additionally, it doesn't
-        # detect compression modes like ADPCM. therefore we just specify
+        # The wave module uses fixed sampling rates. Custom sampling rates are
+        # therefore mapped to commonly used ones. Additionally, it doesn't
+        # detect compression modes like ADPCM. Therefore we just specify
         # `lossless' as encoding type; it's not like these are common
-        # use-cases anyway
+        # use-cases anyway.
 
-        try: audio = _wave.open(self.uri, "r")
-        except _wave.Error: raise TagParseError
+        try:
+            audio = _wave.open(self.uri, "r")
+        except _wave.Error:
+            raise TagParseError
 
         self[SAMPLING_RATE] = audio.getframerate()
         self[CHANNELS] = audio.getnchannels()
         self[CHANNEL_MODE] = "Mono" if self[CHANNELS] == 1 else "Stereo"
         self[BITRATE] = (audio.getframerate() * 8 * audio.getsampwidth() *
-                self[CHANNELS])
+                         self[CHANNELS])
         self[LENGTH] = audio.getnframes() / audio.getframerate()
         self[FORMAT] = "WAVE"
         self[ENCODING] = "lossless"
@@ -47,10 +49,10 @@ class Wav(BlaTrack):
         audio.close()
 
     def _save(self):
-        # since WAVE files don't support tags we just return True here without
-        # actually modifying the file. we also don't complain if a user tries
+        # Since WAVE files don't support tags we just return True here without
+        # actually modifying the file. We also don't complain if a user tries
         # to store metadata for a WAVE file since we can just keep that as
-        # metadata in our library. obviously this data is transient and lost if
-        # a file is reparsed
+        # metadata in our library. Obviously this data is transient and lost if
+        # a file is reparsed.
         return True
 

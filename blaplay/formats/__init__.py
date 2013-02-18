@@ -1,4 +1,4 @@
-# blaplay, Copyright (C) 2012  Niklas Koep
+# blaplay, Copyright (C) 2012-2013  Niklas Koep
 
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -21,26 +21,56 @@ from blaplay import blautil
 formats = {}
 
 
-def init():
-    # every module name in the formats package except those defining formats
-    # start with an underscore. we filter module sources by this. everything
-    # that passes is a format. format classes have the same name as the module
-    # name, only with capitalized first letter
+class TagParseError(Exception):
+    pass
 
-    def f(s): return not (s.endswith("pyc") or s.startswith("_"))
-    modules = filter(f, os.listdir(os.path.dirname(__file__)))
-    for module in map(blautil.toss_extension, modules):
-        format = module.capitalize()
-        module = __import__("blaplay.formats.%s" % module, {}, {}, format)
-        format = getattr(module, format)
-        for ext in format.extensions: formats[ext] = format
 
 def get_track(path):
     ext = blautil.get_extension(path).lower()
-    try: track = formats[ext](path)
-    except (KeyError, TagParseError): track = None
+    try:
+        track = formats[ext](path)
+    except (KeyError, TagParseError):
+        track = None
     return track
 
+def _is_py_file(s):
+    return not (s.endswith("pyc") or s.startswith("_"))
 
-class TagParseError(Exception): pass
+def _check_module_integrity(module, name):
+    try:
+        format_ = getattr(module, name)
+        extensions = format_.extensions
+        if not hasattr(extensions, "__iter__"):
+            raise AttributeError
+        for attr in ["_read_tags", "_save"]:
+            if not hasattr(format_, attr):
+                raise AttributeError
+    except AttributeError as exc:
+        print_d("Failed to initialize \"%s\" visualization: %s" %
+                (identifier, exc))
+        return None
+    return format_
+
+# Every module name in the formats package except those defining a format start
+# with an underscore. We filter module sources by this. Everything that passes
+# is treated like a format. Format classes have the same name as the module
+# name, but with capitalized first letter.
+for module in filter(_is_py_file, os.listdir(os.path.dirname(__file__))):
+    basename = blautil.toss_extension(module)
+    name = basename.capitalize()
+
+    try:
+        module = __import__(
+            "blaplay.formats.%s" % basename, {}, {}, name)
+        format_ = getattr(module, name)
+    except Exception as exc:
+        print_d("Failed to import module \"%s\": %r" % (module, exc))
+    else:
+        format_ = _check_module_integrity(module, name)
+        if format_:
+            for ext in format_.extensions:
+                formats[ext] = format_
+
+del _is_py_file
+del _check_module_integrity
 

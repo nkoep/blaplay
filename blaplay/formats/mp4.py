@@ -23,7 +23,7 @@ from _identifiers import *
 class Mp4(BlaTrack):
     __slots__ = ("extensions", "__tag_to_literal", "__literal_to_tag")
     extensions = ["aac", "m4a", "mp4"]
-    # freeform keys begin with "----" (four dashes)
+    # Freeform keys begin with "----" (four dashes).
     __tag_to_literal = {
         "\xa9ART": ARTIST,
         "\xa9nam": TITLE,
@@ -40,62 +40,80 @@ class Mp4(BlaTrack):
         "cprt": "copyright"
     }
     __literal_to_tag = dict(
-            zip(__tag_to_literal.values(), __tag_to_literal.keys()))
+        zip(__tag_to_literal.values(), __tag_to_literal.keys()))
 
     def _read_tags(self):
         audio = _MP4(self.uri)
 
         for key, values in (audio.tags or {}).iteritems():
-            if key in ["disk", "trkn"]: value = ["%d/%d" % values[0]]
+            if key in ["disk", "trkn"]:
+                value = ["%d/%d" % values[0]]
             elif key.startswith("----:"):
                 key = key[5:]
                 value = values
             elif self.__tag_to_literal.has_key(key):
                 value = map(unicode, values)
-            else: continue
-            try: self[self.__tag_to_literal[key]] = value
-            except KeyError: self[key] = value
+            else:
+                continue
+            try:
+                self[self.__tag_to_literal[key]] = value
+            except KeyError:
+                self[key] = value
 
         self._parse_info(audio.info)
         self[FORMAT] = "MPEG-4 AAC"
         self[ENCODING] = "lossy" if self[BITRATE] else "lossless"
 
     def _save(self):
-        try: audio = _MP4(self.uri)
-        except IOError: return False
+        try:
+            audio = _MP4(self.uri)
+        except IOError:
+            return False
 
         try:
             for tag in self._deleted_tags:
-                try: del audio[tag]
+                try:
+                    del audio[tag]
                 except KeyError:
-                    try: del audio["----:%s" % tag]
-                    except KeyError: pass
+                    try:
+                        del audio["----:%s" % tag]
+                    except KeyError:
+                        pass
             self._deleted_tags.clear()
-        except AttributeError: pass
+        except AttributeError:
+            pass
 
         for identifier in self.keys_tags():
             try:
                 values = self.get(identifier)
-                if not values: raise KeyError
-            except KeyError: continue
+                if not values:
+                    raise KeyError
+            except KeyError:
+                continue
 
-            # if a key is not from our specifically defined mapping dict it's a
-            # freeform key
-            try: tag = self.__literal_to_tag[identifier]
+            # If a key is not from our specifically defined mapping dict it's a
+            # freeform key so treat it accordingly.
+            try:
+                tag = self.__literal_to_tag[identifier]
             except KeyError:
                 tag = "----:%s" % identifier
                 values = [v.encode("utf-8") for v in values]
 
-            # track and disc numbers are stored as a list of tuples, so handle
-            # them separately
+            # Track and disc numbers are stored as a list of tuples so handle
+            # them separately.
             if identifier in [TRACK, DISC]:
                 values = values.split("/")
-                try: v1 = int(values[0])
-                except (IndexError, ValueError): continue
-                try: v2 = int(values[1])
-                except (IndexError, ValueError): v2 = 0
+                try:
+                    v1 = int(values[0])
+                except (IndexError, ValueError):
+                    continue
+                try:
+                    v2 = int(values[1])
+                except (IndexError, ValueError):
+                    v2 = 0
                 audio[tag] = [(v1, v2)]
-            else: audio[tag] = values
+            else:
+                audio[tag] = values
 
         audio.save()
         return True

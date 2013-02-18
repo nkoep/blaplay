@@ -39,13 +39,15 @@ EVENT_CREATED, EVENT_DELETED, EVENT_MOVED, EVENT_CHANGED = xrange(4)
 
 library = None
 pending_save = False
-extensions = None
 BlaPlaylistManager = None
 
 
 def init():
     print_i("Initializing the database")
-    return BlaLibrary()
+
+    global library
+    library = BlaLibrary()
+    return library
 
 def update_library():
     global pending_save
@@ -457,14 +459,8 @@ class BlaLibrary(gobject.GObject):
     def __init__(self):
         super(BlaLibrary, self).__init__()
 
-        # TODO: init formats when importing the module
-        global library, extensions
-        library = self
-
-        formats.init()
-        extensions = formats.formats.keys()
         self.__extension_filter = re.compile(
-                r".*\.(%s)$" % "|".join(extensions)).match
+            r".*\.(%s)$" % "|".join(formats.formats.keys())).match
 
         # restore the library
         tracks = blautil.deserialize_from_file(blaconst.LIBRARY_PATH)
