@@ -64,12 +64,13 @@ def idle(f):
         gobject.idle_add(f, *args)
     return wrapper
 
-# there's nothing complicated about this decorator at all...
+# There's nothing complicated about this decorator at all...
 def lock(lock_):
     def func(f):
         @functools.wraps(f)
         def wrapper(*args, **kwargs):
-            with lock_: f(*args, **kwargs)
+            with lock_:
+                f(*args, **kwargs)
         return wrapper
     return func
 
@@ -93,33 +94,36 @@ def remove_html_tags(string):
     return re.sub(r"<.*?>", "", string)
 
 def format_date(date):
-    # parses a date tuple into a date string, e.g. Thursday 10. January 2013
+    # Parse a date tuple into a date string, e.g. Thursday 10. January 2013.
     return time.strftime("%A %d %B %Y", time.localtime(time.mktime(date)))
 
 @thread
 def open_url(url):
-    # redirect stdout to /dev/null for this thread to hide the status message
-    # of the webbrowser module
+    # Redirect stdout to /dev/null for this thread to hide the status message
+    # of the webbrowser module.
     stdout = os.dup(1)
     os.dup2(os.open(os.devnull, os.O_RDWR), 1)
-    try: webbrowser.open(url, new=2)
-    except OSError: pass
-    finally: os.dup2(stdout, 1)
+    try:
+        webbrowser.open(url, new=2)
+    except OSError:
+        pass
+    finally:
+        os.dup2(stdout, 1)
 
 def open_directory(directory):
     open_with_filehandler(
-            directory, "Failed to open directory \"%s\"" % directory)
+        directory, "Failed to open directory \"%s\"" % directory)
 
 def open_with_filehandler(f, msg):
     with open(os.devnull, "w") as devnull:
         try:
-            subprocess.Popen(
-                    ["gnome-open", f], stdout=devnull, stderr=devnull)
+            subprocess.Popen(["gnome-open", f], stdout=devnull, stderr=devnull)
         except (OSError, ValueError):
             try:
                 subprocess.Popen(
-                        ["xdg-open", f], stdout=devnull, stderr=devnull)
-            except (OSError, ValueError): error_dialog(msg)
+                    ["xdg-open", f], stdout=devnull, stderr=devnull)
+            except (OSError, ValueError):
+                error_dialog(msg)
 
 def discover(d, directories_only=False):
     checked_directories = []
@@ -140,11 +144,13 @@ def discover(d, directories_only=False):
                 if directories_only:
                     yield dirname
                     continue
-            else: continue
-            for filename in filenames: yield join(dirname, filename)
+            else:
+                continue
+            for filename in filenames:
+                yield join(dirname, filename)
 
 def serialize_to_file(data, path):
-    # write data to tempfile
+    # Write data to tempfile first.
     fd, tmp_path = tempfile.mkstemp()
     f = os.fdopen(fd, "wb")
     pickle.dump(data, f, protocol=pickle.HIGHEST_PROTOCOL)
@@ -152,37 +158,54 @@ def serialize_to_file(data, path):
     os.fsync(f.fileno())
     f.close()
 
-    # move old file
+    # Move old file
     new_path = "%s.bak" % path
-    try: os.unlink(new_path)
-    except OSError: pass
+    try:
+        os.unlink(new_path)
+    except OSError:
+        pass
 
-    try: shutil.move(path, new_path)
-    except IOError: pass
+    try:
+        shutil.move(path, new_path)
+    except IOError:
+        pass
 
-    # move tempfile to actual location and remove backup file on success
-    try: shutil.move(tmp_path, path)
-    except IOError: pass
+    # Move the tempfile to its proper location and remove the backup file on
+    # success.
+    try:
+        shutil.move(tmp_path, path)
+    except IOError:
+        pass
     else:
-        try: os.unlink(new_path)
-        except OSError: pass
+        try:
+            os.unlink(new_path)
+        except OSError:
+            pass
 
 def deserialize_from_file(path):
     new_path = "%s.bak" % path
     data = None
-    try: f = open(path, "rb")
+    try:
+        f = open(path, "rb")
     except IOError:
-        try: f = open(new_path, "rb")
-        except IOError: pass
+        try:
+            f = open(new_path, "rb")
+        except IOError:
+            pass
     else:
-        try: os.unlink(new_path)
-        except OSError: pass
+        try:
+            os.unlink(new_path)
+        except OSError:
+            pass
 
-    # reading the file into memory first possibly reduces the number of context
-    # switches compared to pickle.load(f)
-    try: data = pickle.loads(f.read())
-    except UnboundLocalError: pass
-    except (EOFError, TypeError, pickle.UnpicklingError): f.close()
+    # Reading the file into memory first allegedly reduces the number of
+    # context switches compared to pickle.load(f).
+    try:
+        data = pickle.loads(f.read())
+    except UnboundLocalError:
+        pass
+    except (EOFError, TypeError, pickle.UnpicklingError):
+        f.close()
 
     return data
 
@@ -206,7 +229,8 @@ class BlaLock(object):
         try:
             self.__lock.release()
         except ThreadError:
-            if self.__strict: raise
+            if self.__strict:
+                raise
 
     def locked(self):
         return self.__lock.locked()
@@ -260,7 +284,8 @@ class BlaThread(Thread):
         self.run = self.__run_
 
     def __globaltrace(self, frame, event, arg):
-        if event == "call": return self.__localtrace
+        if event == "call":
+            return self.__localtrace
         return None
 
     def __localtrace(self, frame, event, arg):
@@ -275,17 +300,21 @@ class BlaThread(Thread):
 class BlaOrderedSet(collections.MutableSet):
     """
     set-like class which maintains the order in which elements were added.
-    implementation from http://code.activestate.com/recipes/576694
+    Implementation from: http://code.activestate.com/recipes/576694
     """
 
     def __init__(self, iterable=None):
         self.end = end = []
         end += [None, end, end]
         self.map = {}
-        if iterable is not None: self |= iterable
+        if iterable is not None:
+            self |= iterable
 
-    def __len__(self): return len(self.map)
-    def __contains__(self, key): return key in self.map
+    def __len__(self):
+        return len(self.map)
+
+    def __contains__(self, key):
+        return key in self.map
 
     def add(self, key):
         if key not in self.map:

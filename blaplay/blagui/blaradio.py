@@ -272,8 +272,7 @@ class BlaRadio(gtk.VBox):
             model = self.__treeview.get_model()
             iterators = [model.append([None, station])
                     for station in stations]
-            self.emit("count_changed",
-                    blaconst.VIEW_RADIO, model.iter_n_children(None))
+            self.emit("count_changed", blaconst.VIEW_RADIO, len(model))
             self.__treeview.set_cursor(model.get_path(iterators[0]))
             select_path = self.__treeview.get_selection().select_path
             map(select_path, map(model.get_path, iterators))
@@ -309,7 +308,7 @@ class BlaRadio(gtk.VBox):
 
     def __get_station(self, choice):
         def get_random(old=None):
-            idx_max = model.iter_n_children(None)-1
+            idx_max = len(model)-1
             path = randint(0, idx_max)
             if old is not None and idx_max > 0:
                 while path == old[0]: path = randint(0, idx_max)
@@ -323,7 +322,7 @@ class BlaRadio(gtk.VBox):
         # the method is invoked as player callback or a treemodel path if it's
         # invoked as row_activated callback on the treeview
         if not isinstance(choice, tuple):
-            if not model.iter_n_children(None):
+            if len(model) == 0:
                 return player.play_station(None)
 
             if self.__current:
@@ -365,6 +364,5 @@ class BlaRadio(gtk.VBox):
                 if row[1] == self.__current:
                     self.__treeview.set_cursor(row.path)
                     break
-        self.emit("count_changed",
-                blaconst.VIEW_RADIO, model.iter_n_children(None))
+        self.emit("count_changed", blaconst.VIEW_RADIO, len(model))
 

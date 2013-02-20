@@ -57,8 +57,10 @@ class BlaMetadata(object):
         self.__metadata[section][key] = value
 
     def get(self, section, key):
-        try: return self.__metadata[section][key]
-        except KeyError: return None
+        try:
+            return self.__metadata[section][key]
+        except KeyError:
+            return None
 
 class BlaFetcher(gobject.GObject):
     __gsignals__ = {
@@ -74,12 +76,15 @@ class BlaFetcher(gobject.GObject):
         def feed(self, feed, **kwargs):
             s = json.loads(feed)
             pages = s["query"]["pages"]
-            try: lyrics = pages.values()[0]["revisions"][0]["*"]
-            except KeyError: return ""
+            try:
+                lyrics = pages.values()[0]["revisions"][0]["*"]
+            except KeyError:
+                return ""
             try:
                 lyrics = re.search(r"(<lyrics>)(.*)(</lyrics>)",
-                        lyrics, re.UNICODE | re.DOTALL).group(2)
-            except AttributeError: return ""
+                                   lyrics, re.UNICODE | re.DOTALL).group(2)
+            except AttributeError:
+                return ""
             return lyrics
 
     class HTMLParser(HTMLParser_):
@@ -90,26 +95,33 @@ class BlaFetcher(gobject.GObject):
             self.__lyrics_tag_found = False
             self.__lyrics = ""
 
-            try: HTMLParser_.feed(self, unicode(feed.encode("utf-8")))
-            except UnicodeDecodeError: return ""
+            try:
+                HTMLParser_.feed(self, unicode(feed.encode("utf-8")))
+            except UnicodeDecodeError:
+                return ""
             return self.__lyrics[self.__lyrics.find(ignore) +
-                    len(ignore):].strip()
+                                 len(ignore):].strip()
 
         def handle_starttag(self, tag, attrs):
             if tag == self.__tag and self.__attr in attrs:
                 self.__lyrics_tag_found = True
-            if self.__lyrics_tag_found and tag == "br": self.__lyrics += "\n"
+            if self.__lyrics_tag_found and tag == "br":
+                self.__lyrics += "\n"
 
         def handle_endtag(self, tag):
-            if tag == self.__tag: self.__lyrics_tag_found = False
+            if tag == self.__tag:
+                self.__lyrics_tag_found = False
 
         def handle_data(self, data):
-            if self.__lyrics_tag_found: self.__lyrics += data.strip()
+            if self.__lyrics_tag_found:
+                self.__lyrics += data.strip()
 
         def handle_charref(self, name):
             if self.__lyrics_tag_found:
-                if name.startswith("x"): c = unichr(int(name[1:], 16))
-                else: c = unichr(int(name))
+                if name.startswith("x"):
+                    c = unichr(int(name[1:], 16))
+                else:
+                    c = unichr(int(name))
                 self.__lyrics += c
 
     def __init__(self):
@@ -118,60 +130,69 @@ class BlaFetcher(gobject.GObject):
         self.__html_parser = BlaFetcher.HTMLParser()
 
     def __download_feed(self, baseurl, separator, erase, replace, safe, artist,
-            title):
+                        title):
         feed = None
 
-        # erase site-specific characters
+        # TODO: this can probably be achieved more elegantly
+
+        # Erase site-specific characters.
         re_ = re.compile(r"|".join(erase) or r"$^", flags=re.UNICODE)
         artist, title = [re_.sub("", s) for s in (artist, title)]
 
-        # replace site-specific characters by the separator
+        # Replace site-specific characters by the separator.
         # FIXME: this check SHOULD be redundant
         re_ = re.compile(r"|".join(replace) or r"$^", flags=re.UNICODE)
         artist, title = [re_.sub(separator, s) for s in (artist, title)]
 
-        # remove consecutive spaces and capitalize words (wikia is
-        # case-sensitive)
+        # Remove consecutive spaces and capitalize words (wikia is
+        # case-sensitive).
         re_ = re.compile(r" +", re.UNICODE)
         artist, title = [re_.sub(" ", s).strip() for s in (artist, title)]
         re_ = re.compile(r"([\s\(\[\{])(\S)", re.UNICODE)
         artist, title = [re_.sub(lambda m: m.group(1) + m.group(2).upper(), s)
-                for s in (artist, title)]
+                         for s in (artist, title)]
 
         # FIXME: should this really be done for all search engines?
 #        artist = artist.replace(".", separator)
 #        title = title.replace(".", separator)
 
-        url = baseurl.format(artist.replace(" ", separator).replace("&",
-                "and"), title.replace(" ", separator).replace("&", "and"))
+        url = baseurl.format(
+            artist.replace(" ", separator).replace("&", "and"),
+            title.replace(" ", separator).replace("&", "and"))
 
-        # substitue composite letters and transliterate accents
+        # Substitue composite letters and transliterate accents.
         DICT = {
             u"æ": "ae", u"ð": "d", u"ø": "o", u"þ": "th", u"œ": "oe", u"ƒ": "f"
         }
         regexp = re.compile(
-                "|".join(["(%s)" % key for key in DICT]), re.UNICODE)
-        lookup = dict((idx+1, value)
-                for idx, value in enumerate(DICT.itervalues()))
+            "|".join(["(%s)" % key for key in DICT]), re.UNICODE)
+        lookup = dict(
+            (idx+1, value) for idx, value in enumerate(DICT.itervalues()))
         url = regexp.sub(lambda mo: mo.expand(lookup[mo.lastindex]),
-                unicode(url.encode("utf-8")))
+                         unicode(url.encode("utf-8")))
         url = unicodedata.normalize(
-                "NFKD", unicode(url)).encode("ascii", "ignore")
+            "NFKD", unicode(url)).encode("ascii", "ignore")
 
-        # remove consecutive separators and quote url
+        # Remove consecutive separators and quote the URL.
         url = re.sub("%s+" % separator, separator, url, flags=re.UNICODE)
         url = urllib.quote(url, safe=":/?=+&%s%s" % (separator, safe))
 
         print_d(url)
 
-        try: conn = urllib2.urlopen(url, timeout=TIMEOUT)
-        except (IOError, socket.timeout): return feed
+        try:
+            conn = urllib2.urlopen(url, timeout=TIMEOUT)
+        except (IOError, socket.timeout):
+            return feed
         else:
             encoding = conn.headers.getparam("charset")
-            try: feed = conn.read()
-            except socket.timeout: return feed
-        try: feed = feed.decode(encoding).encode("utf-8")
-        except (TypeError, UnicodeDecodeError): pass
+            try:
+                feed = conn.read()
+            except socket.timeout:
+                return feed
+        try:
+            feed = feed.decode(encoding).encode("utf-8")
+        except (TypeError, UnicodeDecodeError):
+            pass
         conn.close()
         return feed
 
@@ -186,19 +207,18 @@ class BlaFetcher(gobject.GObject):
 
         lyrics_key = track.get_lyrics_key()
 
-        # try locally stored lyrics first
+        # Try locally stored lyrics first
         lyrics = metadata.get("lyrics", lyrics_key)
-        if lyrics and False: # TODO: remove this after testing
+        if lyrics and False: # FIXME: remove this after testing
             self.emit("lyrics", lyrics)
             return
 
-        # try to download lyrics
         resources = [
             # TODO: - add option for passing dict of replacements to the __download_feed method
             #       - don't escape ß for wikia
             ("http://lyrics.wikia.com/api.php?action=query&prop=revisions&"
-                "rvprop=content&format=json&titles={0}:{1}", "_", "", "",
-                "()!", self.__json_parser, "", "", ""
+             "rvprop=content&format=json&titles={0}:{1}", "_", "", "",
+             "()!", self.__json_parser, "", "", ""
             ),
 #            ("http://www.lyricsmania.com/{1}_lyrics_{0}.html", "_", ".", "",
 #                    self.__html_parser, "div", ("id", "songlyrics_h"), ""),
@@ -219,12 +239,13 @@ class BlaFetcher(gobject.GObject):
         artist = track[ARTIST]
         title = track[TITLE]
         for (url, separator, erase, replace, safe, parser, tag, attr,
-                ignore) in resources:
+             ignore) in resources:
             # TODO: songtextemania removes apostrophes
 
             feed = self.__download_feed(
-                    url, separator, erase, replace, safe, artist, title)
-            if not feed: continue
+                url, separator, erase, replace, safe, artist, title)
+            if not feed:
+                continue
             lyrics = parser.feed(feed=feed, tag=tag, attr=attr, ignore=ignore)
 
             # TODO: test redirect feature of wikia
@@ -234,12 +255,13 @@ class BlaFetcher(gobject.GObject):
 #                buf = self.__download_lyrics(url, artist, title, separator)
 #                lyrics = self.__parse_buffer(buf, locator, format_)
 
-            if lyrics: break
+            if lyrics:
+                break
 
-        # if lyrics were found, store them locally
         if lyrics:
             lyrics = blautil.remove_html_tags(lyrics).strip()
-            try: lyrics = lyrics.decode("utf-8", "replace")
+            try:
+                lyrics = lyrics.decode("utf-8", "replace")
             except (AttributeError, UnicodeDecodeError):
                 print_d("Failed to store lyrics")
             metadata.add("lyrics", lyrics_key, lyrics)
@@ -259,33 +281,34 @@ class BlaFetcher(gobject.GObject):
             elif os.path.isfile("%s.png" % image_base):
                 cover = "%s.png" % image_base
 
-        if cover: self.emit("cover", cover, force_download)
+        if cover:
+            self.emit("cover", cover, force_download)
         else:
             def f():
-                gobject.idle_add(
-                        self.emit, "cover", blaconst.COVER, force_download)
+                self.emit("cover", blaconst.COVER, force_download)
                 return False
             self.__tid = gobject.timeout_add(2000, f)
             cover = blafm.get_cover(track, image_base)
             if not cover and not force_download:
                 base = os.path.dirname(track.uri)
                 images = [f for f in os.listdir(base)
-                        if blautil.get_extension(f) in ["jpg", "png"]]
+                          if blautil.get_extension(f) in ["jpg", "png"]]
                 for image in images:
                     name = image.lower()
+                    # TODO: re anyone?
                     if ("front" in name or "cover" in name or
-                            name.startswith("folder") or
-                            (name.startswith("albumart") and
-                            name.endswith("large"))):
+                        name.startswith("folder") or
+                        (name.startswith("albumart") and
+                         name.endswith("large"))):
                         path = os.path.join(base, image)
                         name = os.path.basename(image_base)
                         images = [f for f in os.listdir(blaconst.COVERS)
-                                if f.startswith(name)]
+                                  if f.startswith(name)]
                         images = [os.path.join(blaconst.COVERS, f)
-                                for f in images]
+                                  for f in images]
                         map(os.unlink, images)
                         cover = "%s.%s" % (
-                                image_base, blautil.get_extension(path))
+                            image_base, blautil.get_extension(path))
                         shutil.copy(path, cover)
                         break
 
@@ -298,17 +321,19 @@ class BlaFetcher(gobject.GObject):
         track = self.__track
         image, biography = None, None
         if track[ARTIST]:
-            # look for cached artist image
-            image_base = os.path.join(blaconst.ARTISTS,
-                    track[ARTIST].replace(" ", "_").replace("/", "_"))
+            # Look for a cached artist image first.
+            image_base = os.path.join(
+                blaconst.ARTISTS,
+                track[ARTIST].replace(" ", "_").replace("/", "_"))
             if os.path.isfile("%s.jpg" % image_base):
                 image = "%s.jpg" % image_base
             elif os.path.isfile("%s.png" % image_base):
                 image = "%s.png" % image_base
 
-            # check if biography exists
+            # Check if biography already exists.
             biography = metadata.get("bio", track[ARTIST])
 
+            # If either does not exist try to get both from last.fm.
             if not biography or not image:
                 image, biography = blafm.get_biography(track, image_base)
                 if biography:
@@ -323,13 +348,15 @@ class BlaFetcher(gobject.GObject):
             try:
                 if not self.__thread_cover.is_alive():
                     self.__thread_cover = self.__fetch_cover(
-                            force_download=True)
-            except AttributeError: pass
+                        force_download=True)
+            except AttributeError:
+                pass
         else:
             try:
                 map(blautil.BlaThread.kill, [self.__thread_lyrics,
                         self.__thread_cover, self.__thread_biography])
-            except AttributeError: pass
+            except AttributeError:
+                pass
 
             self.__thread_lyrics = self.__fetch_lyrics()
             self.__thread_cover = self.__fetch_cover()
@@ -338,23 +365,23 @@ class BlaFetcher(gobject.GObject):
     def set_cover(self, path=""):
         track = self.__track
 
-        # stop any thread which might be busy with getting a cover
+        # Stop any thread which still might be busy with retrieving a cover.
         self.__thread_cover.kill()
 
-        # remove any old images (user-set or downloaded)
+        # Remove any old images -- user-set or downloaded.
         if path != blaconst.COVER:
             image_base = track.get_cover_basepath()
             name = os.path.basename(image_base)
-            images = [os.path.join(blaconst.COVERS, f) for f in
-                    os.listdir(blaconst.COVERS) if f.startswith(name)]
+            images = [
+                os.path.join(blaconst.COVERS, f)
+                for f in os.listdir(blaconst.COVERS) if f.startswith(name)]
             map(os.unlink, images)
 
         if path:
             cover = "%s.%s" % (image_base, blautil.get_extension(path))
             shutil.copy(path, cover)
-        else: cover = blaconst.COVER
+        else:
+            cover = blaconst.COVER
 
-        # this is called directly from the main thread so we can emit the
-        # signal without gobject.idle_add
         self.emit("cover", cover, False)
 

@@ -750,6 +750,8 @@ class BlaQueue(blaguiutils.BlaScrolledWindow):
 
         self.__treeview.connect("popup", popup, blaconst.VIEW_QUEUE, self)
         self.__treeview.connect("row_activated", self.play_item)
+        self.__treeview.connect(
+            "button_press_event", self.__button_press_event)
         self.__treeview.connect("key_press_event", self.__key_press_event)
         self.__treeview.connect("drag_data_get", self.__drag_data_get)
         self.__treeview.connect("drag_data_received", self.__drag_data_recv)
@@ -757,6 +759,13 @@ class BlaQueue(blaguiutils.BlaScrolledWindow):
         update_columns(self.__treeview, view_id=blaconst.VIEW_QUEUE)
 
         self.show_all()
+
+    def __button_press_event(self, treeview, event):
+        if (event.button == 2 and
+            event.type not in [gtk.gdk._2BUTTON_PRESS,
+                               gtk.gdk._3BUTTON_PRESS]):
+            self.paste()
+            return True
 
     def __key_press_event(self, treeview, event):
         if blagui.is_accel(event, "<Ctrl>X"):
@@ -821,7 +830,7 @@ class BlaQueue(blaguiutils.BlaScrolledWindow):
             if not path:
                 path, column = cls.__treeview.get_cursor()
         except TypeError:
-            path = (model.iter_n_children(None),)
+            path = (len(model),)
             append = model.append
             def insert_func(iterator, item):
                 append(item)
@@ -868,7 +877,7 @@ class BlaQueue(blaguiutils.BlaScrolledWindow):
 
     def update_statusbar(self):
         model = self.__treeview.get_model()
-        count = model.iter_n_children(None)
+        count = len(model)
         if count == 0:
             info = ""
         else:
@@ -886,7 +895,7 @@ class BlaQueue(blaguiutils.BlaScrolledWindow):
             return
         elif type_ == blaconst.SELECT_COMPLEMENT:
             selected_paths = set(selection.get_selected_rows()[-1])
-            paths = set([(p,) for p in xrange(model.iter_n_children(None))])
+            paths = set([(p,) for p in xrange(len(model))])
             paths.difference_update(selected_paths)
             selection.unselect_all()
             select_path = selection.select_path
@@ -1036,7 +1045,7 @@ class BlaQueue(blaguiutils.BlaScrolledWindow):
 
     @classmethod
     def queue_n_items(cls):
-        return cls.__treeview.get_model().iter_n_children(None)
+        return len(cls.__treeview.get_model())
 
 class BlaPlaylist(gtk.VBox):
     __layout = (
@@ -1096,7 +1105,7 @@ class BlaPlaylist(gtk.VBox):
         def __iter_previous(self, iterator):
             path = self.__model.get_path(iterator)
             if path[0] > 0:
-                return self.__model.get_iter((path[0]-1,))
+                return self.__model.get_iter(path[0]-1)
             return None
 
     def __init__(self, name="bla"):
@@ -1124,7 +1133,7 @@ class BlaPlaylist(gtk.VBox):
 
         self.__regexp_button = gtk.ToggleButton(label="r\"\"")
         self.__regexp_button.set_tooltip_text(
-            "Treat search string as regular expression")
+            "Interpret search string as regular expression")
 
         button = gtk.Button()
         button.add(
@@ -1543,8 +1552,7 @@ class BlaPlaylist(gtk.VBox):
             return
         elif type_ == blaconst.SELECT_COMPLEMENT:
             selected_paths = set(selection.get_selected_rows()[-1])
-            paths = [(p,) for p in
-                     xrange(self.__treeview.get_model().iter_n_children(None))]
+            paths = [(p,) for p in xrange(len(self.__treeview.get_model()))]
             paths = set(paths)
             paths.difference_update(selected_paths)
             selection.unselect_all()
@@ -1653,7 +1661,7 @@ class BlaPlaylist(gtk.VBox):
                 path = (path[0]+1,)
                 insert_func = model.insert_after
         else:
-            path = (model.iter_n_children(None),)
+            path = (len(model),)
             append = model.append
             def insert_func(iterator, item):
                 append(item)
@@ -1956,7 +1964,7 @@ class BlaPlaylist(gtk.VBox):
 
     def get_item(self, choice=blaconst.TRACK_PLAY, force_advance=True):
         def get_random(old=None):
-            idx_max = model.iter_n_children(None) - 1
+            idx_max = len(model) - 1
             if idx_max < 0:
                 return None
             item = model[randint(0, idx_max)][0]

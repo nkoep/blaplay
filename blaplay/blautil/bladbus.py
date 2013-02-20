@@ -21,7 +21,8 @@ import dbus.service
 import dbus.mainloop.glib
 dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
 
-INTERFACE = "org.freedesktop.blaplay" # we use the same bus and interface name
+# We use the same bus and interface name for now.
+INTERFACE = "org.freedesktop.blaplay"
 OBJECT_PATH = "/%s/BlaDBus" % INTERFACE.replace(".", "/")
 
 
@@ -35,20 +36,23 @@ def query_bus(query, arg=None):
     # FIXME: do this properly once we comply to MPRIS 2.2
     from blaplay.formats._identifiers import ARTIST, TITLE, ALBUM, DATE, GENRE
 
-    # get a proxy to the bus object of the running blaplay instance
-    try: proxy = dbus.SessionBus().get_object(INTERFACE, OBJECT_PATH)
-    except dbus.DBusException: raise SystemExit
+    # Get a proxy to the bus object of the running blaplay instance.
+    try:
+        proxy = dbus.SessionBus().get_object(INTERFACE, OBJECT_PATH)
+    except dbus.DBusException:
+        raise SystemExit
 
-    # get an interface to the proxy. this offers direct access to methods
-    # exposed on the interface
+    # Get an interface to the proxy. This offers direct access to methods
+    # exposed through the interface.
     interface = dbus.Interface(proxy, INTERFACE)
 
     if isinstance(query, list):
         args = query[0].split("%")
         for idx, arg in enumerate(args):
-            if arg != "": continue
+            if arg != "":
+                continue
             if (idx == len(args)-1 or
-                    args[idx+1][0] not in ["a", "t", "b", "y", "g", "c"]):
+                args[idx+1][0] not in ["a", "t", "b", "y", "g", "c"]):
                 print_e("Invalid format string `%s'" % args)
 
         callbacks = {
@@ -67,11 +71,16 @@ def query_bus(query, arg=None):
         print format_.encode("utf-8")
 
     else:
-        if query == "play_pause": interface.play_pause()
-        elif query == "stop": interface.stop()
-        elif query == "next": interface.next()
-        elif query == "previous": interface.previous()
-        elif query == "raise_window": interface.raise_window()
+        if query == "play_pause":
+            interface.play_pause()
+        elif query == "stop":
+            interface.stop()
+        elif query == "next":
+            interface.next()
+        elif query == "previous":
+            interface.previous()
+        elif query == "raise_window":
+            interface.raise_window()
         elif query in ["append", "new", "replace"] and arg:
             interface.parse_uris(query, arg)
     raise SystemExit
@@ -83,8 +92,8 @@ class BlaDBus(dbus.service.Object):
         import blaplay
         self.__player = blaplay.bla.player
 
-    @dbus.service.method(dbus_interface=INTERFACE, in_signature="i",
-            out_signature="s")
+    @dbus.service.method(
+        dbus_interface=INTERFACE, in_signature="i", out_signature="s")
     def get_tag(self, identifier):
         from blaplay.formats._identifiers import ARTIST, TITLE
 
@@ -92,56 +101,63 @@ class BlaDBus(dbus.service.Object):
         ret = track[identifier]
         if not ret:
             if identifier == ARTIST:
-                if self.__player.radio: ret = track["organization"]
-                else: ret = "?"
-            elif identifier == TITLE: ret = os.path.basename(track.uri)
-            else: ret = ""
+                if self.__player.radio:
+                    ret = track["organization"]
+                else:
+                    ret = "?"
+            elif identifier == TITLE:
+                ret = os.path.basename(track.uri)
+            else:
+                ret = ""
         return str(ret)
 
-    @dbus.service.method(dbus_interface=INTERFACE, in_signature="",
-            out_signature="s")
+    @dbus.service.method(
+        dbus_interface=INTERFACE, in_signature="", out_signature="s")
     def get_cover(self):
         track = self.__player.get_track()
         if track:
             cover = track.get_cover_basepath()
-            if os.path.isfile("%s.jpg" % cover): return ("%s.jpg" % cover)
-            elif os.path.isfile("%s.png" % cover): return ("%s.png" % cover)
+            if os.path.isfile("%s.jpg" % cover):
+                return ("%s.jpg" % cover)
+            elif os.path.isfile("%s.png" % cover):
+                return ("%s.png" % cover)
         return ""
 
-    @dbus.service.method(dbus_interface=INTERFACE, in_signature="",
-            out_signature="")
+    @dbus.service.method(
+        dbus_interface=INTERFACE, in_signature="", out_signature="")
     def play_pause(self):
         self.__player.play_pause()
 
-    @dbus.service.method(dbus_interface=INTERFACE, in_signature="",
-            out_signature="")
+    @dbus.service.method(
+        dbus_interface=INTERFACE, in_signature="", out_signature="")
     def stop(self):
         self.__player.stop()
 
-    @dbus.service.method(dbus_interface=INTERFACE, in_signature="",
-            out_signature="")
+    @dbus.service.method(
+        dbus_interface=INTERFACE, in_signature="", out_signature="")
     def next(self):
         self.__player.next()
 
-    @dbus.service.method(dbus_interface=INTERFACE, in_signature="",
-            out_signature="")
+    @dbus.service.method(
+        dbus_interface=INTERFACE, in_signature="", out_signature="")
     def previous(self):
         self.__player.previous()
 
-    @dbus.service.method(dbus_interface=INTERFACE, in_signature="",
-            out_signature="")
+    @dbus.service.method(
+        dbus_interface=INTERFACE, in_signature="", out_signature="")
     def raise_window(self):
-        # FIXME: this seems to work only once
         import blaplay
         blaplay.bla.window.raise_window()
 
-    @dbus.service.method(dbus_interface=INTERFACE, in_signature="sas",
-            out_signature="")
+    @dbus.service.method(
+        dbus_interface=INTERFACE, in_signature="sas", out_signature="")
     def parse_uris(self, action, uris):
-        # FIXME: do this via blaplay.bla
+        # TODO: do this via pipe
         from blaplay.blagui.blaplaylist import BlaPlaylistManager
-        if action == "append": f = BlaPlaylistManager.add_to_current_playlist
-        elif action == "new": f = BlaPlaylistManager.send_to_new_playlist
-        else: f = BlaPlaylistManager.send_to_current_playlist
-        f("", uris, resolve=True)
+        if action == "append":
+            BlaPlaylistManager.add_to_current_playlist(uris, resolve=True)
+        elif action == "new":
+            BlaPlaylistManager.send_to_new_playlist(uris, resolve=True)
+        else:
+            f = BlaPlaylistManager.send_to_current_playlist(uris, resolve=True)
 

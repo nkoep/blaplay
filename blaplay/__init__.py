@@ -26,10 +26,10 @@ cli_queue = None
 
 
 class Blaplay(object):
-    # class instances which need to shut down gracefully and preferably before
+    # Class instances which need to shut down gracefully and preferably before
     # the user interface has been destroyed can register themselves via the
-    # "register_for_cleanup" method. classes that do so need to implement the
-    # __call__ method as their cleanup routine
+    # `register_for_cleanup' method. Classes that do so need to implement the
+    # __call__ method as their cleanup routine.
 
     __cleanup = []
 
@@ -56,46 +56,52 @@ def finish_startup():
     from blaplay.blacore import blacfg, bladb
     from blaplay import blautil
 
-    # initialize the config
+    # Initialize the config.
     blacfg.init()
 
-    # initialize the database
+    # Initialize the library.
     bla.library = bladb.init()
 
-    # create an instance of the playback device
+    # Create an instance of the playback device.
     from blaplay.blacore import blaplayer
     bla.player = blaplayer.init()
 
-    # initialize the GUI
+    # Initialize the GUI.
     from blaplay import blagui
     bla.window = blagui.init()
     bla.window.connect("destroy", shutdown)
 
-    # set up the D-Bus interface and last.fm services
+    # Set up the D-Bus interface.
     try: from blaplay.blautil import bladbus
     except ImportError:
-        # if the dbus module isn't available we just define a class which acts
-        # on behalf of the module, issuing warnings whenever it's used
+        # If the DBUS module isn't available we just define a class which acts
+        # on behalf of the module, issuing warnings whenever it's used.
         class bladbus:
             @classmethod
             def __warning(cls, exit):
                 print_w("Failed to import dbus module. Install dbus-python.")
-                if exit: raise SystemExit
+                if exit:
+                    raise SystemExit
+
             @classmethod
-            def setup_bus(cls, *args): cls.__warning(False)
+            def setup_bus(cls, *args):
+                cls.__warning(False)
+
             @classmethod
-            def query_bus(cls, *args): cls.__warning(True)
+            def query_bus(cls, *args):
+                cls.__warning(True)
+
     bladbus.setup_bus()
 
-    # initialize the scrobbler
+    # Initialize last.fm services.
     from blaplay.blautil import blafm
     blafm.init()
 
-    # initialize metadata module
+    # Initialize metadata module.
     from blaplay.blautil import blametadata
     blametadata.init()
 
-    # set process name for programs like top or gnome-system-monitor
+    # Set process name for programs like top or gnome-system-monitor.
     import ctypes
     import ctypes.util
 
@@ -104,12 +110,13 @@ def finish_startup():
         soname = ctypes.util.find_library("c")
         # 15 == PR_SET_NAME
         ctypes.CDLL(soname).prctl(15, blaconst.APPNAME, 0, 0, 0)
-    except AttributeError: pass
+    except AttributeError:
+        pass
 
-    # update the config on disk from time to time
+    # Schedule periodic saving of the config.
     gobject.timeout_add(blaconst.CFG_TIMEOUT * 60 * 1000, blacfg.save, False)
 
-    # start the main loop
+    # Finally, start the main loop.
     bla.main()
 
 def shutdown(window):
@@ -125,6 +132,6 @@ def shutdown(window):
     from blaplay.blacore import blacfg
     blacfg.save()
 
-    print_d("Stopping event loop")
+    print_d("Stopping the main loop")
     gtk.main_quit()
 

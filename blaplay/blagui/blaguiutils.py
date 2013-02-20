@@ -25,28 +25,31 @@ PADDING_X, PADDING_Y, PADDING_WIDTH, PADDING_HEIGHT = -2, 0, 4, 0
 
 
 def question_dialog(text, secondary_text="", with_cancel_button=False):
-    kwargs = dict(flags=gtk.DIALOG_DESTROY_WITH_PARENT|gtk.DIALOG_MODAL,
-            type=gtk.MESSAGE_QUESTION)
-    if not with_cancel_button: kwargs["buttons"] = gtk.BUTTONS_YES_NO
+    kwargs = {
+        "flags": gtk.DIALOG_DESTROY_WITH_PARENT|gtk.DIALOG_MODAL,
+        "type": gtk.MESSAGE_QUESTION
+    }
+    if not with_cancel_button:
+        kwargs["buttons"] = gtk.BUTTONS_YES_NO
     diag = gtk.MessageDialog(**kwargs)
 
     if with_cancel_button:
         diag.add_buttons(gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL, gtk.STOCK_NO,
-                gtk.RESPONSE_NO, gtk.STOCK_YES, gtk.RESPONSE_YES)
+                         gtk.RESPONSE_NO, gtk.STOCK_YES, gtk.RESPONSE_YES)
 
     diag.set_property("text", text)
     diag.set_property("secondary-text", secondary_text)
     response = diag.run()
     diag.destroy()
 
-    if with_cancel_button: return response
-    else: return True if response == gtk.RESPONSE_YES else False
+    if with_cancel_button:
+        return response
+    return True if response == gtk.RESPONSE_YES else False
 
 def warning_dialog(text, secondary_text):
     diag = gtk.MessageDialog(
-            flags=gtk.DIALOG_DESTROY_WITH_PARENT|gtk.DIALOG_MODAL,
-            type=gtk.MESSAGE_WARNING, buttons=gtk.BUTTONS_OK
-    )
+        flags=gtk.DIALOG_DESTROY_WITH_PARENT|gtk.DIALOG_MODAL,
+        type=gtk.MESSAGE_WARNING, buttons=gtk.BUTTONS_OK)
     diag.set_property("text", text)
     diag.set_property("secondary-text", secondary_text)
     diag.run()
@@ -54,17 +57,18 @@ def warning_dialog(text, secondary_text):
 
 def error_dialog(text, secondary_text=""):
     diag = gtk.MessageDialog(
-            flags=gtk.DIALOG_DESTROY_WITH_PARENT|gtk.DIALOG_MODAL,
-            type=gtk.MESSAGE_ERROR, buttons=gtk.BUTTONS_OK
-    )
+        flags=gtk.DIALOG_DESTROY_WITH_PARENT|gtk.DIALOG_MODAL,
+        type=gtk.MESSAGE_ERROR, buttons=gtk.BUTTONS_OK)
     diag.set_property("text", text)
     diag.set_property("secondary-text", secondary_text)
     diag.run()
     diag.destroy()
 
 def set_visible(state):
-    if state: f = BlaWindow.present
-    else: f = gtk.Window.hide
+    if state:
+        f = BlaWindow.present
+    else:
+        f = gtk.Window.hide
     map(f, BlaWindow.instances)
 
 
@@ -120,7 +124,8 @@ class BlaBaseWindow(gtk.Window):
         self.__restore_window_state()
 
     def __configure_event(self, window, event):
-        if self.__maximized: return
+        if self.__maximized:
+            return
         self.__size = (event.width, event.height)
         if self.__is_main_window:
             blacfg.set("general", "size", "%d, %d" % self.__size)
@@ -131,9 +136,10 @@ class BlaBaseWindow(gtk.Window):
                 blacfg.set("general", "position", "%d, %d" % self.__position)
 
     def __window_state_event(self, window, event):
-        self.__maximized = bool(event.new_window_state &
-                                gtk.gdk.WINDOW_STATE_MAXIMIZED)
-        if event.new_window_state & gtk.gdk.WINDOW_STATE_WITHDRAWN: return
+        self.__maximized = bool(
+            event.new_window_state & gtk.gdk.WINDOW_STATE_MAXIMIZED)
+        if event.new_window_state & gtk.gdk.WINDOW_STATE_WITHDRAWN:
+            return
         blacfg.setboolean("general", "maximized", self.__maximized)
 
     def __map(self, *args):
@@ -147,32 +153,38 @@ class BlaBaseWindow(gtk.Window):
     def __restore_size(self):
         if self.__is_main_window:
             size = blacfg.getlistint("general", "size")
-            if size is not None: self.__size = size
+            if size is not None:
+                self.__size = size
         w, h = self.__size
         screen = self.get_screen()
         w = min(w, screen.get_width())
         h = min(h, screen.get_height())
-        if w >= 0 and h >= 0: self.resize(w, h)
+        if w >= 0 and h >= 0:
+            self.resize(w, h)
 
     def __restore_state(self):
         if self.__is_main_window:
             self.__maximized = blacfg.getboolean("general", "maximized")
-        if self.__maximized: self.maximize()
-        else: self.unmaximize()
+        if self.__maximized:
+            self.maximize()
+        else:
+            self.unmaximize()
 
     def __restore_position(self):
         if self.__is_main_window:
             position = blacfg.getlistint("general", "position")
-            if position is not None: self.__position = position
+            if position is not None:
+                self.__position = position
         x, y = self.__position
-        if x >= 0 and y >= 0: self.move(x, y)
+        if x >= 0 and y >= 0:
+            self.move(x, y)
 
 class BlaWindow(BlaBaseWindow):
     """ A window that binds the ^W accelerator to close. """
 
     __gsignals__ = {
         "close_accel": (gobject.SIGNAL_RUN_LAST | gobject.SIGNAL_ACTION,
-                gobject.TYPE_NONE, ())
+                        gobject.TYPE_NONE, ())
     }
 
     instances = []
@@ -186,14 +198,15 @@ class BlaWindow(BlaBaseWindow):
 
         super(BlaWindow, self).__init__(*args, **kwargs)
         type(self).instances.append(self)
-        if dialog: self.set_type_hint(gtk.gdk.WINDOW_TYPE_HINT_DIALOG)
+        if dialog:
+            self.set_type_hint(gtk.gdk.WINDOW_TYPE_HINT_DIALOG)
         self.set_destroy_with_parent(True)
         self.set_position(gtk.WIN_POS_CENTER_ON_PARENT)
 
         accels = gtk.AccelGroup()
         self.add_accel_group(accels)
         self.add_accelerator("close_accel", accels, ord("w"),
-                gtk.gdk.CONTROL_MASK, 0)
+                             gtk.gdk.CONTROL_MASK, 0)
         if close_on_escape:
             esckey, mod = gtk.accelerator_parse("Escape")
             self.add_accelerator("close_accel", accels, esckey, mod, 0)
@@ -207,12 +220,17 @@ class BlaWindow(BlaBaseWindow):
             self.buttonbox.set_border_width(5)
             self.buttonbox.set_layout(gtk.BUTTONBOX_END)
 
-            if with_closebutton: button = gtk.Button(stock=gtk.STOCK_CLOSE)
-            elif with_cancelbutton: button = gtk.Button(stock=gtk.STOCK_CANCEL)
+            if with_closebutton:
+                button = gtk.Button(stock=gtk.STOCK_CLOSE)
+            elif with_cancelbutton:
+                button = gtk.Button(stock=gtk.STOCK_CANCEL)
 
-            try: button.connect("clicked", self.__clicked)
-            except NameError: pass
-            else: self.buttonbox.pack_start(button)
+            try:
+                button.connect("clicked", self.__clicked)
+            except NameError:
+                pass
+            else:
+                self.buttonbox.pack_start(button)
 
             self.vbox.set_border_width(10)
             self.vbox.pack_end(self.buttonbox, expand=False, fill=False)
@@ -225,8 +243,10 @@ class BlaWindow(BlaBaseWindow):
             self.destroy()
 
     def __destroy(self, *args):
-        try: type(self).instances.remove(self)
-        except ValueError: return
+        try:
+            type(self).instances.remove(self)
+        except ValueError:
+            return
 
     def do_close_accel(self):
         self.__clicked()
@@ -243,11 +263,14 @@ class BlaUniqueWindow(BlaWindow):
 
     @classmethod
     def is_not_unique(cls):
-        if cls.__window: return True
+        if cls.__window:
+            return True
 
     def __init__(self, *args, **kwargs):
-        if type(self).__window: return
-        else: type(self).__window = self
+        if type(self).__window:
+            return
+        else:
+            type(self).__window = self
         super(BlaUniqueWindow, self).__init__(*args, **kwargs)
         self.connect_object("destroy", self.__destroy, self)
 
@@ -267,22 +290,23 @@ class BlaTreeViewBase(gtk.TreeView):
         self.__text_column = kwargs.pop("text_column", None)
         self.__allow_no_selection = kwargs.pop("allow_no_selection", True)
         set_button_event_handlers = kwargs.pop(
-                "set_button_event_handlers", True)
+            "set_button_event_handlers", True)
 
         super(BlaTreeViewBase, self).__init__(*args, **kwargs)
         if blacfg.getboolean("colors", "overwrite") and self.__multicol:
             name = blaconst.STYLE_NAME
-        else: name = ""
+        else:
+            name = ""
         self.set_name(name)
         type(self).instances.append(self)
         self.set_enable_search(False)
         if set_button_event_handlers:
             self.connect_object("button_press_event",
-                    BlaTreeViewBase.__button_press_event, self)
+                                BlaTreeViewBase.__button_press_event, self)
             self.connect_object("button_release_event",
-                    BlaTreeViewBase.__button_release_event, self)
-            self.connect_object(
-                    "row_activated", BlaTreeViewBase.__row_activated, self)
+                                BlaTreeViewBase.__button_release_event, self)
+            self.connect_object("row_activated",
+                                BlaTreeViewBase.__row_activated, self)
         self.connect_after("drag_begin", self.__drag_begin)
         self.connect_object("drag_failed", BlaTreeViewBase.__drag_failed, self)
         self.get_selection().set_mode(gtk.SELECTION_MULTIPLE)
@@ -294,7 +318,7 @@ class BlaTreeViewBase(gtk.TreeView):
 
     def __accept_button_event(self, column, path, event, check_expander):
         if (not blacfg.getboolean("library", "custom.browser") or
-                self.__multicol or self.__renderer is None):
+            self.__multicol or self.__renderer is None):
             return True
 
         renderer = column.get_cell_renderers()[self.__renderer]
@@ -314,17 +338,18 @@ class BlaTreeViewBase(gtk.TreeView):
 
         # check for click on expander and if the row has children
         if (check_expander and
-                event.x >= cell_area.x+PADDING_X-expander_size and
-                event.x <= cell_area.x+PADDING_X and
-                model.iter_has_child(iterator) and
-                event.type not in [gtk.gdk._2BUTTON_PRESS,
-                gtk.gdk._3BUTTON_PRESS]):
+            event.x >= cell_area.x+PADDING_X-expander_size and
+            event.x <= cell_area.x+PADDING_X and
+            model.iter_has_child(iterator) and
+            event.type not in [gtk.gdk._2BUTTON_PRESS,
+                               gtk.gdk._3BUTTON_PRESS]):
             return True
 
         # check for click in the highlighted area
         if (event.x >= cell_area.x+PADDING_X and
-                event.x <= cell_area.x+width):
+            event.x <= cell_area.x+width):
             return True
+
         return False
 
     def __button_press_event(self, event):
@@ -336,23 +361,28 @@ class BlaTreeViewBase(gtk.TreeView):
 
         selection = self.get_selection()
         x, y = map(int, [event.x, event.y])
-        try: path, column, cellx, celly = self.get_path_at_pos(x, y)
+        try:
+            path, column, cellx, celly = self.get_path_at_pos(x, y)
         except TypeError:
             if self.__allow_no_selection:
-                if event.button == 3: self.emit("popup", event)
+                if event.button == 3:
+                    self.emit("popup", event)
+                if event.button == 2:
+                    return False
                 unselect_all(selection)
             return True
 
-        if event.button == 1: check_expander = True
-        else: check_expander = False
+        if event.button == 1:
+            check_expander = True
+        else:
+            check_expander = False
         if not self.__accept_button_event(column, path, event, check_expander):
             unselect_all(selection)
 
         self.grab_focus()
-        if event.button in [1, 2]:
-            if ((selection.path_is_selected(path) and
-                    not (event.state &
-                    (gtk.gdk.CONTROL_MASK | gtk.gdk.SHIFT_MASK)))):
+        if event.button == 1:
+            if (selection.path_is_selected(path) and
+                not (event.state & (gtk.gdk.CONTROL_MASK|gtk.gdk.SHIFT_MASK))):
                 self.__pending_event = [x, y]
                 selection.set_select_function(lambda *args: False)
                 return False
@@ -362,10 +392,14 @@ class BlaTreeViewBase(gtk.TreeView):
                     selection.set_select_function(lambda *args: True)
                     return False
 
+        elif event.button == 2:
+            return False
+
         elif event.button == 3:
             if not selection.path_is_selected(path):
                 self.set_cursor(path, column, 0)
-            else: column.focus_cell(column.get_cell_renderers()[0])
+            else:
+                column.focus_cell(column.get_cell_renderers()[0])
             self.emit("popup", event)
 
         return True
@@ -381,8 +415,10 @@ class BlaTreeViewBase(gtk.TreeView):
                     oldevent[1]-safezone <= event.y <= oldevent[1]+safezone):
                 return True
             x, y = map(int, [event.x, event.y])
-            try: path, column, cellx, celly = self.get_path_at_pos(x, y)
-            except TypeError: return True
+            try:
+                path, column, cellx, celly = self.get_path_at_pos(x, y)
+            except TypeError:
+                return True
             self.set_cursor(path, column, 0)
 
     def __drag_begin(self, treeview, context):

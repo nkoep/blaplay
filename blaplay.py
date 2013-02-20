@@ -33,57 +33,59 @@ def init_signals():
     def main_quit(*args):
         def idle_quit():
             import blaplay
-            try: blaplay.bla.window.destroy()
-            except AttributeError: pass
+            try:
+                blaplay.bla.window.destroy()
+            except AttributeError:
+                pass
         gobject.idle_add(idle_quit, priority=gobject.PRIORITY_HIGH)
         return False
 
-    # writing to a file descriptor that's monitored by gobject is buffered,
+    # Writing to a file descriptor that's monitored by gobject is buffered,
     # i.e. we can write to it here and the event gets handled as soon as a main
-    # loop is started. we use this to defer shutdown instructions during
-    # startup
+    # loop is started. We use this to defer shutdown requests during startup.
     r, w = os.pipe()
     gobject.io_add_watch(r, gobject.IO_IN, main_quit)
     for sig in (signal.SIGTERM, signal.SIGINT, signal.SIGHUP):
-        signal.signal(sig, lambda *x: os.write(w, "bla"))
+        signal.signal(sig, lambda *x: os.write(w, "bla")) # What else?
 
 def parse_args():
     from argparse import ArgumentParser, RawTextHelpFormatter
 
-    parser = ArgumentParser(add_help=False,
-            description="%s - A bla that plays" % blaconst.APPNAME,
-            prog=blaconst.APPNAME, formatter_class=RawTextHelpFormatter
-    )
+    parser = ArgumentParser(
+        add_help=False, description="%s - A bla that plays" % blaconst.APPNAME,
+        prog=blaconst.APPNAME, formatter_class=RawTextHelpFormatter)
     group = parser.add_mutually_exclusive_group()
     group.add_argument("-c", "--append", action="store_true",
-            help="Append URIs to current playlist")
+                       help="Append URIs to current playlist")
     group.add_argument("-t", "--new", action="store_true",
-            help="Send URIs to new playlist")
-    parser.add_argument("URI", nargs="*", help="Input to be sent to the "
-            "current playlist unless\noption -c or -n is specified")
+                       help="Send URIs to new playlist")
+    parser.add_argument(
+        "URI", nargs="*", help="Input to be sent to the current playlist "
+        "unless\noption -c or -n is specified")
     parser.add_argument("-a", "--play-pause", action="store_true",
-            help="play or pause playback")
+                        help="play or pause playback")
     parser.add_argument("-s", "--stop", action="store_true",
-            help="stop playback")
+                        help="stop playback")
     parser.add_argument("-n", "--next", action="store_true",
-            help="play next track in current playlist")
+                        help="play next track in current playlist")
     parser.add_argument("-p", "--previous", action="store_true",
-            help="play previous track in current playlist")
-    parser.add_argument("-f", "--format", nargs=1, help="print track "
-            "information and exit\n   %%a: artist\n   %%t: "
-            "title\n   %%b: album\n   %%y: year"
-            "\n   %%g: genre\n   %%c: cover", action="append"
-    )
-    parser.add_argument("-d", "--debug", action="store_true", help="print "
-            "debug messages")
-    parser.add_argument("-q", "--quiet", action="store_true", help="only "
-            "print fatal messages")
-    parser.add_argument("-h", "--help", action="help", help="display this "
-            "help and exit")
-    parser.add_argument("-v", "--version", action="version", help="output "
-            "version information and exit\n\n", version="%s %s"
-            % (blaconst.APPNAME, blaconst.VERSION)
-    )
+                        help="play previous track in current playlist")
+    parser.add_argument(
+        "-f", "--format", nargs=1, help="print track "
+        "information and exit\n   %%a: artist\n   %%t: "
+        "title\n   %%b: album\n   %%y: year"
+        "\n   %%g: genre\n   %%c: cover", action="append")
+    parser.add_argument("-d", "--debug", action="store_true",
+                        help="print debug messages")
+    parser.add_argument("-q", "--quiet", action="store_true",
+                        help="only print fatal messages")
+    parser.add_argument("-h", "--help", action="help",
+                        help="display this help and exit")
+    parser.add_argument(
+        "-v", "--version", action="version",
+        help="output version information and exit\n\n",
+        version="%s %s" % (blaconst.APPNAME, blaconst.VERSION))
+
     return vars(parser.parse_args())
 
 def init_logging(args):
@@ -104,8 +106,8 @@ def init_logging(args):
         (logging.WARNING, "35"), (logging.CRITICAL, "31")
     ]
     for level, color in colors:
-        logging.addLevelName(level, "\033[1;%sm%s\033[1;m"
-                % (color, logging.getLevelName(level)))
+        logging.addLevelName(level, "\033[1;%sm%s\033[1;m" %
+                             (color, logging.getLevelName(level)))
 
     def critical(msg):
         logging.critical(msg)
@@ -121,61 +123,73 @@ def process_args(args):
     # FIXME: bladbus needs to be treated differently
     global cli_queue
 
-    # player info formatting
-    if args["format"]: bladbus.query_bus(args["format"][0])
+    # Print information about the current track.
+    if args["format"]:
+        bladbus.query_bus(args["format"][0])
 
+    # Parse URIs given on the command-line.
     if args["URI"]:
-        if args["append"]: action = "append"
-        elif args["new"]: action = "new"
-        else: action = "replace"
-        n = lambda uri: os.path.normpath(os.path.abspath(uri))
+        if args["append"]:
+            action = "append"
+        elif args["new"]:
+            action = "new"
+        else:
+            action = "replace"
+
+        def normpath(uri):
+            os.path.normpath(os.path.abspath(uri))
         # TODO: make cli_queue a FIFO we write to here. then connect a handler
         #       which monitors the FIFO in the main thread and adds tracks as
         #       they arrive
         isfile = os.path.isfile
-        cli_queue = (action, filter(isfile, map(n, args["URI"])))
-    else: cli_queue = ("raise_window", None)
+        cli_queue = (action, filter(isfile, map(normpath, args["URI"])))
+    else:
+        cli_queue = ("raise_window", None)
 
-    # player commands
+    # Player commands
     for cmd in ["play_pause", "stop", "next", "previous"]:
-        if args[cmd]: bladbus.query_bus(cmd)
-
-    if args["play_pause"]: bladbus.query_bus("play_pause")
-    elif args["stop"]: bladbus.query_bus("stop")
-    elif args["next"]: bladbus.query_bus("next")
-    elif args["previous"]: bladbus.query_bus("previous")
+        if args[cmd]:
+            bladbus.query_bus(cmd)
 
 def force_singleton():
     # TODO: do this via dbus once we ported to pygobject. in that case
     #       python-dbus can be dropped as optional dependency as an
     #       introspected dbus wrapper is accessible through glib/gio
 
-    # set up user directories
+    # Set up user directories if necessary.
     directories = [blaconst.CACHEDIR, blaconst.USERDIR, blaconst.COVERS,
-            blaconst.ARTISTS, blaconst.RELEASES, blaconst.EVENTS]
+                   blaconst.ARTISTS, blaconst.RELEASES, blaconst.EVENTS]
 
     if not all(map(os.path.isdir, directories)):
         print_i("Setting up user directories")
         for directory in [blaconst.USERDIR, blaconst.COVERS, blaconst.ARTISTS,
-                blaconst.RELEASES, blaconst.EVENTS]:
-            try: os.makedirs(directory)
+                          blaconst.RELEASES, blaconst.EVENTS]:
+            try:
+                os.makedirs(directory)
             except OSError as (errno, strerror):
-                # inode exists, but it's a file. we can only bail in this case
-                if errno != 17: raise
+                # inode exists, but it's a file. We can only bail in this case
+                # and just re-raise the exception.
+                if errno != 17:
+                    raise
 
-    # we use a lock file to ensure a singleton of blaplay. however, the lock is
-    # only valid as long as the file descriptor is valid. that's why we need to
-    # keep it open (and referenced)
+    # We use a lock file to ensure blaplay operates as singleton. However, the
+    # lock is only valid as long as the file descriptor is alive. That's why we
+    # need to keep it open (and referenced) which is why we assign it to a
+    # global.
     global lock_file
     lock_file = open(blaconst.PIDFILE, "w")
-    try: fcntl.lockf(lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    try:
+        fcntl.lockf(lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
     except IOError:
         print_i("%s is already running" % blaconst.APPNAME)
         from blaplay.blautil import bladbus
         global cli_queue
-        try: bladbus.query_bus(*cli_queue)
-        except TypeError: pass
-        else: cli_queue = None
+        try:
+            bladbus.query_bus(*cli_queue)
+        except TypeError:
+            pass
+        else:
+            cli_queue = None
         raise SystemExit
     lock_file.write(str(os.getpid()))
 
@@ -190,15 +204,17 @@ def main():
 
     force_singleton()
 
-    # finish startup
+    # Finish startup
     import blaplay
     blaplay.finish_startup()
 
-    # clean up lock file
+    # Get rid of the lock file.
     fcntl.lockf(lock_file, fcntl.LOCK_UN)
     lock_file.close()
-    try: os.unlink(blaconst.PIDFILE)
-    except OSError: pass
+    try:
+        os.unlink(blaconst.PIDFILE)
+    except OSError:
+        pass
 
     print_d("Shutdown complete")
 

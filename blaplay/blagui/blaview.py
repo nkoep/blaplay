@@ -309,7 +309,7 @@ class BlaSidePane(gtk.VBox):
 
     def __selection_changed(self, selection):
         view = selection.get_selected_rows()[-1][0][0]
-        states = [False] * self.__treeview.get_model().iter_n_children(None)
+        states = [False] * len(self.__treeview.get_model())
         states[view] = True
         for idx, view in enumerate(blaconst.MENU_VIEWS):
             action = blagui.uimanager.get_widget(view)

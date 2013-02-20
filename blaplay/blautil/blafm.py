@@ -25,7 +25,6 @@ import urllib2
 import httplib
 import socket
 import webbrowser
-quote_url = lambda url: urllib2.quote(url.encode("utf-8"), safe=":/?=+&")
 import cPickle as pickle
 
 import gtk
@@ -38,13 +37,12 @@ from blaplay.blacore import blacfg, blaconst
 from blaplay import blautil
 from blaplay.formats._identifiers import *
 
-scrobbler = None
-
 TIMEOUT = 10
 LEGAL_NOTICE = str(
     "User-contributed text is available under the Creative Commons By-SA "
-    "License and may also be available under the GNU FDL."
-)
+    "License and may also be available under the GNU FDL.")
+
+scrobbler = None
 
 
 def init():
@@ -53,16 +51,21 @@ def init():
     player.connect("track_changed", scrobbler.submit_track)
     player.connect("track_stopped", scrobbler.submit_track)
 
+def quote_url(url):
+    return urllib2.quote(url.encode("utf-8"), safe=":/?=+&")
+
 def get_popup_menu(track=None):
     user = blacfg.getstring("lastfm", "user")
-    if track is None: track = player.get_track()
-    if not track and not user: return None
+    if track is None:
+        track = player.get_track()
+    if not track and not user:
+        return None
 
     menu = gtk.Menu()
     if user:
         m = gtk.MenuItem("View your profile")
         m.connect("activate",
-                lambda *x: blautil.open_url("http://last.fm/user/%s" % user))
+                  lambda *x: blautil.open_url("http://last.fm/user/%s" % user))
         menu.append(m)
 
         m = gtk.MenuItem("Love song")
@@ -76,16 +79,17 @@ def get_popup_menu(track=None):
     m = gtk.MenuItem("View song profile")
 
     if track:
-        m.connect("activate",
-                lambda *x: blautil.open_url("http://last.fm/music/%s/_/%s" %
-                (track[ARTIST].replace(" ", "+"),
-                track[TITLE].replace(" ", "+")))
-        )
+        m.connect(
+            "activate",
+             lambda *x: blautil.open_url("http://last.fm/music/%s/_/%s" % (
+             track[ARTIST].replace(" ", "+"), track[TITLE].replace(" ", "+"))))
         menu.append(m)
 
         m = gtk.MenuItem("View artist profile")
-        m.connect("activate", lambda *x: blautil.open_url(
-                "http://last.fm/music/%s" % track[ARTIST].replace(" ", "+")))
+        m.connect(
+            "activate",
+            lambda *x: blautil.open_url("http://last.fm/music/%s" %
+            track[ARTIST].replace(" ", "+")))
         menu.append(m)
 
     return menu
@@ -95,33 +99,50 @@ def post_message(params):
     conn = httplib.HTTPConnection("ws.audioscrobbler.com")
     params.append(("format", "json"))
     header = {"Content-type": "application/x-www-form-urlencoded"}
-    try: conn.request("POST", "/2.0/?", urllib.urlencode(dict(params)), header)
-    except (socket.gaierror, socket.error) as (error, response): pass
+    try:
+        conn.request("POST", "/2.0/?", urllib.urlencode(dict(params)), header)
+    except (socket.gaierror, socket.error) as (error, response):
+        pass
     else:
-        try: response = conn.getresponse()
-        except (httplib.BadStatusLine, socket.error): pass
+        try:
+            response = conn.getresponse()
+        except (httplib.BadStatusLine, socket.error):
+            pass
         else:
-            try: response = json.loads(response.read())
+            try:
+                response = json.loads(response.read())
             except (socket.timeout, ValueError):
                 error, response = response.status, response.reason
-            else: error, response = 0, response
+            else:
+                error, response = 0, response
     conn.close()
     return error, response
 
 def get_response(url, key):
     error, response = 0, None
-    try: f = urllib2.urlopen(url, timeout=TIMEOUT)
-    except (socket.timeout, urllib2.URLError, IOError): pass
-    else:
-        try: response = json.loads(f.read())
-        except (socket.timeout, ValueError): pass
+    try:
+        try:
+            f = urllib2.urlopen(url, timeout=TIMEOUT)
+        except (socket.timeout, urllib2.URLError, IOError):
+            pass
         else:
-            f.close()
-            try: response = response[key]
-            except TypeError: pass
-            except KeyError:
-                error = response["error"]
-                response = response["message"]
+            try:
+                response = json.loads(f.read())
+            except (socket.timeout, ValueError):
+                pass
+            else:
+                f.close()
+                try:
+                    response = response[key]
+                except TypeError:
+                    pass
+                except KeyError:
+                    error = response["error"]
+                    response = response["message"]
+    except:
+        print_w("FIXME")
+        import pprint
+        pprint.pprint(response)
     return error, response
 
 def get_image_url(images):
@@ -129,7 +150,8 @@ def get_image_url(images):
         if image_dict["size"] == "extralarge":
             url = image_dict["#text"]
             break
-    else: raise ValueError("No extralarge cover found")
+    else:
+        raise ValueError("No extralarge cover found")
     return url
 
 def get_cover(track, image_base):
@@ -142,20 +164,25 @@ def get_cover(track, image_base):
     error, response = get_response(url, "album")
 
     try:
-        if error: raise KeyError
+        if error:
+            raise KeyError
         images = response["image"]
-    except (TypeError, KeyError): url = None
-    else: url = get_image_url(images)
+    except (TypeError, KeyError):
+        url = None
+    else:
+        url = get_image_url(images)
 
     try:
-        if not url: raise IOError
+        if not url:
+            raise IOError
         name = os.path.basename(image_base)
-        images = [os.path.join(blaconst.COVERS, f) for f in
-                os.listdir(blaconst.COVERS) if f.startswith(name)]
+        images = [os.path.join(blaconst.COVERS, f)
+                  for f in os.listdir(blaconst.COVERS) if f.startswith(name)]
         map(os.unlink, images)
         cover, message = urllib.urlretrieve(
-                url, "%s.%s" % (image_base, blautil.get_extension(url)))
-    except IOError: pass
+            url, "%s.%s" % (image_base, blautil.get_extension(url)))
+    except IOError:
+        pass
 
     return cover
 
@@ -163,29 +190,35 @@ def get_biography(track, image_base):
     image, biography = None, None
 
     url = "%s&method=artist.getinfo&artist=%s" % (
-            blaconst.LASTFM_BASEURL, track[ARTIST])
+        blaconst.LASTFM_BASEURL, track[ARTIST])
     url = quote_url(url)
     error, response = get_response(url, "artist")
 
-    try: images = response["image"]
-    except (TypeError, KeyError): pass
+    try:
+        images = response["image"]
+    except (TypeError, KeyError):
+        pass
     else:
         url = get_image_url(images)
         try:
-            if not url: raise IOError
+            if not url:
+                raise IOError
             image, message = urllib.urlretrieve(
-                    url, "%s.%s" % (image_base, blautil.get_extension(url)))
-        except IOError: pass
+                url, "%s.%s" % (image_base, blautil.get_extension(url)))
+        except IOError:
+            pass
 
-    try: biography = response["bio"]["content"]
-    except (TypeError, KeyError): pass
+    try:
+        biography = response["bio"]["content"]
+    except (TypeError, KeyError):
+        pass
     else:
         biography = blautil.remove_html_tags(
-                biography.replace(LEGAL_NOTICE, "").strip())
+            biography.replace(LEGAL_NOTICE, "").strip())
 
     if error or response is None:
-        print_d("Failed to retrieve artist biography: %s (error %d)"
-                % (response, error))
+        print_d("Failed to retrieve artist biography: %s (error %d)" % (
+                response, error))
 
     return image, biography
 
@@ -194,11 +227,12 @@ def get_events(limit, recommended, city="", country=""):
 
     if recommended:
         session_key = BlaScrobbler.get_session_key()
-        if not session_key: return events
+        if not session_key:
+            return events
 
-        # since this is an authorized service the location information from the
-        # associated last.fm user account is used. passing the country kwarg ,
-        # doesn't allow specifying the city, so we just ignore it here
+        # Since this is an authorized service the location information from the
+        # associated last.fm user account is used. Passing the country kwarg
+        # doesn't allow specifying the city, so we just ignore it here.
         method = "user.getRecommendedEvents"
         params = [
             ("method", method), ("api_key", blaconst.LASTFM_APIKEY),
@@ -208,20 +242,28 @@ def get_events(limit, recommended, city="", country=""):
         api_signature = sign_api_call(params)
         params.append(("api_sig", api_signature))
         error, response = post_message(params)
-        try: response = response["events"]
-        except (TypeError, KeyError): pass
+        try:
+            response = response["events"]
+        except (TypeError, KeyError):
+            pass
 
     else:
         location = ", ".join([city, country] if country else [city])
         url = "%s&method=geo.getEvents&location=%s&limit=%d" % (
-                blaconst.LASTFM_BASEURL, location, limit)
+              blaconst.LASTFM_BASEURL, location, limit)
         url = quote_url(url)
         error, response = get_response(url, "events")
 
     try:
-        # if webservices are unavailable we might not get an error code despite
-        # an erroneous return message
-        if error: raise TypeError
+        # TODO: the reasonable thing to do here would be to set `error' and
+        #       response to a proper error-message-pair when response would be
+        #       returned as None from the callee
+
+        # If webservices are unavailable we might not get an error code despite
+        # an erroneous return message. Consequently `response' might actually
+        # be None.
+        if error:
+            raise TypeError
         events = response["event"]
     except (TypeError, KeyError):
         print_d("Failed to retrieve recommended events: %s (error %d)"
@@ -231,15 +273,19 @@ def get_events(limit, recommended, city="", country=""):
 def get_new_releases(recommended=False):
     releases = []
     user = blacfg.getstring("lastfm", "user")
-    if not user: return releases
+    if not user:
+        return releases
 
     url = "%s&method=user.getNewReleases&user=%s&userecs=%d" % (
-            blaconst.LASTFM_BASEURL, user, int(recommended))
+          blaconst.LASTFM_BASEURL, user, int(recommended))
     url = quote_url(url)
     error, response = get_response(url, "albums")
 
+    # Same as above: we still might have an error even if `error' doesn't
+    # reflect it.
     try:
-        if error: raise TypeError
+        if error:
+            raise TypeError
         releases = response["album"]
     except (TypeError, KeyError):
         print_d("Failed to get new releases: %s (error %d)"
@@ -249,7 +295,8 @@ def get_new_releases(recommended=False):
 def get_request_token():
     url = "%s&method=auth.gettoken" % blaconst.LASTFM_BASEURL
     error, response = get_response(url, "token")
-    if not error: token = response
+    if not error:
+        token = response
     else:
         token = None
         print_d("Failed to retrieve request token: %s (error %d)"
@@ -264,10 +311,11 @@ def sign_api_call(params):
 @blautil.thread
 def love_unlove_song(track, unlove=False):
     if (not blacfg.getstring("lastfm", "user") or not track[ARTIST] or
-            not track[TITLE]):
+        not track[TITLE]):
         return
     session_key = BlaScrobbler.get_session_key(create=True)
-    if not session_key: return
+    if not session_key:
+        return
 
     method = "track.unlove" if unlove else "track.love"
     params = [
@@ -281,8 +329,8 @@ def love_unlove_song(track, unlove=False):
     params.append(("api_sig", api_signature))
     error, response = post_message(params)
     if error:
-        print_d("Failed to love/unlove song: %s (error %d)"
-                % (response, error))
+        print_d("Failed to love/unlove song: %s (error %d)" % (
+                response, error))
 
 
 class BlaScrobbler(object):
@@ -310,48 +358,50 @@ class BlaScrobbler(object):
                 self.__not_empty.wait()
 
                 items = []
-                # the API allows submission of up to 50 scrobbles in one POST
+                # The API allows submission of up to 50 scrobbles in one POST.
                 for idx in xrange(50):
-                    try: items.append(self.__items[idx])
-                    except IndexError: pass
+                    try:
+                        items.append(self.__items[idx])
+                    except IndexError:
+                        pass
 
                 method = "track.scrobble"
                 session_key = BlaScrobbler.get_session_key()
-                if not session_key: continue
+                if not session_key:
+                    continue
                 params = [
                     ("method", method), ("api_key", blaconst.LASTFM_APIKEY),
                     ("sk", session_key)
                 ]
                 for idx, item in enumerate(items):
                     uri, start_time = item
-                    try: track = library[uri]
-                    except KeyError: continue
-                    params.extend([
-                        ("artist[%d]" % idx, track[ARTIST]),
-                        ("track[%d]" % idx, track[TITLE]),
-                        ("timestamp[%d]" % idx, str(start_time))
-                    ])
+                    try:
+                        track = library[uri]
+                    except KeyError:
+                        continue
+                    params.extend(
+                        [("artist[%d]" % idx, track[ARTIST]),
+                         ("track[%d]" % idx, track[TITLE]),
+                         ("timestamp[%d]" % idx, str(start_time))])
                     if track[ALBUM]:
                         params.append(("album[%d]" % idx, track[ALBUM]))
                     if track[ALBUM_ARTIST]:
-                        params.append(("album_artist[%d]" % idx,
-                                track[ALBUM_ARTIST]))
+                        params.append(
+                            ("album_artist[%d]" % idx, track[ALBUM_ARTIST]))
 
                 api_signature = sign_api_call(params)
                 params.append(("api_sig", api_signature))
                 error, response = post_message(params)
                 if error:
-                    print_d("Failed to submit %d scrobbles to "
-                            "last.fm: %s (error %d)" % (len(item), response,
-                            error)
-                    )
-                else: map(self.__items.remove, items)
+                    print_d("Failed to submit %d scrobbles to last.fm: %s "
+                            "(error %d)" % (len(item), response, error))
+                else:
+                    map(self.__items.remove, items)
 
         def __restore(self):
             items = blautil.deserialize_from_file(blaconst.SCROBBLES_PATH)
             if items:
-                print_d("Queuing %d unsubmitted scrobble(s)"
-                        % len(items))
+                print_d("Queuing %d unsubmitted scrobble(s)" % len(items))
                 self.put(items)
 
         def put(self, items):
@@ -374,38 +424,46 @@ class BlaScrobbler(object):
     @classmethod
     def __request_authorization(cls):
         from blaplay.blagui import blaguiutils
-        if blaguiutils.question_dialog("last.fm authorization required",
-                "In order to submit tracks to the last.fm scrobbler, blaplay "
-                "needs to be authorized to use your account. Open the "
-                "last.fm authorization page now?"):
-            blautil.open_url("http://www.last.fm/api/auth/?api_key=%s&"
-                    "token=%s" % (blaconst.LASTFM_APIKEY, cls.__token))
+        if blaguiutils.question_dialog(
+            "last.fm authorization required", "In order to submit tracks to "
+            "the last.fm scrobbler, blaplay needs to be authorized to use "
+            "your account. Open the last.fm authorization page now?"):
+            blautil.open_url(
+                "http://www.last.fm/api/auth/?api_key=%s&token=%s" % (
+                blaconst.LASTFM_APIKEY, cls.__token))
         return False
 
     def __passes_ignore(self, track):
-        tokens = map(str.strip, filter(None, blacfg.getstring(
-                "lastfm", "ignore.pattern").split(",")))
+        tokens = map(
+            str.strip,
+            filter(None, blacfg.getstring("lastfm",
+                                          "ignore.pattern").split(",")))
         res = [re.compile(t.decode("utf-8"), re.UNICODE | re.IGNORECASE)
-                for t in tokens]
+               for t in tokens]
         for r in res:
             search = r.search
             for identifier in [ARTIST, TITLE]:
-                if search(track[identifier]): return False
+                if search(track[identifier]):
+                    return False
         return True
 
     @blautil.thread
     def __update_now_playing(self, delay=False):
-        if delay: time.sleep(1)
+        if delay:
+            time.sleep(1)
 
-        try: track = library[self.__uri]
-        except KeyError: return
+        try:
+            track = library[self.__uri]
+        except KeyError:
+            return
         if (not track[ARTIST] or not track[TITLE] or track[LENGTH] < 30 or
-                not blacfg.getboolean("lastfm", "scrobble") or
-                not blacfg.getboolean("lastfm", "nowplaying")):
+            not blacfg.getboolean("lastfm", "scrobble") or
+            not blacfg.getboolean("lastfm", "nowplaying")):
             return
 
         session_key = self.get_session_key()
-        if not session_key: return
+        if not session_key:
+            return
 
         method = "track.updateNowPlaying"
         params = [
@@ -423,35 +481,40 @@ class BlaScrobbler(object):
         params.append(("api_sig", api_signature))
         error, response = post_message(params)
         if error:
-            print_d("Failed to update nowplaying: %s (error %d)"
-                    % (response, error))
+            print_d("Failed to update nowplaying: %s (error %d)" % (
+                    response, error))
 
     def __query_status(self):
         state = player.get_state()
         self.__iterations += 1
-        # wait 10~ seconds in between POSTs. before actually posting an update
-        # kill any remaining thread that might be running
+        # Wait 10~ seconds in between POSTs. Before actually posting an update
+        # kill any remaining thread that still might be running.
         if self.__iterations % 10 == 0:
-            try: self.__t.kill()
-            except AttributeError: pass
+            try:
+                self.__t.kill()
+            except AttributeError:
+                pass
             self.__t = self.__update_now_playing()
             self.__iterations = 0
 
-        if state == blaconst.STATE_PLAYING: self.__elapsed += 1
+        if state == blaconst.STATE_PLAYING:
+            self.__elapsed += 1
         return state != blaconst.STATE_STOPPED
 
     def __submit_last_track(self, shutdown=False):
         if self.__uri:
-            try: track = library[self.__uri]
-            except KeyError: return
-            # according to the last.fm api docs, only tracks longer than 30
+            try:
+                track = library[self.__uri]
+            except KeyError:
+                return
+            # According to the last.fm API docs, only tracks longer than 30
             # seconds should be submitted, and only if min(len[s]/2, 240)
-            # seconds of the track elapsed. submission should happen when a
-            # track stops, e.g. on track changes or playback stop (not pause)
+            # seconds of the track elapsed. Submission should be performed once
+            # a track stops, e.g. on track changes or playback stops (and not
+            # in paused states).
             if (track[LENGTH] > 30 and track[ARTIST] and track[TITLE] and
-                    blacfg.getboolean("lastfm", "scrobble") and
-                    (self.__elapsed > track[LENGTH] / 2 or
-                    self.__elapsed > 240)):
+                blacfg.getboolean("lastfm", "scrobble") and
+                (self.__elapsed > track[LENGTH] / 2 or self.__elapsed > 240)):
                 print_d("Submitting track to scrobbler queue")
                 self.__queue.put([(self.__uri, self.__start_time)])
 
@@ -463,12 +526,15 @@ class BlaScrobbler(object):
     @classmethod
     def get_session_key(cls, create=False):
         session_key = blacfg.getstring("lastfm", "sessionkey")
-        if session_key: return session_key
-        if not create or cls.__requested_authorization: return None
+        if session_key:
+            return session_key
+        if not create or cls.__requested_authorization:
+            return None
 
         if not cls.__token:
             cls.__token = get_request_token()
-            if not cls.__token: return None
+            if not cls.__token:
+                return None
             cls.__request_authorization()
             return None
 
@@ -478,11 +544,11 @@ class BlaScrobbler(object):
 
         # TODO: check this more than once
 
-        # we have a token, but it still might be unauthorized, i.e. we can't
-        # create a session key from it. if that is the case, ignore the
-        # situation until the next start of blaplay. in order to avoid sending
+        # We have a token, but it still might be unauthorized, i.e. we can't
+        # create a session key from it. If that is the case ignore the
+        # situation until the next start of blaplay. In order to avoid sending
         # requests to last.fm all the time we set an escape variable when we
-        # encounter an unauthorized token
+        # encounter an unauthorized token.
         method = "auth.getSession"
         params = [
             ("method", method), ("api_key", blaconst.LASTFM_APIKEY),
@@ -491,7 +557,7 @@ class BlaScrobbler(object):
         api_signature = sign_api_call(params)
         string = "&".join(["%s=%s" % p for p in params])
         url = "%s&api_sig=%s&%s" % (
-                blaconst.LASTFM_BASEURL, api_signature, string)
+              blaconst.LASTFM_BASEURL, api_signature, string)
         error, response = get_response(url, "session")
         if not error:
             session_key = response["key"]
@@ -503,32 +569,37 @@ class BlaScrobbler(object):
 
     def submit_track(self, player):
         if (not blacfg.getstring("lastfm", "user") or
-                not self.get_session_key(create=True)):
+            not self.get_session_key(create=True)):
             return
         gobject.source_remove(self.__tid)
 
-        # we request track submission on track changes. we don't have to check
+        # We request track submission on track changes. We don't have to check
         # here if a track passes the ignore settings as this is done when the
-        # __uri attribute of the instance is set below
+        # __uri attribute of the instance is set further down below.
         self.__submit_last_track()
 
         self.__elapsed = 0
         self.__iterations = 0
         track = player.get_track()
         try:
-            if player.radio: raise KeyError
+            if player.radio:
+                raise KeyError
             library[track.uri]
-        except (AttributeError, KeyError): return
+        except (AttributeError, KeyError):
+            return
 
         if self.__passes_ignore(track):
             self.__uri = track.uri
-            try: self.__t.kill()
-            except AttributeError: pass
+            try:
+                self.__t.kill()
+            except AttributeError:
+                pass
             self.__t = self.__update_now_playing(delay=True)
             self.__start_time = int(time.time())
             self.__tid = gobject.timeout_add(1000, self.__query_status)
         else:
             self.__uri = None
-            print_d("Not submitting track \"%s - %s\" to the scrobbler queue"
-                    % (track[ARTIST], track[TITLE]))
+            print_d(
+                "Not submitting track \"%s - %s\" to the scrobbler queue" % (
+                track[ARTIST], track[TITLE]))
 
