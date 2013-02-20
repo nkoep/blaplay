@@ -918,8 +918,8 @@ class BlaQueue(blaguiutils.BlaScrolledWindow):
             values.add(eval_(item.track).lower())
         if not values:
             return
-        r = re.compile(r"^(%s)$" % "|".join(values),
-                       re.UNICODE | re.IGNORECASE)
+        r = re.compile(
+            r"^(%s)$" % "|".join(values), re.UNICODE | re.IGNORECASE)
         items = [row[0] for row in model if r.match(eval_(row[0].track))]
         paths = [row.path for row in model if row[0] in items]
         selection.unselect_all()
@@ -939,7 +939,7 @@ class BlaQueue(blaguiutils.BlaScrolledWindow):
 
         # update labels
         for idx, row in enumerate(model):
-            model[row.path][1] = idx + 1
+            model[row.path][1] = idx+1
 
         # invalidate visible rows of the current playlists
         BlaPlaylistManager.get_current_playlist().invalidate_visible_rows()
@@ -950,8 +950,8 @@ class BlaQueue(blaguiutils.BlaScrolledWindow):
             track = row[0].track
             cls.__size += track[FILESIZE]
             cls.__length += track[LENGTH]
-        cls.__instance.emit("count_changed",
-                            blaconst.VIEW_QUEUE, cls.queue_n_items())
+        cls.__instance.emit("count_changed", blaconst.VIEW_QUEUE,
+                            cls.queue_n_items())
         cls.__instance.update_statusbar()
 
     @classmethod
@@ -970,7 +970,8 @@ class BlaQueue(blaguiutils.BlaScrolledWindow):
 
     @classmethod
     def remove_items(cls, items):
-        # this is invoked by playlists who want to remove tracks from the queue
+        # This is invoked by playlists who want to remove tracks from the
+        # queue.
         model = cls.__treeview.get_model()
         for row in model:
             if row[0] in items:
@@ -993,7 +994,11 @@ class BlaQueue(blaguiutils.BlaScrolledWindow):
 
     @classmethod
     def copy(cls, *args):
-        cls.clipboard = map(copy, cls.__get_items(remove=False))
+        # We specifically don't create actual copies of items here as it's not
+        # desired to have unique ones in the queue. Copied and pasted tracks
+        # should still refer to the same BlaListItem instances which are part
+        # (possibly part of a playlist).
+        cls.clipboard = cls.__get_items(remove=False)
         blagui.update_menu(blaconst.VIEW_QUEUE)
 
     @classmethod
@@ -1471,6 +1476,9 @@ class BlaPlaylist(gtk.VBox):
         return True
 
     def clear(self):
+        if not self.modification_allowed(check_filter_state=False):
+            return
+
         self.__treeview.freeze_notify()
         self.__treeview.freeze_child_notify()
         model = self.__treeview.get_model()
@@ -1875,7 +1883,7 @@ class BlaPlaylist(gtk.VBox):
             self.__name.pack_start(image)
             self.__name.show_all()
 
-        BlaPlaylistManager.update_lock_button_state()
+        BlaPlaylistManager.update_playlist_lock_state()
 
     def locked(self):
         return self.__lock.locked()
@@ -2191,7 +2199,7 @@ class BlaPlaylistManager(gtk.Notebook):
         self.connect("page_removed", page_num_changed)
         def switch_page(*args):
             playlist = self.get_nth_page(args[-1])
-            self.update_lock_button_state()
+            self.update_playlist_lock_state()
             self.update_statusbar(playlist)
         self.connect_after("switch_page", switch_page)
 
@@ -2498,13 +2506,15 @@ class BlaPlaylistManager(gtk.Notebook):
         return name, uris
 
     @classmethod
-    def update_lock_button_state(cls):
+    def update_playlist_lock_state(cls):
         playlist = cls.get_current_playlist()
         try:
             label = "%s playlist" % ("Unlock" if playlist.locked() else "Lock")
         except AttributeError:
             return
         cls.__instance.__lock_button.set_tooltip_text(label)
+        blagui.uimanager.get_widget("/Menu/Edit/LockUnlockPlaylist").set_label(
+            label)
 
     @classmethod
     def get_active_playlist(cls):

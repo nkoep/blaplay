@@ -1,6 +1,6 @@
 blaplay - a bla that plays (or: a working title that stuck)
 
-blaplay is an audio player for GNU/Linux with a minimalistic design approach
+blaplay is an audio player for GNU/Linux with a minimalist design approach
 rather than feature richness. It is written in Python 2.6, and relies on PyGTK,
 PyGST, and Mutagen to implement its core functionality. Notable features
 include a monitored audio library, automatic cover art, lyrics and biography
