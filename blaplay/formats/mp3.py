@@ -140,7 +140,7 @@ class Mp3(BlaTrack):
         ttr = set(self.__id3v1)
         other_tags = [k.split(":")[0] for k in tags.iterkeys()
                       if not k.startswith("TXXX")]
-        ttr.update(self.__tag_to_literal.keys().intersection(other_tags))
+        ttr.update(set(self.__tag_to_literal.keys()).intersection(other_tags))
 
         for tag in ttr:
             identifier = self.__tag_to_literal[tag]
@@ -164,10 +164,10 @@ class Mp3(BlaTrack):
             self[identifier] = map(
                 fix_encoding, zip(value, [enc] * len(value)))
 
-        # get all custom tags
+        # Get all custom tags.
         for tag in tags.getall("TXXX"):
-            # ALBUM ARTIST user tags (as written by older fb2k versions) get
-            # special treatment
+            # ALBUM ARTIST user tags (as written by older fb2k versions)
+            # receive special treatment.
             if tag.desc == "ALBUM ARTIST":
                 tag.desc = ALBUM_ARTIST
             enc = frame.encoding
@@ -205,7 +205,7 @@ class Mp3(BlaTrack):
             if not text:
                 continue
 
-            # utf-8 is ascii-compatible
+            # UTF-8 is ASCII-compatible
             if isascii("\n".join(text)):
                 encoding = 3
             else:
