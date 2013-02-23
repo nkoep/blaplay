@@ -185,7 +185,7 @@ def popup(treeview, event, view_id, target):
 
         if view_id == blaconst.VIEW_QUEUE:
             m = gtk.MenuItem("Clear queue")
-            m.connect("activate", lambda *x: BlaQueue.clear())
+            m.connect("activate", lambda *x: element.clear())
             menu.append(m)
 
         menu.show_all()
@@ -304,7 +304,7 @@ def popup(treeview, event, view_id, target):
 
         # remaining options
         items = [
-            ("Add to queue", "Q", lambda *x: target.send_to_queue(treeview)),
+            ("Add to queue", "Q", lambda *x: target.send_to_queue()),
             ("Remove from queue", "R",
              lambda *x: target.remove_from_queue(treeview)),
         ]
@@ -757,7 +757,6 @@ class BlaQueue(blaguiutils.BlaScrolledWindow):
         self.__treeview.connect("drag_data_received", self.__drag_data_recv)
 
         update_columns(self.__treeview, view_id=blaconst.VIEW_QUEUE)
-
         self.show_all()
 
     def __button_press_event(self, treeview, event):
@@ -963,8 +962,13 @@ class BlaQueue(blaguiutils.BlaScrolledWindow):
     def queue_items(cls, items):
         if not items:
             return
+
+        # If any of the items is not an instance of BlaListItem it means all of
+        # the items are actually just URIs which stem from the library browser
+        # and are not part of a playlist.
         if not isinstance(items[0], BlaListItem):
             items = map(BlaListItem, items)
+
         count = blaconst.QUEUE_MAX_ITEMS - cls.queue_n_items()
         cls.__add_items(items[:count], path=-1)
 
@@ -980,12 +984,44 @@ class BlaQueue(blaguiutils.BlaScrolledWindow):
 
     @classmethod
     def get_queue(cls):
-        print_w("TODO")
-        items = map(copy, [row[0] for row in cls.__treeview.get_model()])
+        queue = []
+        playlists = BlaPlaylistManager.get_playlists()
+
+        for row in cls.__treeview.get_model():
+            item = row[0]
+            playlist = item.playlist
+
+            try:
+                playlist_idx = playlists.index(playlist)
+            except ValueError:
+                item = item.uri
+            else:
+                item = (playlist_idx,
+                        playlist.get_path_from_item(item, all_=True))
+
+            queue.append(item)
+
+        return queue
 
     @classmethod
     def restore(cls, items):
-        print_w("TODO")
+        if not items:
+            return
+
+        items_ = []
+        playlists = BlaPlaylistManager.get_playlists()
+
+        for item in items:
+            try:
+                playlist_idx, path = item
+            except TypeError:
+                item = BlaListItem(item)
+            else:
+                item = playlists[playlist_idx].get_item_from_path(path)
+
+            items_.append(item)
+
+        cls.queue_items(items_)
 
     @classmethod
     def cut(cls, *args):
@@ -1437,7 +1473,7 @@ class BlaPlaylist(gtk.VBox):
         is_accel = blagui.is_accel
         accels = [
             ("Delete", delete),
-            ("Q", lambda: self.send_to_queue(self.__treeview)),
+            ("Q", lambda: self.send_to_queue()),
             ("R", lambda: self.remove_from_queue(self.__treeview)),
             ("Escape", self.disable_search),
             ("<Alt>Return", self.show_properties)
@@ -2092,13 +2128,13 @@ class BlaPlaylist(gtk.VBox):
         playlist.add_items(items=items, select_rows=True)
         BlaPlaylistManager.focus_playlist(playlist)
 
-    def send_to_queue(self, treeview):
+    def send_to_queue(self):
         queue_n_items = BlaQueue.queue_n_items()
         if queue_n_items >= blaconst.QUEUE_MAX_ITEMS:
             return
 
         count = blaconst.QUEUE_MAX_ITEMS - queue_n_items
-        model, selection = treeview.get_selection().get_selected_rows()
+        model, selection = self.__treeview.get_selection().get_selected_rows()
         BlaQueue.queue_items([model[p][0] for p in selection[:count]])
 
     def remove_from_queue(self, treeview):
