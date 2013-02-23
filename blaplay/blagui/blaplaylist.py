@@ -705,6 +705,8 @@ class BlaListItem(object):
 
     def select(self):
         if self.playlist:
+            if BlaPlaylistManager.get_current_playlist() != self.playlist:
+                BlaPlaylistManager.focus_playlist(self.playlist)
             self.playlist.set_row(self.playlist.get_path_from_item(self))
 
     def clear_icon(self):
