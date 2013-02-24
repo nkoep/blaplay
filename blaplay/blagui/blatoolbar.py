@@ -115,7 +115,7 @@ class PositionSlider(gtk.HScale):
         track = player.get_track()
         duration = track[LENGTH] * 1e9
         self.set_range(0, max(1, duration))
-        self.set_increments(-int(duration / 100.), -int(duration / 10.))
+        self.set_increments(-int(duration / 100.0), -int(duration / 10.0))
         self.__seekid = gobject.timeout_add(
                 self.__seek_interval, self.__update_position)
 
@@ -180,7 +180,7 @@ class VolumeControl(gtk.HBox):
         if state: volume = self.__volume
         else: volume = scale.get_value()
 
-        blacfg.set("player", "volume", volume / 100.)
+        blacfg.set("player", "volume", volume / 100.0)
         player.set_volume(scale.get_value())
         self.__update_icon(state)
 
@@ -198,7 +198,7 @@ class VolumeControl(gtk.HBox):
 
         # unmute
         if not state:
-            k = int(math.ceil(2.95 * volume / 100.))
+            k = int(math.ceil(2.95 * volume / 100.0))
             icon_name %= self.__states[k]
         # mute
         else: icon_name %= self.__states[0]
@@ -208,7 +208,7 @@ class VolumeControl(gtk.HBox):
         volume = self.__scale.get_value()
         if blacfg.getboolean("player", "logarithmic.volume.scale"):
             if volume == 0: tooltip = "-Inf dB"
-            else: tooltip = "%d dB" % (50 * (volume / 100 - 1))
+            else: tooltip = "%.1f dB" % (50 * (volume / 100.0 - 1))
         else: tooltip = "%d%%" % volume
         self.__scale.set_tooltip_text(tooltip)
         return False
