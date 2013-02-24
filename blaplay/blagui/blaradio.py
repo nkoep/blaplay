@@ -200,7 +200,7 @@ class BlaRadio(gtk.VBox):
         self.__save_stations()
 
     def __drag_data_get(self, treeview, drag_context, selection_data, info,
-            time):
+                        time):
         self.__paths = treeview.get_selection().get_selected_rows()[-1]
         selection_data.set("radio", 8, "")
 

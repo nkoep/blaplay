@@ -157,6 +157,7 @@ def is_accel(event, accel):
     return (accel_keyval, accel_mod) == (keyval, event.state & default_mod)
 
 
+# TODO: move this to its own file
 class BlaTray(gtk.StatusIcon):
     def __init__(self, window):
         super(BlaTray, self).__init__()
