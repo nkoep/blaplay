@@ -996,7 +996,7 @@ class BlaQueue(blaguiutils.BlaScrolledWindow):
             try:
                 playlist_idx = playlists.index(playlist)
             except ValueError:
-                item = item.uri
+                item = (item.uri,)
             else:
                 item = (playlist_idx,
                         playlist.get_path_from_item(item, all_=True))
@@ -1016,7 +1016,7 @@ class BlaQueue(blaguiutils.BlaScrolledWindow):
         for item in items:
             try:
                 playlist_idx, path = item
-            except TypeError:
+            except ValueError:
                 item = BlaListItem(item)
             else:
                 item = playlists[playlist_idx].get_item_from_path(path)
