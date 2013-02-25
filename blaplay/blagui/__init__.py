@@ -46,6 +46,7 @@ def update_menu(view):
     state = False
     if view == blaconst.VIEW_PLAYLISTS: state = True
 
+    # TODO: update the "Clear" label for the playlist or queue
     for entry in blaconst.MENU_PLAYLISTS:
         uimanager.get_widget(entry).set_visible(state)
 
@@ -68,7 +69,7 @@ def update_colors():
     # invert background color to get a clearly visible color for the drop
     # indicator of DND operations
     color = gtk.gdk.color_parse(blacfg.getstring("colors", "background"))
-    color = [65535-c for c in [color.red, color.green, color.blue]]
+    color = (65535-c for c in [color.red, color.green, color.blue])
     color = gtk.gdk.Color(*color).to_string()
 
     gtk.rc_parse_string(

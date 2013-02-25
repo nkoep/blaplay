@@ -22,14 +22,13 @@ APPNAME = "blaplay"
 COMMENT = "A bla that plays"
 WEB = "http://nkoep.github.com/blaplay"
 AUTHOR = "Niklas Koep"
-AUTHORS = sorted([
-    AUTHOR
-])
+AUTHORS = sorted(
+    [AUTHOR])
 EMAIL = "niklas.koep@gmail.com"
 COPYRIGHT = "Copyright © 2012-2013 %s\n<%s>" % (AUTHOR, EMAIL)
 CFG_TIMEOUT = 30
 
-# dirs
+# Directories
 USERDIR = os.path.join(os.path.expanduser("~"), ".%s" % APPNAME)
 CACHEDIR = os.path.join(USERDIR, "cache")
 BASEDIR = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
@@ -39,7 +38,7 @@ ARTISTS = os.path.join(CACHEDIR, "artists")
 RELEASES = os.path.join(CACHEDIR, "releases")
 EVENTS = os.path.join(CACHEDIR, "events")
 
-# files
+# Files
 CFG_PATH = os.path.join(USERDIR, "config")
 PIDFILE = os.path.join(USERDIR, "pid")
 LIBRARY_PATH = os.path.join(USERDIR, "library")
@@ -61,98 +60,104 @@ LASTFM_BASEURL = ("http://ws.audioscrobbler.com/2.0/?api_key=%s&format=json"
         % LASTFM_APIKEY)
 LASTFM_LOGO = os.path.join(IMAGES_PATH, "lastfm.gif")
 
-# player constants
+# Player constants
 STATE_PLAYING, STATE_PAUSED, STATE_STOPPED = xrange(3)
 TRACK_PLAY, TRACK_NEXT, TRACK_PREVIOUS, TRACK_RANDOM = xrange(4)
 EQUALIZER_BANDS = 10
 
-# menu
+# Main menu
 MENU = """
-    <ui>
-        <menubar name="Menu">
-            <menu action="File">
-                <menuitem action="OpenPlaylist"/>
-                <menuitem action="AddFiles"/>
-                <menuitem action="AddDirectories"/>
-                <menuitem action="SavePlaylist"/>
-                <separator/>
-                <menuitem action="Quit"/>
+<ui>
+    <menubar name="Menu">
+        <menu action="File">
+            <menuitem action="OpenPlaylist"/>
+            <menuitem action="AddFiles"/>
+            <menuitem action="AddDirectories"/>
+            <menuitem action="SavePlaylist"/>
+            <separator/>
+            <menuitem action="Quit"/>
+        </menu>
+        <menu action="Edit">
+            <menuitem action="AddNewPlaylist"/>
+            <menuitem action="RemovePlaylist"/>
+            <menuitem action="Clear"/>
+            <menuitem action="LockUnlockPlaylist"/>
+            <menu action="Select">
+                <menuitem action="SelectAll"/>
+                <menuitem action="SelectComplement"/>
+                <menuitem action="SelectByArtist"/>
+                <menuitem action="SelectByAlbum"/>
+                <menuitem action="SelectByAlbumArtist"/>
+                <menuitem action="SelectByGenre"/>
             </menu>
-            <menu action="Edit">
-                <menuitem action="Paste"/>
-                <menuitem action="Clear"/>
-                <menuitem action="LockUnlockPlaylist"/>
-                <menu action="Select">
-                    <menuitem action="SelectAll"/>
-                    <menuitem action="SelectComplement"/>
-                    <menuitem action="SelectByArtist"/>
-                    <menuitem action="SelectByAlbum"/>
-                    <menuitem action="SelectByAlbumArtist"/>
-                    <menuitem action="SelectByGenre"/>
-                </menu>
-                <menu action="Selection">
-                    <menuitem action="Cut"/>
-                    <menuitem action="Copy"/>
-                    <menuitem action="Remove"/>
-                </menu>
-                <menu action="NewPlaylistFrom">
-                    <menuitem action="PlaylistFromSelection"/>
-                    <menuitem action="PlaylistFromArtists"/>
-                    <menuitem action="PlaylistFromAlbums"/>
-                    <menuitem action="PlaylistFromAlbumArtists"/>
-                    <menuitem action="PlaylistFromGenre"/>
-                </menu>
-                <separator/>
-                <menuitem action="RemoveDuplicates"/>
-                <menuitem action="RemoveInvalidTracks"/>
-                <menuitem action="Search"/>
-                <separator/>
-                <menuitem action="Preferences"/>
+            <menu action="Selection">
+                <menuitem action="Cut"/>
+                <menuitem action="Copy"/>
+                <menuitem action="Remove"/>
             </menu>
-            <menu action="PlayOrder">
-                <menuitem action="OrderNormal"/>
-                <menuitem action="OrderRepeat"/>
-                <menuitem action="OrderShuffle"/>
+            <menuitem action="Paste"/>
+            <menu action="NewPlaylistFrom">
+                <menuitem action="PlaylistFromSelection"/>
+                <menuitem action="PlaylistFromArtists"/>
+                <menuitem action="PlaylistFromAlbums"/>
+                <menuitem action="PlaylistFromAlbumArtists"/>
+                <menuitem action="PlaylistFromGenre"/>
             </menu>
-            <menu action="View">
-                <menuitem action="Playlists"/>
-                <menuitem action="Queue"/>
-                <menuitem action="Radio"/>
-                <menuitem action="RecommendedEvents"/>
-                <menuitem action="NewReleases"/>
-                <separator/>
-                <menuitem action="Browsers"/>
-                <menuitem action="PlaylistTabs"/>
-                <menuitem action="SidePane"/>
-                <menuitem action="Statusbar"/>
-                <menuitem action="Visualization"/>
-                <separator/>
-                <menuitem action="JumpToPlayingTrack"/>
-            </menu>
-            <menu action="Help">
-                <menuitem action="About"/>
-            </menu>
-        </menubar>
-    </ui>
+            <separator/>
+            <menuitem action="RemoveDuplicates"/>
+            <menuitem action="RemoveInvalidTracks"/>
+            <menuitem action="Search"/>
+            <separator/>
+            <menuitem action="Preferences"/>
+        </menu>
+        <menu action="PlayOrder">
+            <menuitem action="OrderNormal"/>
+            <menuitem action="OrderRepeat"/>
+            <menuitem action="OrderShuffle"/>
+        </menu>
+        <menu action="View">
+            <menuitem action="Playlists"/>
+            <menuitem action="Queue"/>
+            <menuitem action="Radio"/>
+            <menuitem action="RecommendedEvents"/>
+            <menuitem action="NewReleases"/>
+            <separator/>
+            <menuitem action="Browsers"/>
+            <menuitem action="PlaylistTabs"/>
+            <menuitem action="SidePane"/>
+            <menuitem action="Statusbar"/>
+            <menuitem action="Visualization"/>
+            <separator/>
+            <menuitem action="JumpToPlayingTrack"/>
+        </menu>
+        <menu action="Help">
+            <menuitem action="About"/>
+        </menu>
+    </menubar>
+</ui>
 """
-MENU_PLAYLISTS = map(lambda entry: "/Menu/%s" % entry,
-        ["File/AddFiles", "File/AddDirectories", "File/SavePlaylist",
-         "Edit/LockUnlockPlaylist", "Edit/NewPlaylistFrom", "Edit/Search",
-         "View/PlaylistTabs", "View/JumpToPlayingTrack"]
-)
-MENU_EDIT = map(lambda entry: "/Menu/Edit/%s" % entry,
-        ["Paste", "Clear", "Select", "Select/SelectAll",
-         "Select/SelectComplement", "Selection/Cut", "Selection/Copy",
-         "Selection/Remove", "RemoveDuplicates", "RemoveInvalidTracks"]
-         + map(lambda entry: "Select/Select%s" % entry,
-         ["All", "ByArtist", "ByAlbum", "ByAlbumArtist", "ByGenre"])
-)
-MENU_ORDER = map(lambda entry: "/Menu/PlayOrder/%s" % entry,
-        ["OrderNormal", "OrderRepeat", "OrderShuffle"])
-MENU_VIEWS = map(lambda entry: "/Menu/View/%s" % entry,
-        ["Playlists", "Queue", "Radio", "RecommendedEvents", "NewReleases"])
+def _builder(base, items):
+    return [base % item for item in items]
+MENU_PLAYLISTS = _builder(
+    "/Menu/%s",
+    ["File/AddFiles", "File/AddDirectories", "File/SavePlaylist",
+     "Edit/AddNewPlaylist", "Edit/RemovePlaylist",
+     "Edit/LockUnlockPlaylist", "Edit/NewPlaylistFrom", "Edit/Search",
+     "View/PlaylistTabs", "View/JumpToPlayingTrack"])
+MENU_EDIT = _builder(
+    "/Menu/Edit/%s",
+    ["Paste", "Clear", "Select", "Select/SelectAll",
+     "Select/SelectComplement", "Selection/Cut", "Selection/Copy",
+     "Selection/Remove", "RemoveDuplicates", "RemoveInvalidTracks"] +
+    _builder("Select/Select%s", ["All", "ByArtist", "ByAlbum",
+                                 "ByAlbumArtist", "ByGenre"]))
+MENU_ORDER = _builder("/Menu/PlayOrder/%s",
+                      ["OrderNormal", "OrderRepeat", "OrderShuffle"])
+MENU_VIEWS = _builder("/Menu/View/%s", ["Playlists", "Queue", "Radio",
+                                        "RecommendedEvents", "NewReleases"])
+del _builder
 
-# library and browser constants
+# Library and browser constants
 (ORGANIZE_BY_DIRECTORY, ORGANIZE_BY_ARTIST, ORGANIZE_BY_ARTIST_ALBUM,
  ORGANIZE_BY_ALBUM, ORGANIZE_BY_GENRE, ORGANIZE_BY_YEAR) = xrange(6)
 
@@ -160,12 +165,12 @@ BROWSER_LIBRARY, BROWSER_FILESYSTEM = xrange(2)
 (ACTION_SEND_TO_CURRENT, ACTION_ADD_TO_CURRENT, ACTION_SEND_TO_NEW,
  ACTION_EXPAND_COLLAPSE) = xrange(4)
 
-# view constants
+# View constants
 VIEW_PLAYLISTS, VIEW_QUEUE, VIEW_RADIO, VIEW_EVENTS, VIEW_RELEASES = xrange(5)
 (SELECT_ALL, SELECT_COMPLEMENT, SELECT_BY_ARTISTS, SELECT_BY_ALBUMS,
  SELECT_BY_ALBUM_ARTISTS, SELECT_BY_GENRES) = xrange(6)
 
-# playlist constants
+# Playlist constants
 QUEUE_MAX_ITEMS = 128
 ORDER_NORMAL, ORDER_REPEAT, ORDER_SHUFFLE = xrange(3)
 ORDER_LITERALS = ["Normal", "Repeat", "Shuffle"]
@@ -175,9 +180,9 @@ ORDER_LITERALS = ["Normal", "Repeat", "Shuffle"]
 
 METADATA_LYRICS, METADATA_BIOGRAPHY = xrange(2)
 
-# events browser
+# Events browser
 EVENTS_RECOMMENDED, EVENTS_ALL = xrange(2)
 
-# releases browser
+# Releases browser
 NEW_RELEASES_FROM_LIBRARY, NEW_RELEASES_RECOMMENDED = xrange(2)
 

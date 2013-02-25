@@ -44,6 +44,9 @@ class BlaMainWindow(blaguiutils.BlaBaseWindow):
         gtk.window_set_default_icon_name(blaconst.APPNAME)
         self.set_resizable(True)
         self.connect("delete_event", self.__delete_event)
+        self.enable_tracking(is_main_window=True)
+
+        # Install global mouse hook.
         def button_press_hook(receiver, event):
             if event.button == 8:
                 player.previous()
@@ -52,16 +55,15 @@ class BlaMainWindow(blaguiutils.BlaBaseWindow):
             return True
         gobject.add_emission_hook(self, "button_press_event",
                                   button_press_hook)
-        self.enable_tracking(is_main_window=True)
 
-        # mainmenu
+        # Main menu
         blagui.uimanager = uimanager = gtk.UIManager()
         blagui.accelgroup = uimanager.get_accel_group()
         self.add_accel_group(blagui.accelgroup)
         actiongroup = gtk.ActionGroup("blagui-actions")
 
         actions = [
-            # menus and submenus
+            # Menus and submenus
             ("File", None, "_File"),
             ("Edit", None, "_Edit"),
             ("Select", None, "S_elect"),
@@ -71,17 +73,20 @@ class BlaMainWindow(blaguiutils.BlaBaseWindow):
             ("View", None, "_View"),
             ("Help", None, "_Help"),
 
-            # menuitems
+            # Menu items
             ("OpenPlaylist", None, "Open playlist...", None, "",
-                    self.__open_playlist),
+             self.__open_playlist),
             ("AddFiles", None, "Add _files...", None, "",
-                    lambda *x: self.__add_tracks()),
+             lambda *x: self.__add_tracks()),
             ("AddDirectories", None, "_Add directories...", None, "",
-                    lambda *x: self.__add_tracks(files=False)),
+             lambda *x: self.__add_tracks(files=False)),
             ("SavePlaylist", None, "_Save playlist...", None, "",
-                    self.__save_playlist),
+             self.__save_playlist),
+            ("AddNewPlaylist", None, "Add new playlist", "<Ctrl>T", "",
+             lambda *x: BlaPlaylistManager.add_playlist(focus=True)),
+            ("RemovePlaylist", None, "Remove playlist", "<Ctrl>W", "",
+             lambda *x: BlaPlaylistManager.remove_playlist()),
             ("Quit", gtk.STOCK_QUIT, "_Quit", "<Ctrl>Q", "", self.quit),
-            ("Paste", None, "Paste", None, "", BlaView.paste),
             ("Clear", None, "_Clear", None, "", BlaView.clear),
             ("LockUnlockPlaylist", None, "Lock/Unlock playlist", None, "",
              BlaPlaylistManager.toggle_lock_playlist),
@@ -100,26 +105,22 @@ class BlaMainWindow(blaguiutils.BlaBaseWindow):
             ("Cut", None, "Cut", None, "", BlaView.cut),
             ("Copy", None, "Copy", None, "", BlaView.copy),
             ("Remove", None, "Remove", None, "", BlaView.remove),
+            ("Paste", None, "Paste", None, "", BlaView.paste),
             ("PlaylistFromSelection", None, "Selection", None, "",
-                    lambda *x: BlaPlaylistManager.new_playlist(
-                    blaconst.PLAYLIST_FROM_SELECTION)
-            ),
+             lambda *x: BlaPlaylistManager.new_playlist(
+             blaconst.PLAYLIST_FROM_SELECTION)),
             ("PlaylistFromArtists", None, "Selected artist(s)", None, "",
-                    lambda *x: BlaPlaylistManager.new_playlist(
-                    blaconst.PLAYLIST_FROM_ARTISTS)
-            ),
+             lambda *x: BlaPlaylistManager.new_playlist(
+             blaconst.PLAYLIST_FROM_ARTISTS)),
             ("PlaylistFromAlbums", None, "Selected album(s)", None, "",
-                    lambda *x: BlaPlaylistManager.new_playlist(
-                    blaconst.PLAYLIST_FROM_ALBUMS)
-            ),
+             lambda *x: BlaPlaylistManager.new_playlist(
+             blaconst.PLAYLIST_FROM_ALBUMS)),
             ("PlaylistFromAlbumArtists", None, "Selected album artist(s)",
-                    None, "", lambda *x: BlaPlaylistManager.new_playlist(
-                    blaconst.PLAYLIST_FROM_ALBUM_ARTISTS)
-            ),
+             None, "", lambda *x: BlaPlaylistManager.new_playlist(
+             blaconst.PLAYLIST_FROM_ALBUM_ARTISTS)),
             ("PlaylistFromGenre", None, "Selected genre(s)", None, "",
-                    lambda *x: BlaPlaylistManager.new_playlist(
-                    blaconst.PLAYLIST_FROM_GENRE)
-            ),
+             lambda *x: BlaPlaylistManager.new_playlist(
+             blaconst.PLAYLIST_FROM_GENRE)),
             ("RemoveDuplicates", None, "Remove _duplicates", None, "",
              BlaView.remove_duplicates),
             ("RemoveInvalidTracks", None, "Remove _invalid tracks", None, "",
@@ -128,34 +129,30 @@ class BlaMainWindow(blaguiutils.BlaBaseWindow):
              lambda *x: BlaPlaylistManager.enable_search()),
             ("Preferences", None, "Pre_ferences...", None, "", BlaPreferences),
             ("JumpToPlayingTrack", None, "_Jump to playing track", "<Ctrl>J",
-                    "", lambda *x: BlaPlaylistManager.jump_to_playing_track()),
+             "", lambda *x: BlaPlaylistManager.jump_to_playing_track()),
             ("About", None, "_About...", None, "", BlaAbout)
         ]
         toggle_actions = [
             ("Browsers", None, "_Browsers", None, "", self.__toggle_browsers,
-                    blacfg.getboolean("general", "browsers")),
+             blacfg.getboolean("general", "browsers")),
             ("PlaylistTabs", None, "Playlist _tabs", None, "",
-                    self.__toggle_tabs,
-                    blacfg.getboolean("general", "playlist.tabs")
-            ),
+             self.__toggle_tabs, blacfg.getboolean("general",
+                                                   "playlist.tabs")),
             ("SidePane", None, "_Side pane", None, "",
-                    self.__toggle_side_pane, blacfg.getboolean(
-                    "general", "side.pane")
-            ),
+             self.__toggle_side_pane, blacfg.getboolean("general",
+                                                        "side.pane")),
             ("Statusbar", None, "St_atusbar", None, "",
-                    self.__toggle_statusbar,
-                    blacfg.getboolean("general", "statusbar")
-            ),
+             self.__toggle_statusbar, blacfg.getboolean("general",
+                                                        "statusbar")),
             ("Visualization", None, "Visualization", None, "",
-                    self.__toggle_visualization,
-                    blacfg.getboolean("general", "show.visualization")
-            )
+             self.__toggle_visualization,
+             blacfg.getboolean("general", "show.visualization"))
         ]
         radio_actions0 = [
             ("OrderNormal", None, "_Normal", None, "", blaconst.ORDER_NORMAL),
             ("OrderRepeat", None, "_Repeat", None, "", blaconst.ORDER_REPEAT),
             ("OrderShuffle", None, "_Shuffle", None, "",
-                    blaconst.ORDER_SHUFFLE)
+             blaconst.ORDER_SHUFFLE)
         ]
         radio_actions1 = [
             ("Playlists", None, "_Playlists", None, "",
@@ -169,21 +166,20 @@ class BlaMainWindow(blaguiutils.BlaBaseWindow):
         ]
         actiongroup.add_actions(actions)
         actiongroup.add_toggle_actions(toggle_actions)
-        actiongroup.add_radio_actions(radio_actions0,
-                value=blacfg.getint("general", "play.order"),
-                on_change=BlaStatusbar.set_order
-        )
-        actiongroup.add_radio_actions(radio_actions1, value=blacfg.getint(
-                "general", "view"), on_change=lambda *x: BlaView.update_view(
-                x[-1].get_current_value())
-        )
+        actiongroup.add_radio_actions(
+            radio_actions0, value=blacfg.getint("general", "play.order"),
+            on_change=BlaStatusbar.set_order)
+        actiongroup.add_radio_actions(
+            radio_actions1, value=blacfg.getint("general", "view"),
+            on_change=lambda *x: BlaView.update_view(
+            x[-1].get_current_value()))
         uimanager.insert_action_group(actiongroup, 0)
         uimanager.add_ui_from_string(blaconst.MENU)
 
-        # this is the topmost box that holds all the other objects
+        # This is the topmost box that holds all the other components.
         self.add(gtk.VBox())
 
-        # create instances of the main parts of the gui
+        # Create instances of the main parts of the GUI.
         self.__toolbar = BlaToolbar()
         self.__browsers = BlaBrowsers()
         self.__view = BlaView()
@@ -191,30 +187,35 @@ class BlaMainWindow(blaguiutils.BlaBaseWindow):
 
         player.connect("state_changed", self.update_title)
 
-        # pack the browser + view-widget into a gtk.HPane instance
+        # Pack the browser + view-widget into a gtk.HPane instance.
         hpane = gtk.HPaned()
         hpane.pack1(self.__browsers, resize=False, shrink=False)
         hpane.pack2(self.__view, resize=True, shrink=True)
         hpane.show()
 
-        # restore left pane handle position
-        try: hpane.set_position(blacfg.getint("general", "pane.pos.left"))
-        except TypeError: pass
-        hpane.connect("notify", lambda pane, propspec:
-                      blacfg.set("general", "pane.pos.left",
-                      "%d" % pane.get_position()))
+        # Restore left pane handle position.
+        try:
+            hpane.set_position(blacfg.getint("general", "pane.pos.left"))
+        except TypeError:
+            pass
+        hpane.connect(
+            "notify",
+            lambda pane, propspec: blacfg.set("general", "pane.pos.left",
+                                              "%d" % pane.get_position()))
 
-        # restore right pane handle position
+        # Restore right pane handle position.
         try:
             self.__view.set_position(
-                    blacfg.getint("general", "pane.pos.right"))
-        except TypeError: pass
-        self.__view.connect("notify", lambda pane, propspec:
-                            blacfg.set("general", "pane.pos.right",
-                            "%d" % pane.get_position()))
+                blacfg.getint("general", "pane.pos.right"))
+        except TypeError:
+            pass
+        self.__view.connect(
+            "notify",
+            lambda pane, propspec: blacfg.set("general", "pane.pos.right",
+                                              "%d" % pane.get_position()))
 
-        # create a vbox for the toolbar, browser and playlist view. this allows
-        # for setting a border around those items, excluding the menubar
+        # Create a vbox for the toolbar, browser and playlist view. This allows
+        # for setting a border around those items which excludes the menubar.
         vbox = gtk.VBox(spacing=2)
         vbox.set_border_width(2)
         vbox.pack_start(self.__toolbar, expand=False)
@@ -222,11 +223,8 @@ class BlaMainWindow(blaguiutils.BlaBaseWindow):
         vbox.pack_start(self.__statusbar, expand=False)
         vbox.show()
 
-        # the topmost vbox wraps all other widgets
         self.child.pack_start(uimanager.get_widget("/Menu"), expand=False)
         self.child.pack_start(vbox)
-
-        # position main window, set colors and show everything
         blagui.update_colors()
         self.child.show()
 
@@ -243,12 +241,14 @@ class BlaMainWindow(blaguiutils.BlaBaseWindow):
         else:
             if player.radio:
                 title = track[TITLE] or "%s - %s" % (
-                        blaconst.APPNAME, track["organization"])
+                    blaconst.APPNAME, track["organization"])
             else:
                 artist = track[ARTIST]
                 title = track[TITLE] or "?"
-                if artist and title: title = "%s - %s" % (artist, title)
-                else: title = track.basename
+                if artist and title:
+                    title = "%s - %s" % (artist, title)
+                else:
+                    title = track.basename
 
             tooltip = title
 
@@ -269,12 +269,13 @@ class BlaMainWindow(blaguiutils.BlaBaseWindow):
         if visible:
             self.hide()
             blagui.tray.set_visible(True)
-        else: self.raise_window()
+        else:
+            self.raise_window()
 
     def quit(self, *args):
-        # hide the main window, the tray icon, and every other tracked window.
-        # then destroy the main window which in turn initiates the actual
-        # shutdown sequence
+        # Hide the main window, the tray icon, and every other tracked window.
+        # Then destroy the main window which in turn initiates the actual
+        # shutdown sequence.
         self.hide()
         blaguiutils.set_visible(False)
         blagui.tray.set_visible(False)
@@ -293,7 +294,7 @@ class BlaMainWindow(blaguiutils.BlaBaseWindow):
 
     def __toggle_tabs(self, event):
         self.__view.views[blaconst.VIEW_PLAYLISTS].show_tabs(
-                event.get_active())
+            event.get_active())
 
     def __toggle_side_pane(self, event):
         self.__view.set_show_side_pane(event.get_active())
@@ -311,10 +312,9 @@ class BlaMainWindow(blaguiutils.BlaBaseWindow):
         diag.set_current_folder(directory)
 
     def __open_playlist(self, window):
-        diag = gtk.FileChooserDialog("Select playlist",
-                buttons=(gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL,
-                gtk.STOCK_OPEN, gtk.RESPONSE_OK)
-        )
+        diag = gtk.FileChooserDialog(
+            "Select playlist", buttons=(gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL,
+                                        gtk.STOCK_OPEN, gtk.RESPONSE_OK))
         diag.set_local_only(True)
         self.__set_file_chooser_directory(diag)
 
@@ -327,15 +327,17 @@ class BlaMainWindow(blaguiutils.BlaBaseWindow):
             if BlaPlaylistManager.open_playlist(path):
                 BlaView.update_view(blaconst.VIEW_PLAYLISTS)
                 blacfg.set("general", "filechooser.directory",
-                        os.path.dirname(path))
+                           os.path.dirname(path))
 
     def __add_tracks(self, files=True):
-        if files: action = gtk.FILE_CHOOSER_ACTION_OPEN
-        else: action = gtk.FILE_CHOOSER_ACTION_SELECT_FOLDER
-        diag = gtk.FileChooserDialog("Select files", action=action,
-                buttons=(gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL,
-                gtk.STOCK_OPEN, gtk.RESPONSE_OK)
-        )
+        if files:
+            action = gtk.FILE_CHOOSER_ACTION_OPEN
+        else:
+            action = gtk.FILE_CHOOSER_ACTION_SELECT_FOLDER
+        diag = gtk.FileChooserDialog(
+            "Select files", action=action,
+            buttons=(gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL, gtk.STOCK_OPEN,
+                     gtk.RESPONSE_OK))
         diag.set_select_multiple(True)
         diag.set_local_only(True)
         self.__set_file_chooser_directory(diag)
@@ -346,16 +348,15 @@ class BlaMainWindow(blaguiutils.BlaBaseWindow):
 
         if response == gtk.RESPONSE_OK and filenames:
             filenames = map(str.strip, filenames)
-            BlaPlaylistManager.add_to_current_playlist(
-                    "", filenames, resolve=True)
+            BlaPlaylistManager.add_to_current_playlist(filenames, resolve=True)
             blacfg.set("general", "filechooser.directory",
-                    os.path.dirname(filenames[0]))
+                       os.path.dirname(filenames[0]))
 
     def __save_playlist(self, window):
-        diag = gtk.FileChooserDialog("Save playlist",
-                action=gtk.FILE_CHOOSER_ACTION_SAVE, buttons=(gtk.STOCK_CANCEL,
-                gtk.RESPONSE_CANCEL, gtk.STOCK_SAVE, gtk.RESPONSE_OK)
-        )
+        diag = gtk.FileChooserDialog(
+            "Save playlist", action=gtk.FILE_CHOOSER_ACTION_SAVE,
+            buttons=(gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL, gtk.STOCK_SAVE,
+                     gtk.RESPONSE_OK))
         diag.set_do_overwrite_confirmation(True)
         self.__set_file_chooser_directory(diag)
 
@@ -369,11 +370,12 @@ class BlaMainWindow(blaguiutils.BlaBaseWindow):
             filt = gtk.FileFilter()
             filt.set_name(label)
             filt.add_pattern("*.%s" % extension)
-            if mime_type: filt.add_mime_type(mime_type)
+            if mime_type:
+                filt.add_mime_type(mime_type)
             diag.add_filter(filt)
 
-        # add combobox to the dialog to decide whether to save relative or
-        # absolute paths in the playlist
+        # Add combobox to the dialog to choose whether to save relative or
+        # absolute paths in the playlist.
         box = diag.child
         hbox = gtk.HBox()
         cb = gtk.combo_box_new_text()
@@ -385,8 +387,10 @@ class BlaMainWindow(blaguiutils.BlaBaseWindow):
 
         def filter_changed(diag, filt):
             filt = diag.get_filter()
-            if diag.list_filters().index(filt) == 2: sensitive = False
-            else: sensitive = True
+            if diag.list_filters().index(filt) == 2:
+                sensitive = False
+            else:
+                sensitive = True
             cb.set_sensitive(sensitive)
         diag.connect("notify::filter", filter_changed)
 
@@ -397,10 +401,11 @@ class BlaMainWindow(blaguiutils.BlaBaseWindow):
             filt = diag.get_filter()
             type_ = items[diag.list_filters().index(filt)][-1]
             path = path.strip()
-            if type_ is None: type_ = blautil.get_extension(path)
+            if type_ is None:
+                type_ = blautil.get_extension(path)
             BlaPlaylistManager.save(path, type_, cb.get_active() == 0)
             blacfg.set("general", "filechooser.directory",
-                    os.path.dirname(path))
+                       os.path.dirname(path))
 
         diag.destroy()
 

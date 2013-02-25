@@ -2338,21 +2338,16 @@ class BlaPlaylistManager(gtk.Notebook):
             self.copy()
         elif blagui.is_accel(event, "<Ctrl>V"):
             self.paste()
-
-        # TODO: handle these two by global accelerators
-        elif blagui.is_accel(event, "<Ctrl>T"):
-            self.add_playlist(focus=True)
-        elif blagui.is_accel(event, "<Ctrl>W"):
-            self.remove_playlist(self.get_current_playlist())
-
         elif blagui.is_accel(event, "Escape"):
             self.get_current_playlist().disable_search()
         return False
 
     def __query_name(self, title, default=""):
-        diag = gtk.Dialog(title=title, flags=gtk.DIALOG_DESTROY_WITH_PARENT |
-                          gtk.DIALOG_MODAL, buttons=(gtk.STOCK_CANCEL,
-                          gtk.RESPONSE_CANCEL, gtk.STOCK_OK, gtk.RESPONSE_OK))
+        diag = gtk.Dialog(
+            title=title, flags=(gtk.DIALOG_DESTROY_WITH_PARENT |
+                                gtk.DIALOG_MODAL),
+            buttons=(gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL, gtk.STOCK_OK,
+                     gtk.RESPONSE_OK))
         diag.set_resizable(False)
 
         vbox = gtk.VBox(spacing=5)
@@ -2382,7 +2377,8 @@ class BlaPlaylistManager(gtk.Notebook):
         menu = gtk.Menu()
 
         items = [
-            ("Rename playlist", lambda *x: self.__rename_playlist(playlist)),
+            ("Add new playlist...",
+             lambda *x: self.add_playlist(query_name=True, focus=True)),
             ("Remove playlist", lambda *x: self.remove_playlist(playlist)),
             ("Clear playlist", lambda *x: playlist.clear())
         ]
@@ -2394,7 +2390,12 @@ class BlaPlaylistManager(gtk.Notebook):
                 m.set_sensitive(False)
             menu.append(m)
 
-        menu.append(gtk.SeparatorMenuItem())
+        m = gtk.MenuItem("Rename playlist...")
+        m.connect("activate",
+                  lambda *x: self.__rename_playlist(playlist))
+        if not all_options:
+            m.set_sensitive(False)
+        menu.append(m)
 
         try:
             label = "%s playlist" % ("Unlock" if playlist.locked() else "Lock")
@@ -2404,13 +2405,6 @@ class BlaPlaylistManager(gtk.Notebook):
             m = gtk.MenuItem(label)
             m.connect("activate", lambda *x: playlist.toggle_lock())
             menu.append(m)
-
-            menu.append(gtk.SeparatorMenuItem())
-
-        m = gtk.MenuItem("Add new playlist...")
-        m.connect("activate",
-                  lambda *x: self.add_playlist(query_name=True, focus=True))
-        menu.append(m)
 
         menu.show_all()
         menu.popup(None, None, None, button, time)
@@ -2739,11 +2733,11 @@ class BlaPlaylistManager(gtk.Notebook):
         return cls.__instance.get_nth_page(idx)
 
     @classmethod
-    def remove_playlist(cls, playlist):
+    def remove_playlist(cls, playlist=None):
+        if playlist is None:
+            playlist = cls.get_current_playlist()
         if not playlist.modification_allowed(check_filter_state=False):
             return
-        if not playlist:
-            return False
 
         if cls.get_active_playlist() == playlist:
             try:
