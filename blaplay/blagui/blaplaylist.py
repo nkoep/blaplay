@@ -1911,12 +1911,12 @@ class BlaPlaylist(gtk.VBox):
 
             # Create a lock image and resize it so it fits the text size.
             label = self.__name.children()[0]
-            width, height = label.create_pango_layout(
-                label.get_text()).get_pixel_size()
+            height = label.create_pango_layout(
+                label.get_text()).get_pixel_size()[-1]
             pixbuf = self.render_icon(
                 gtk.STOCK_DIALOG_AUTHENTICATION, gtk.ICON_SIZE_MENU)
             pixbuf = pixbuf.scale_simple(
-                width, height, gtk.gdk.INTERP_BILINEAR)
+                height, height, gtk.gdk.INTERP_BILINEAR)
             image = gtk.image_new_from_pixbuf(pixbuf)
             self.__name.pack_start(image)
             self.__name.show_all()
