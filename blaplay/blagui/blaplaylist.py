@@ -1353,7 +1353,7 @@ class BlaPlaylist(gtk.VBox):
 
         # Get selected items
         try:
-            selected_items = [self.get_item_from_path(p)
+            selected_items = [self.get_item_from_path(path)
                               for path in selected_paths]
         except IndexError:
             selected_items = None
