@@ -32,7 +32,9 @@ def init():
     from blamainwindow import BlaMainWindow
     global tray
 
-    gtk.icon_theme_get_default().append_search_path(blaconst.IMAGES_PATH)
+    gtk.icon_theme_get_default().append_search_path(blaconst.ICONS_PATH)
+    theme = gtk.icon_theme_get_default()
+    gtk.window_set_default_icon_name(blaconst.APPNAME)
 
     window = BlaMainWindow()
     tray = BlaTray(window)
@@ -44,7 +46,8 @@ def update_menu(view):
     from blaplaylist import BlaPlaylistManager, BlaQueue
 
     state = False
-    if view == blaconst.VIEW_PLAYLISTS: state = True
+    if view == blaconst.VIEW_PLAYLISTS:
+        state = True
 
     # TODO: update the "Clear" label for the playlist or queue
     for entry in blaconst.MENU_PLAYLISTS:
@@ -56,18 +59,22 @@ def update_menu(view):
                      else BlaQueue.clipboard)
         uimanager.get_widget("/Menu/Edit/Paste").set_sensitive(bool(clipboard))
         state = True
-    else: state = False
+    else:
+        state = False
 
     for entry in blaconst.MENU_EDIT:
         uimanager.get_widget(entry).set_visible(state)
 
 def update_colors():
-    if blacfg.getboolean("colors", "overwrite"): name = blaconst.APPNAME
-    else: name = ""
-    map(lambda treeview: treeview.set_name(name), BlaTreeViewBase.instances)
+    # When the user chooses to overwrite the theme colors we set the name of
+    # the affected widgets to blaconst.APPNAME in order for them to respect the
+    # style defined below.
+    name = blaconst.APPNAME if blacfg.getboolean("colors", "overwrite") else ""
+    for treeview in BlaTreeViewBase.instances:
+        treeview.set_name(name)
 
-    # invert background color to get a clearly visible color for the drop
-    # indicator of DND operations
+    # Invert the background color to get a clearly visible color for the drop
+    # indicator drawn during DND operations.
     color = gtk.gdk.color_parse(blacfg.getstring("colors", "background"))
     color = (65535-c for c in [color.red, color.green, color.blue])
     color = gtk.gdk.Color(*color).to_string()
@@ -106,21 +113,21 @@ def update_colors():
         """ % (
             blaconst.APPNAME,
 
-            # text colors
+            # Text colors
             blacfg.getstring("colors", "text"),
             blacfg.getstring("colors", "active.text"),
             blacfg.getstring("colors", "text"),
             blacfg.getstring("colors", "active.text"),
             blacfg.getstring("colors", "text"),
 
-            # base colors
+            # Base colors
             blacfg.getstring("colors", "background"),
             blacfg.getstring("colors", "selected.rows"),
             blacfg.getstring("colors", "background"),
             blacfg.getstring("colors", "selected.rows"),
             blacfg.getstring("colors", "background"),
 
-            # even-odd-row colors
+            # Even-odd-row colors
             blacfg.getstring("colors", "background"),
             blacfg.getstring("colors", "alternate.rows"),
 
@@ -135,11 +142,12 @@ def update_colors():
     BlaView.update_colors()
 
 def is_accel(event, accel):
-    # convenience function from quodlibet to check for accelerator matches
-    if event.type != gtk.gdk.KEY_PRESS: return False
+    # Convenience function from quodlibet to check for accelerator matches.
+    if event.type != gtk.gdk.KEY_PRESS:
+        return False
 
     # ctrl+shift+x gives us ctrl+shift+X and accelerator_parse returns
-    # lowercase values for matching, so lowercase it if possible
+    # lowercase values for matching, so lowercase it if possible.
     keyval = event.keyval
     if not keyval & ~0xFF:
         keyval = ord(chr(keyval).lower())
@@ -147,14 +155,14 @@ def is_accel(event, accel):
     default_mod = gtk.accelerator_get_default_mod_mask()
     accel_keyval, accel_mod = gtk.accelerator_parse(accel)
 
-    # if the accel contains non default modifiers matching will never work and
-    # since no one should use them, complain
+    # If the accel contains non default modifiers matching will never work and
+    # since no one should use them, complain.
     non_default = accel_mod & ~default_mod
     if non_default:
         print_w("Accelerator `%s' contains a non default modifier "
                 "`%s'." % (accel, gtk.accelerator_name(0, non_default) or ""))
 
-    # remove everything except default modifiers and compare
+    # Remove everything except default modifiers and compare.
     return (accel_keyval, accel_mod) == (keyval, event.state & default_mod)
 
 
@@ -164,10 +172,10 @@ class BlaTray(gtk.StatusIcon):
         super(BlaTray, self).__init__()
         self.set_from_icon_name(blaconst.APPNAME)
         self.set_visible(
-                blacfg.getboolean("general", "always.show.tray"))
+            blacfg.getboolean("general", "always.show.tray"))
         self.set_tooltip_text("Stopped")
         self.set_has_tooltip(
-                blacfg.getboolean("general", "tray.tooltip"))
+            blacfg.getboolean("general", "tray.tooltip"))
         self.connect("activate", window.toggle_hide)
         self.connect("popup_menu", self.__tray_menu)
 
@@ -187,14 +195,19 @@ class BlaTray(gtk.StatusIcon):
         for label, callback in items:
             if label and callback is None:
                 submenu = blafm.get_popup_menu()
-                if not submenu: continue
+                if not submenu:
+                    continue
                 m = gtk.MenuItem(label)
                 m.set_submenu(submenu)
                 menu.append(m)
                 m = gtk.SeparatorMenuItem()
-            elif not label: m = gtk.SeparatorMenuItem()
+            elif not label:
+                m = gtk.SeparatorMenuItem()
             else:
                 m = gtk.MenuItem(label)
+                # Force early binding of `callback'. The functions used as
+                # callbacks here have different signatures so we use lambda
+                # expressions for convenience.
                 m.connect("activate", lambda x, c=callback: c())
             menu.append(m)
 

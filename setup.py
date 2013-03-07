@@ -29,6 +29,7 @@ def exec_(args, split=True, cwd="."):
     p = p.communicate()[0]
     return p.split() if split else p
 
+
 class clean(d_clean):
     def run(self):
         d_clean.run(self)
@@ -73,12 +74,12 @@ class check(Command):
             raise SystemExit("%s requires at least Python 2.6. "
                              "(http://www.python.org)" % self.__NAME)
 
-        print "Checking for PyGTK >= 2.21:",
+        print "Checking for PyGTK >= 2.22:",
         try:
             import pygtk
             pygtk.require("2.0")
             import gtk
-            if gtk.pygtk_version < (2, 21) or gtk.gtk_version < (2, 21):
+            if gtk.pygtk_version < (2, 22) or gtk.gtk_version < (2, 22):
                 raise ImportError
         except ImportError:
             raise SystemExit("not found\n%s requires PyGTK 2.21. "
@@ -166,10 +167,8 @@ class build_scripts(d_build_scripts):
                 self.copy_file(script, newpath)
 
 class build_shortcuts(Command):
-    build_base = None
-
     def initialize_options(self):
-        pass
+        self.build_base = None
 
     def finalize_options(self):
         self.shortcuts = self.distribution.shortcuts
@@ -179,30 +178,31 @@ class build_shortcuts(Command):
         basepath = os.path.join(self.build_base, "share", "applications")
         self.mkpath(basepath)
         for shortcut in self.shortcuts:
-            self.copy_file(shortcut, os.path.join(basepath, shortcut))
+            self.copy_file(shortcut, os.path.join(basepath,
+                                                  os.path.basename(shortcut)))
 
 class update_icon_cache(Command):
     def initialize_options(self):
         pass
+
     def finalize_options(self):
         pass
 
     def run(self):
-        icon_dir = os.path.join(sys.prefix, "share/icons/hicolor")
+        print os.getcwd()
+        icon_dir = "blaplay/images/icons/hicolor"
         if os.access(icon_dir, os.W_OK):
             self.spawn(["gtk-update-icon-cache", "-f", icon_dir])
 
 class install_shortcuts(Command):
     description = "install .desktop files"
 
-    prefix = None
-    skip_build = None
-    shortcuts = None
-    build_base = None
-    root = None
-
     def initialize_options(self):
-        pass
+        self.prefix = None
+        self.skip_build = None
+        self.shortcuts = None
+        self.build_base = None
+        self.root = None
 
     def finalize_options(self):
         self.set_undefined_options("build", ("build_base", "build_base"))
@@ -221,6 +221,7 @@ class install_shortcuts(Command):
         srcpath = os.path.join(self.build_base, "share", "applications")
         self.mkpath(basepath)
         for shortcut in self.shortcuts:
+            shortcut = os.path.basename(shortcut)
             fullsrc = os.path.join(srcpath, shortcut)
             fullpath = os.path.join(basepath, shortcut)
             self.copy_file(fullsrc, fullpath)
@@ -232,10 +233,9 @@ class build(d_build):
 
 class install(d_install):
     sub_commands = d_install.sub_commands
-
-    # Update the icon cache only after moving icons to the system directories.
-    sub_commands.extend([("install_shortcuts", lambda *x: True),
-            ("update_icon_cache", lambda *x: True)])
+    sub_commands.extend(
+        [("install_shortcuts", lambda *x: True),
+         ("update_icon_cache", lambda *x: True)])
 
 class BlaDistribution(Distribution):
     shortcuts = []
@@ -248,10 +248,11 @@ class BlaDistribution(Distribution):
         self.cmdclass.setdefault("build", build)
         self.cmdclass.setdefault("install", install)
 
+
 if __name__ == "__main__":
     description = "Minimalist audio player for GNU/Linux written in Python"
 
-    # visualizations
+    # Visualization modules
     visualizations = [f for f in os.listdir("visualizations")
                       if blautil.get_extension(f) == "pyx"]
     extra_compile_args = ["-std=gnu99"]
@@ -265,7 +266,7 @@ if __name__ == "__main__":
                   extra_compile_args=extra_compile_args)
         for f in visualizations]
 
-    # mmkeys
+    # mmkeys module
     defs = exec_("pkg-config --variable=defsdir pygtk-2.0".split())
     defs = " ".join(map(str.strip, defs))
     name = "mmkeys_"
@@ -287,23 +288,18 @@ if __name__ == "__main__":
                   extra_link_args=exec_(
                   "pkg-config --libs gtk+-2.0 pygtk-2.0".split())))
 
-    src_base = "blaplay/images"
+    # Icons
+    base = "blaplay/images/icons"
     images_comps = []
-    for dirname, dirs, filenames in os.walk(src_base):
+    for dirname, dirs, filenames in os.walk(base):
         for filename in filenames:
-            images_comps.append(
-                os.path.join(dirname, filename)[len(src_base)+1:])
+            images_comps.append(os.path.join(dirname, filename)[len(base)+1:])
 
-    base = os.path.join(sys.prefix, "share/icons/hicolor")
-    src_base = "blaplay/images/hicolor"
-    data_files = []
-    for dirname, dirs, filenames in os.walk(src_base):
-        for filename in filenames:
-            src_leaf = os.path.join(dirname, filename)
-            leaf = os.path.dirname(
-                os.path.join(base, src_leaf[len(src_base)+1:]))
-            data_files.append((leaf, [src_leaf]))
+    # DBus activation
+    data_files = [("share/dbus-1/services",
+                  ["data/org.freedesktop.blaplay.service"])]
 
+    # Collect all parameters.
     kwargs = {
         "name": blaconst.APPNAME,
         "version": blaconst.VERSION,
@@ -313,14 +309,17 @@ if __name__ == "__main__":
         "description": description,
         "license": "GNU GPL v2",
         "packages": ["blaplay"] + ["blaplay.%s" % module for module in
-            ["blacore", "blagui", "formats", "util", "visualizations"]],
+                                   ["blacore", "blagui", "blautil", "formats",
+                                    "visualizations"]],
+        # package_data is used for files directly used by blaplay, but which
+        # aren't modules.
         "package_data": {
             "": ["ChangeLog", "TODO"],
-            "blaplay": ["images/%s" % comp for comp in images_comps]
+            "blaplay": ["images/icons/%s" % comp for comp in images_comps]
         },
-        "data_files": data_files,
         "scripts": ["blaplay.py"],
-        "shortcuts": ["blaplay.desktop"],
+        "shortcuts": ["data/blaplay.desktop"],
+        "data_files": data_files,
         "distclass": BlaDistribution,
         "cmdclass": {
             "clean": clean,

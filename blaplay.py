@@ -103,12 +103,13 @@ def init_logging(args):
 
     colors = [
         (logging.INFO, "32"), (logging.DEBUG, "34"),
-        (logging.WARNING, "35"), (logging.CRITICAL, "31")
+        (logging.WARNING, "31"), (logging.CRITICAL, "36")
     ]
     for level, color in colors:
         logging.addLevelName(level, "\033[1;%sm%s\033[1;m" %
                              (color, logging.getLevelName(level)))
 
+    # FIXME: use this maybe??
     def critical(msg):
         logging.critical(msg)
         raise SystemExit
