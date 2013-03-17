@@ -189,7 +189,6 @@ class update_icon_cache(Command):
         pass
 
     def run(self):
-        print os.getcwd()
         icon_dir = "blaplay/images/icons/hicolor"
         if os.access(icon_dir, os.W_OK):
             self.spawn(["gtk-update-icon-cache", "-f", icon_dir])
@@ -289,15 +288,11 @@ if __name__ == "__main__":
                   "pkg-config --libs gtk+-2.0 pygtk-2.0".split())))
 
     # Icons
-    base = "blaplay/images/icons"
+    base = "blaplay/images"
     images_comps = []
     for dirname, dirs, filenames in os.walk(base):
         for filename in filenames:
             images_comps.append(os.path.join(dirname, filename)[len(base)+1:])
-
-    # DBus activation
-    data_files = [("share/dbus-1/services",
-                  ["data/org.freedesktop.blaplay.service"])]
 
     # Collect all parameters.
     kwargs = {
@@ -311,15 +306,17 @@ if __name__ == "__main__":
         "packages": ["blaplay"] + ["blaplay.%s" % module for module in
                                    ["blacore", "blagui", "blautil", "formats",
                                     "visualizations"]],
-        # package_data is used for files directly used by blaplay, but which
-        # aren't modules.
+        # package_data is used for files directly used by blaplay which
+        # aren't modules such as images.
         "package_data": {
             "": ["ChangeLog", "TODO"],
-            "blaplay": ["images/icons/%s" % comp for comp in images_comps]
+            "blaplay": ["images/%s" % comp for comp in images_comps]
         },
         "scripts": ["blaplay.py"],
         "shortcuts": ["data/blaplay.desktop"],
-        "data_files": data_files,
+        # DBus activation
+        "data_files": [("share/dbus-1/services",
+                        ["data/org.freedesktop.blaplay.service"])],
         "distclass": BlaDistribution,
         "cmdclass": {
             "clean": clean,
