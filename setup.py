@@ -314,9 +314,6 @@ if __name__ == "__main__":
         },
         "scripts": ["blaplay.py"],
         "shortcuts": ["data/blaplay.desktop"],
-        # DBus activation
-        "data_files": [("share/dbus-1/services",
-                        ["data/org.freedesktop.blaplay.service"])],
         "distclass": BlaDistribution,
         "cmdclass": {
             "clean": clean,

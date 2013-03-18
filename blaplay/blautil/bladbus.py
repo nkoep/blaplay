@@ -14,6 +14,7 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
+import sys
 import os
 
 import dbus
@@ -40,7 +41,7 @@ def query_bus(query, arg=None):
     try:
         proxy = dbus.SessionBus().get_object(INTERFACE, OBJECT_PATH)
     except dbus.DBusException:
-        raise SystemExit
+        sys.exit()
 
     # Get an interface to the proxy. This offers direct access to methods
     # exposed through the interface.
@@ -68,7 +69,7 @@ def query_bus(query, arg=None):
         for key in callbacks.iterkeys():
             if key in format_:
                 format_ = format_.replace(key, callbacks[key]())
-        print format_.encode("utf-8")
+        sys.stdout.write("%s\n" % format_.encode("utf-8"))
 
     else:
         if query == "play_pause":
@@ -83,7 +84,8 @@ def query_bus(query, arg=None):
             interface.raise_window()
         elif query in ["append", "new", "replace"] and arg:
             interface.parse_uris(query, arg)
-    raise SystemExit
+
+    sys.exit()
 
 
 class BlaDBus(dbus.service.Object):

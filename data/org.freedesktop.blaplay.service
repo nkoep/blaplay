@@ -1,4 +1,0 @@
-[D-BUS Service]
-Name=org.freedesktop.blaplay
-Exec=/usr/bin/blaplay
-
