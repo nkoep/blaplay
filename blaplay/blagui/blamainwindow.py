@@ -41,13 +41,15 @@ class BlaMainWindow(blaguiutils.BlaBaseWindow):
     def __init__(self):
         super(BlaMainWindow, self).__init__(gtk.WINDOW_TOPLEVEL)
 
-        gtk.window_set_default_icon_name(blaconst.APPNAME)
         self.set_resizable(True)
         self.connect("delete_event", self.__delete_event)
         self.enable_tracking(is_main_window=True)
 
         # Install global mouse hook.
         def button_press_hook(receiver, event):
+            # FIXME: this is called 5+ times if the mouse hovers over the
+            #        visualization drawingarea, the album cover pixbuf or the
+            #        lyrics/bio textview when this hook executes
             if event.button == 8:
                 player.previous()
             elif event.button == 9:
