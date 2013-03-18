@@ -18,7 +18,7 @@ import os
 import struct
 StructError = struct.error
 
-from mutagen.mp3 import MP3 as _MP3, HeaderNotFoundError
+from mutagen.mp3 import MP3 as _Mp3, HeaderNotFoundError
 from mutagen import id3
 
 from _blatrack import BlaTrack
@@ -128,7 +128,7 @@ class Mp3(BlaTrack):
             return text
 
         try:
-            audio = _MP3(self.uri)
+            audio = _Mp3(self.uri)
         except HeaderNotFoundError:
             raise TagParseError
         tags = audio.tags or id3.ID3()
@@ -180,7 +180,7 @@ class Mp3(BlaTrack):
 
     def _save(self):
         try:
-            audio = _MP3(self.uri)
+            audio = _Mp3(self.uri)
             tags = audio.tags
             if tags is None:
                 audio.add_tags()

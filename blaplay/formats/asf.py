@@ -14,9 +14,10 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-from mutagen.asf import ASF as _ASF
+from mutagen.asf import ASF as _Asf, error as AsfError
 
 from _blatrack import BlaTrack
+from blaplay.formats import TagParseError
 from _identifiers import *
 
 
@@ -44,7 +45,10 @@ class Asf(BlaTrack):
         zip(__tag_to_literal.values(), __tag_to_literal.keys()))
 
     def _read_tags(self):
-        audio = _ASF(self.uri)
+        try:
+            audio = _Asf(self.uri)
+        except AsfError:
+            raise TagParseError
 
         for key, values in (audio.tags or {}).iteritems():
             try:
@@ -61,9 +65,9 @@ class Asf(BlaTrack):
 
     def _save(self):
         try:
-            audio = _ASF(self.uri)
+            audio = _Asf(self.uri)
             tags = audio.tags
-        except IOError:
+        except (IOError, AsfError):
             return False
 
         try:

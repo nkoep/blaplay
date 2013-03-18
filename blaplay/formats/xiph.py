@@ -14,12 +14,13 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-from mutagen.oggvorbis import OggVorbis
-from mutagen.oggflac import OggFLAC
-from mutagen.flac import FLAC
+from mutagen.oggvorbis import OggVorbis, error as OggVorbisError
+from mutagen.oggflac import OggFLAC, error as OggFLACError
+from mutagen.flac import FLAC, error as FLACError
 
 from blaplay import blautil
 from _blatrack import BlaTrack
+from blaplay.formats import TagParseError
 from _identifiers import *
 
 
@@ -59,7 +60,11 @@ class Xiph(BlaTrack):
         uri = self.uri
         baseclass, format_, encoding = self.__ext_to_format[
             blautil.get_extension(uri)]
-        audio = baseclass(uri)
+
+        try:
+            audio = baseclass(uri)
+        except (OggVorbisError, OggFLACError, FLACError):
+            raise TagParseError
 
         for key, values in (audio.tags or {}).iteritems():
             try:

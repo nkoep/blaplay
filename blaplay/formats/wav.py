@@ -14,7 +14,7 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-import wave as _wave
+import wave
 
 from _blatrack import BlaTrack
 from blaplay.formats import TagParseError
@@ -33,8 +33,8 @@ class Wav(BlaTrack):
         # use-cases anyway.
 
         try:
-            audio = _wave.open(self.uri, "r")
-        except _wave.Error:
+            audio = wave.open(self.uri, "r")
+        except wave.Error:
             raise TagParseError
 
         self[SAMPLING_RATE] = audio.getframerate()

@@ -14,9 +14,10 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-from mutagen.mp4 import MP4 as _MP4
+from mutagen.mp4 import Mp4 as _Mp4, error as Mp4Error
 
 from _blatrack import BlaTrack
+from blaplay.formats import TagParseError
 from _identifiers import *
 
 
@@ -43,7 +44,10 @@ class Mp4(BlaTrack):
         zip(__tag_to_literal.values(), __tag_to_literal.keys()))
 
     def _read_tags(self):
-        audio = _MP4(self.uri)
+        try:
+            audio = _Mp4(self.uri)
+        except Mp4Error:
+            raise TagParseError
 
         for key, values in (audio.tags or {}).iteritems():
             if key in ["disk", "trkn"]:
@@ -66,7 +70,7 @@ class Mp4(BlaTrack):
 
     def _save(self):
         try:
-            audio = _MP4(self.uri)
+            audio = _Mp4(self.uri)
         except IOError:
             return False
 
