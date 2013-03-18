@@ -26,8 +26,7 @@ def init():
     print_i("Loading config")
 
     init = {
-        "general":
-        {
+        "general": {
             "size": "",
             "position": "",
             "maximized": "no",
@@ -60,22 +59,16 @@ def init():
             "events.filter": blaconst.EVENTS_RECOMMENDED,
             "events.limit": 25
         },
-
-        "player":
-        {
+        "player": {
             "logarithmic.volume.scale": "no",
             "use.equalizer": "no",
             "equalizer.profile": "",
             "volume": "1.0",
             "muted": "no"
         },
-
-        "equalizer.profiles":
-        {
+        "equalizer.profiles": {
         },
-
-        "library":
-        {
+        "library": {
             "directories": "",
             "restrict.to": "*",
             "exclude": "",
@@ -86,18 +79,14 @@ def init():
             "custom.browser": "yes",
             "update.on.startup": "yes"
         },
-
-        "lastfm":
-        {
+        "lastfm": {
             "user": "",
             "sessionkey": "",
             "scrobble": "yes",
             "nowplaying": "yes",
             "ignore.pattern": ""
         },
-
-        "colors":
-        {
+        "colors": {
             "overwrite": "no",
             "background": "#313131",
             "highlight": "#A51F1C",
@@ -113,50 +102,73 @@ def init():
         for key, value in values.iteritems():
             cfg.set(section, key, value)
 
-    if not cfg.read(blaconst.CFG_PATH): cfg.read("%s.bak" % blaconst.CFG_PATH)
+    if not cfg.read(blaconst.CFG_PATH):
+        cfg.read("%s.bak" % blaconst.CFG_PATH)
 
 def getstring(section, key):
-    try: return str(cfg.get(section, key))
-    except (ValueError, NoSectionError, NoOptionError): return None
+    try:
+        return str(cfg.get(section, key))
+    except (ValueError, NoSectionError, NoOptionError):
+        return None
 
 def getint(section, key):
-    try: return int(float(cfg.get(section, key)))
-    except (ValueError, NoSectionError, NoOptionError): return None
+    try:
+        return int(float(cfg.get(section, key)))
+    except (ValueError, NoSectionError, NoOptionError):
+        return None
 
 def getfloat(section, key):
-    try: return float(cfg.get(section, key))
-    except (ValueError, NoSectionError, NoOptionError): return None
+    try:
+        return float(cfg.get(section, key))
+    except (ValueError, NoSectionError, NoOptionError):
+        return None
 
 def getboolean(section, key):
-    try: return cfg.getboolean(section, key)
-    except (ValueError, NoSectionError, NoOptionError): return None
+    try:
+        return cfg.getboolean(section, key)
+    except (ValueError, NoSectionError, NoOptionError):
+        return None
 
 def getlistint(section, key):
-    try: return map(int, cfg.get(section, key).split(","))
-    except (ValueError, NoSectionError, NoOptionError): return None
+    try:
+        return map(int, cfg.get(section, key).split(","))
+    except (ValueError, NoSectionError, NoOptionError):
+        return None
 
 def getlistfloat(section, key):
-    try: return map(float, cfg.get(section, key).split(","))
-    except (ValueError, NoSectionError, NoOptionError): return None
+    try:
+        return map(float, cfg.get(section, key).split(","))
+    except (ValueError, NoSectionError, NoOptionError):
+        return None
 
 def getliststr(section, key):
-    try: return filter(None, cfg.get(section, key).split(","))
-    except (ValueError, NoSectionError, NoOptionError): return None
-    except AttributeError: return []
+    try:
+        return filter(None, cfg.get(section, key).split(","))
+    except (ValueError, NoSectionError, NoOptionError):
+        return None
+    except AttributeError:
+        return []
 
 def getdotliststr(section, key):
-    try: return filter(None, cfg.get(section, key).split(":"))
-    except (NoSectionError, NoOptionError): return None
-    except AttributeError: return []
+    try:
+        return filter(None, cfg.get(section, key).split(":"))
+    except (NoSectionError, NoOptionError):
+        return None
+    except AttributeError:
+        return []
 
 def set(section, key, value):
-    if not cfg.has_section(section): cfg.add_section(section)
+    if not cfg.has_section(section):
+        cfg.add_section(section)
     cfg.set(section, key, value)
 
 def setboolean(section, key, value):
-    if not cfg.has_section(section): cfg.add_section(section)
-    if value: cfg.set(section, key, "yes")
-    else: cfg.set(section, key, "no")
+    if not cfg.has_section(section):
+        cfg.add_section(section)
+    if value:
+        cfg.set(section, key, "yes")
+    else:
+        cfg.set(section, key, "no")
 
 def save(force=True):
     import os
@@ -171,34 +183,45 @@ def save(force=True):
     last_save = t
     print_d("Saving config")
 
-    # write data to tempfile
+    # Write data to tempfile.
     fd, tmp_path = tempfile.mkstemp()
-    with os.fdopen(fd, "w") as f: cfg.write(f)
+    with os.fdopen(fd, "w") as f:
+        cfg.write(f)
 
-    # move old file
-    try: shutil.move(blaconst.CFG_PATH, "%s.bak" % blaconst.CFG_PATH)
-    except IOError: pass
+    # Move the old file.
+    try:
+        shutil.move(blaconst.CFG_PATH, "%s.bak" % blaconst.CFG_PATH)
+    except IOError:
+        pass
 
-    # move tempfile to actual location and remove backup file on success
-    try: shutil.move(tmp_path, blaconst.CFG_PATH)
-    except IOError: pass
+    # Nove the tempfile to the actual location and remove the backup file on
+    # success.
+    try:
+        shutil.move(tmp_path, blaconst.CFG_PATH)
+    except IOError:
+        pass
     else:
-        try: os.unlink("%s.bak" % blaconst.CFG_PATH)
-        except OSError: pass
+        try:
+            os.unlink("%s.bak" % blaconst.CFG_PATH)
+        except OSError:
+            pass
 
     return True
 
 def add_section(section):
-    if not cfg.has_section(section): cfg.add_section(section)
+    if not cfg.has_section(section):
+        cfg.add_section(section)
 
 def delete_option(section, key):
     if cfg.has_section(section) and cfg.has_option(section, key):
         cfg.remove_option(section, key)
 
 def has_option(section, key):
-    if cfg.has_section(section) and cfg.has_option(section, key): return True
+    if cfg.has_section(section) and cfg.has_option(section, key):
+        return True
     return False
 
 def get_keys(section):
-    if cfg.has_section(section): return cfg.items(section)
+    if cfg.has_section(section):
+        return cfg.items(section)
 

@@ -26,11 +26,6 @@ cli_queue = None
 
 
 class Blaplay(object):
-    # Class instances which need to shut down gracefully and preferably before
-    # the user interface has been destroyed can register themselves via the
-    # `register_for_cleanup' method. Classes that do so need to implement the
-    # __call__ method as their cleanup routine.
-
     __cleanup = []
 
     def __init__(self):
@@ -44,9 +39,13 @@ class Blaplay(object):
         self.__cleanup.append(instance)
 
     def shutdown(self):
+        # Class instances which need to shut down gracefully and preferably
+        # before the user interface has been destroyed can register themselves
+        # via the `register_for_cleanup' method. Classes that do so need to
+        # implement the __call__ method as their cleanup routine.
         for instance in self.__cleanup:
-            print_d("Calling shutdown routine for %s"
-                    % instance.__class__.__name__)
+            print_d("Calling shutdown routine for %s" %
+                    instance.__class__.__name__)
             instance()
 
 bla = Blaplay()
@@ -72,7 +71,8 @@ def finish_startup():
     bla.window.connect("destroy", shutdown)
 
     # Set up the D-Bus interface.
-    try: from blaplay.blautil import bladbus
+    try:
+        from blaplay.blautil import bladbus
     except ImportError:
         # If the DBUS module isn't available we just define a class which acts
         # on behalf of the module, issuing warnings whenever it's used.
