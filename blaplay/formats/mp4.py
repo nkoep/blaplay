@@ -14,7 +14,7 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-from mutagen.mp4 import Mp4 as _Mp4, error as Mp4Error
+from mutagen.mp4 import MP4 as _Mp4, error as Mp4Error
 
 from _blatrack import BlaTrack
 from blaplay.formats import TagParseError
