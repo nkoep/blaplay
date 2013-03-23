@@ -45,16 +45,23 @@ class BlaMainWindow(blaguiutils.BlaBaseWindow):
         self.connect("delete_event", self.__delete_event)
         self.enable_tracking(is_main_window=True)
 
-        # Install global mouse hook.
+        # Install a global mouse hook. If connected callbacks don't consume the
+        # event by returning True this hook gets called for every widget in the
+        # hierarchy that re-emits the event. We therefore cache the event's
+        # timestamp to detect and ignore signal re-emissions.
         def button_press_hook(receiver, event):
-            # FIXME: this is called 5+ times if the mouse hovers over the
-            #        visualization drawingarea, the album cover pixbuf or the
-            #        lyrics/bio textview when this hook executes
-            if event.button == 8:
-                player.previous()
-            elif event.button == 9:
-                player.next()
+            event_time = event.get_time()
+            if event_time != self.__previous_event_time:
+                self.__previous_event_time = event_time
+                if event.button == 8:
+                    player.previous()
+                elif event.button == 9:
+                    player.next()
+            # This behaves like gobject.{timeout|idle}_add: if the callback
+            # doesn't return True it's only called once. It does NOT prevent
+            # signal callbacks from executing.
             return True
+        self.__previous_event_time = -1
         gobject.add_emission_hook(self, "button_press_event",
                                   button_press_hook)
 
@@ -195,26 +202,16 @@ class BlaMainWindow(blaguiutils.BlaBaseWindow):
         hpane.pack2(self.__view, resize=True, shrink=True)
         hpane.show()
 
-        # Restore left pane handle position.
-        try:
-            hpane.set_position(blacfg.getint("general", "pane.pos.left"))
-        except TypeError:
-            pass
-        hpane.connect(
-            "notify",
-            lambda pane, propspec: blacfg.set("general", "pane.pos.left",
-                                              "%d" % pane.get_position()))
-
-        # Restore right pane handle position.
-        try:
-            self.__view.set_position(
-                blacfg.getint("general", "pane.pos.right"))
-        except TypeError:
-            pass
-        self.__view.connect(
-            "notify",
-            lambda pane, propspec: blacfg.set("general", "pane.pos.right",
-                                              "%d" % pane.get_position()))
+        # Restore pane positions.
+        def notify_cb(pane, propspec, key):
+            blacfg.set("general", key, str(pane.get_position()))
+        for pane, side in [(hpane, "left"), (self.__view, "right")]:
+            key = "pane.pos.%s" % side
+            try:
+                pane.set_position(blacfg.getint("general", key))
+            except TypeError:
+                pass
+            pane.connect("notify", notify_cb, key)
 
         # Create a vbox for the toolbar, browser and playlist view. This allows
         # for setting a border around those items which excludes the menubar.
