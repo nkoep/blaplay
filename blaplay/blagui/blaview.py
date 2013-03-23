@@ -1,4 +1,4 @@
-# blaplay, Copyright (C) 2012  Niklas Koep
+# blaplay, Copyright (C) 2012-2013  Niklas Koep
 
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -39,16 +39,18 @@ from blaplay.formats._identifiers import *
 
 class BlaSidePane(gtk.VBox):
     track = None
-    timestamp = 0.0
 
     __MIN_WIDTH = 175
-    __delay = 100
+    __DELAY = 100
+
     __tid = -1
+    __timestamp = -1
 
     class BlaCoverDisplay(gtk.Viewport):
         __alpha = 1.0
         __cover = None
         __pb = None
+        __timestamp = -1
 
         def __init__(self):
             super(BlaSidePane.BlaCoverDisplay, self).__init__()
@@ -58,66 +60,78 @@ class BlaSidePane(gtk.VBox):
             self.__da = gtk.DrawingArea()
             self.__da.add_events(gtk.gdk.BUTTON_PRESS_MASK)
             self.__da.connect_object(
-                    "expose_event", BlaSidePane.BlaCoverDisplay.__expose, self)
-            self.__da.connect_object("button_press_event",
-                    BlaSidePane.BlaCoverDisplay.__button_press_event, self)
+                "expose_event", BlaSidePane.BlaCoverDisplay.__expose, self)
+            self.__da.connect_object(
+                "button_press_event",
+                BlaSidePane.BlaCoverDisplay.__button_press_event, self)
             self.add(self.__da)
 
             def size_allocate(*args):
                 self.__img_size = self.__da.get_allocation()[-1]
                 self.__da.set_size_request(self.__img_size, self.__img_size)
-                if self.__cover is None: self.__cover = blaconst.COVER
+                if self.__cover is None:
+                    self.__cover = blaconst.COVER
                 self.__prepare_cover(self.__cover)
             self.connect("size_allocate", size_allocate)
 
         def __button_press_event(self, event):
+            def renew_timestamp():
+                # Update and return the new timestamp.
+                self.__timestamp = gobject.get_current_time()
+                return self.__timestamp
+
             def open_cover(*args):
-                blautil.open_with_filehandler(self.__cover,
-                        "Failed to open image '%s'" % self.__cover)
+                blautil.open_with_filehandler(
+                    self.__cover, "Failed to open image '%s'" % self.__cover)
 
             def fetch_cover(*args):
-                BlaSidePane.fetcher.start(
-                        BlaSidePane.track, cover_only=True)
+                BlaSidePane.fetcher.fetch_cover(
+                    BlaSidePane.track, renew_timestamp())
 
             def set_cover(*args):
-                diag = gtk.FileChooserDialog("Select cover",
-                        buttons=(gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL,
-                        gtk.STOCK_OPEN, gtk.RESPONSE_OK)
-                )
+                diag = gtk.FileChooserDialog(
+                    "Select cover",
+                    buttons=(gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL,
+                             gtk.STOCK_OPEN, gtk.RESPONSE_OK))
                 diag.set_local_only(True)
                 response = diag.run()
                 path = diag.get_filename()
                 diag.destroy()
 
                 if response == gtk.RESPONSE_OK and path:
-                    BlaSidePane.fetcher.set_cover(path)
+                    BlaSidePane.fetcher.set_cover(renew_timestamp(), path)
 
             def delete_cover(*args):
-                BlaSidePane.fetcher.set_cover()
+                BlaSidePane.fetcher.set_cover(renew_timestamp())
 
             if (event.button == 1 and event.type == gtk.gdk._2BUTTON_PRESS and
-                    self.__cover != blaconst.COVER):
+                self.__cover != blaconst.COVER):
                 open_cover()
-            elif (event.button == 3 and event.type not in
-                    [gtk.gdk._2BUTTON_PRESS, gtk.gdk._3BUTTON_PRESS]):
+            elif (event.button == 3 and
+                  event.type not in [gtk.gdk._2BUTTON_PRESS,
+                                     gtk.gdk._3BUTTON_PRESS]):
                 menu = gtk.Menu()
                 sensitive = self.__cover != blaconst.COVER
                 items = [
                     ("Open in image viewer", open_cover, sensitive),
                     ("Open directory", lambda *x: blautil.open_directory(
-                            os.path.dirname(self.__cover)), sensitive), None,
+                     os.path.dirname(self.__cover)), sensitive),
+                    None,
                     ("Fetch cover", fetch_cover, True),
-                    ("Set cover...", set_cover, True),
+                    ("Set cover...", lambda *x: set_cover(renew_timestamp()),
+                     True),
                     ("Delete cover", delete_cover, sensitive)
                 ]
                 track = BlaSidePane.track
                 if (player.get_state() == blaconst.STATE_STOPPED or
-                        not track[ARTIST] or not track[ALBUM]):
+                    not track[ARTIST] or not track[ALBUM]):
                     state = False
-                else: state = True
+                else:
+                    state = True
 
                 for item in items:
-                    if not item: m = gtk.SeparatorMenuItem()
+                    if not item:
+                        m = gtk.SeparatorMenuItem()
                     else:
                         label, callback, sensitive = item
                         m = gtk.MenuItem(label)
@@ -131,16 +145,20 @@ class BlaSidePane(gtk.VBox):
             return False
 
         def __prepare_cover(self, cover):
-            try: pb = gtk.gdk.pixbuf_new_from_file(cover)
+            try:
+                pb = gtk.gdk.pixbuf_new_from_file(cover)
             except gobject.GError:
-                try:
-                    if cover != blaconst.COVER: os.unlink(cover)
-                except OSError: pass
-                if self.__cover == blaconst.COVER: return False
+                if cover != blaconst.COVER:
+                    try:
+                        os.unlink(cover)
+                    except OSError:
+                        pass
+                if self.__cover == blaconst.COVER:
+                    return False
                 pb = gtk.gdk.pixbuf_new_from_file(blaconst.COVER)
 
             pb = pb.scale_simple(
-                    self.__img_size, self.__img_size, gtk.gdk.INTERP_HYPER)
+                self.__img_size, self.__img_size, gtk.gdk.INTERP_HYPER)
             self.__pb_old = self.__pb
             self.__pb = pb
             self.__cover = cover
@@ -151,37 +169,49 @@ class BlaSidePane(gtk.VBox):
             cr.set_source_color(self.__bg_color)
             x, y, width, height = self.get_allocation()
 
-            # fill background
+            # Fill background.
             cr.rectangle(0, 0, width, height)
             cr.fill()
-            if not self.__pb: return
+            if not self.__pb:
+                return
 
-            # draw old cover
+            # Draw the old cover.
             cr.set_source_pixbuf(self.__pb_old, 0, 0)
             cr.paint_with_alpha(self.__alpha)
 
-            # draw new cover
+            # Draw the new cover.
             cr.set_source_pixbuf(self.__pb, 0, 0)
             cr.paint_with_alpha(1.0 - self.__alpha)
+
+            # Decrease the alpha value to create a linear fade between covers.
             self.__alpha -= 0.05
 
         @blautil.idle
-        def update(self, cover, force_download):
+        def update(self, timestamp, cover, force_download):
             def crossfade():
                 self.__da.queue_draw()
                 return self.__alpha > 0
 
-            if cover == self.__cover and not force_download: return
-            if not self.__prepare_cover(cover): return
+            if (timestamp != self.__timestamp or
+                cover == self.__cover and not force_download):
+                return
+            if not self.__prepare_cover(cover):
+                return
             self.__alpha = 1.0
-            # 25 ms intervals for 40 fps
+            # Use 25 ms intervals for an update rate of 40 fps.
             gobject.timeout_add(25, crossfade)
+
+        def fetch_cover(self):
+            self.__timestamp = gobject.get_current_time()
+            BlaSidePane.fetcher.fetch_cover(
+                BlaSidePane.track, self.__timestamp)
 
         def update_colors(self):
             if blacfg.getboolean("colors", "overwrite"):
                 self.__bg_color = gtk.gdk.Color(
-                        blacfg.getstring("colors", "background"))
-            else: self.__bg_color = self.get_style().bg[gtk.STATE_NORMAL]
+                    blacfg.getstring("colors", "background"))
+            else:
+                self.__bg_color = self.get_style().bg[gtk.STATE_NORMAL]
             self.__da.queue_draw()
 
     def __init__(self, views):
@@ -190,7 +220,7 @@ class BlaSidePane(gtk.VBox):
         notebook = gtk.Notebook()
         notebook.set_scrollable(True)
 
-        # create the cover art and lyrics display
+        # Create lyrics textview.
         self.__tv = gtk.TextView()
         self.__tv.set_size_request(self.__MIN_WIDTH, -1)
         self.__tv.set_editable(False)
@@ -208,7 +238,7 @@ class BlaSidePane(gtk.VBox):
         self.__tb.create_tag("italic", style=pango.STYLE_ITALIC)
         self.__tag = self.__tb.create_tag("color")
 
-        # create the biography display
+        # Create the biography textview.
         self.__tv2 = gtk.TextView()
         self.__tv2.set_size_request(self.__MIN_WIDTH, -1)
         self.__tv2.set_editable(False)
@@ -224,7 +254,7 @@ class BlaSidePane(gtk.VBox):
         self.__tb2.create_tag("large", scale=pango.SCALE_LARGE)
         self.__tag2 = self.__tb2.create_tag("color")
 
-        # view selector
+        # Set up the view selector.
         viewport = gtk.Viewport()
         viewport.set_shadow_type(gtk.SHADOW_IN)
         self.__treeview = blaguiutils.BlaTreeViewBase(multicol=False)
@@ -242,8 +272,8 @@ class BlaSidePane(gtk.VBox):
         c.pack_start(r, expand=False)
         def cell_data_func(column, renderer, model, iterator):
             count = model[iterator][1]
-            renderer.set_property("markup", "<i>(%d)</i>" % count
-                    if count > 0 else "")
+            renderer.set_property(
+                "markup", "<i>(%d)</i>" % count if count > 0 else "")
         c.set_cell_data_func(r, cell_data_func)
         self.__treeview.append_column(c)
         viewport.add(self.__treeview)
@@ -253,7 +283,7 @@ class BlaSidePane(gtk.VBox):
         selection = self.__treeview.get_selection()
         selection.select_path(blacfg.getint("general", "view"))
         self.__treeview.get_selection().connect(
-                "changed", self.__selection_changed)
+            "changed", self.__selection_changed)
 
         self.cover_display = BlaSidePane.BlaCoverDisplay()
 
@@ -264,13 +294,13 @@ class BlaSidePane(gtk.VBox):
         notebook.append_page(sw, gtk.Label("Lyrics"))
         notebook.append_page(sw2, gtk.Label("Biography"))
 
-        # modify lyrics button
+        # Add the `modify metadata' button.
         button = gtk.Button()
         button.set_tooltip_text("Edit metadata")
         button.set_relief(gtk.RELIEF_NONE)
         button.set_focus_on_click(False)
         button.add(
-                gtk.image_new_from_stock(gtk.STOCK_EDIT, gtk.ICON_SIZE_MENU))
+            gtk.image_new_from_stock(gtk.STOCK_EDIT, gtk.ICON_SIZE_MENU))
         style = gtk.RcStyle()
         style.xthickness = style.ythickness = 0
         button.modify_style(style)
@@ -284,21 +314,23 @@ class BlaSidePane(gtk.VBox):
 
         self.update_colors()
 
-        type(self).fetcher = blametadata.BlaFetcher()
+        # Hook up the metadata callbacks.
+        BlaSidePane.fetcher = blametadata.BlaFetcher()
         self.fetcher.connect_object(
-                "lyrics", BlaSidePane.__update_lyrics, self)
-        self.fetcher.connect("cover", lambda fetcher, cover, force_download:
-                self.cover_display.update(cover, force_download))
+            "lyrics", BlaSidePane.__update_lyrics, self)
         self.fetcher.connect_object(
-                "biography", BlaSidePane.__update_biography, self)
+            "biography", BlaSidePane.__update_biography, self)
+        self.fetcher.connect_object(
+            "cover", type(self.__cover_display).update, self.__cover_display)
 
         self.show_all()
 
         page_num = blacfg.getint("general", "metadata.view")
-        if page_num not in [0, 1]: page_num = 0
         notebook.set_current_page(page_num)
-        notebook.connect("switch_page",
-                lambda *x: blacfg.set("general", "metadata.view", x[-1]))
+        notebook.connect(
+            "switch_page",
+            lambda notebook, child, page_num: blacfg.set(
+                "general", "metadata.view", page_num))
 
     def __popup_menu(self, treeview, event):
         menu = gtk.Menu()
@@ -320,60 +352,68 @@ class BlaSidePane(gtk.VBox):
     def __update_track(self, track):
         iterator = self.__tb.get_iter_at_mark(self.__tb.get_insert())
 
-        # set track name and artist
+        # Set track name and artist.
         title = track[TITLE]
-        if not title: title = track.basename
+        if not title:
+            title = track.basename
         artist = track[ARTIST]
 
         self.__tb.insert_with_tags_by_name(
-                iterator, "\n%s" % title, "bold", "large", "color")
+            iterator, "\n%s" % title, "bold", "large", "color")
         if artist:
             self.__tb.insert_with_tags_by_name(
-                    iterator, "\n%s" % artist, "italic", "color")
+                iterator, "\n%s" % artist, "italic", "color")
 
             iterator = self.__tb2.get_iter_at_mark(self.__tb2.get_insert())
             self.__tb2.insert_with_tags_by_name(
-                    iterator, "\n%s" % artist, "bold", "large", "color")
+                iterator, "\n%s" % artist, "bold", "large", "color")
 
     @blautil.idle
-    def __update_lyrics(self, lyrics):
-        if lyrics:
+    def __update_lyrics(self, timestamp, lyrics):
+        if timestamp == self.__timestamp and lyrics:
             self.__tb.insert_with_tags_by_name(self.__tb.get_iter_at_mark(
-                    self.__tb.get_insert()), "\n\n%s\n" % lyrics, "color")
+                self.__tb.get_insert()), "\n\n%s\n" % lyrics, "color")
 
     @blautil.idle
-    def __update_biography(self, image, biography):
+    def __update_biography(self, timestamp, image, biography):
+        if timestamp != self.__timestamp:
+            return
+
         iterator = self.__tb2.get_iter_at_mark(self.__tb2.get_insert())
 
         if image:
-            try: image = gtk.gdk.pixbuf_new_from_file(image)
+            try:
+                image = gtk.gdk.pixbuf_new_from_file(image)
             except gobject.GError:
-                try: os.unlink(image)
-                except OSError: pass
+                try:
+                    os.unlink(image)
+                except OSError:
+                    pass
             else:
                 width = image.get_width()
                 if width > self.__MIN_WIDTH:
-                    image = image.scale_simple(self.__MIN_WIDTH,
-                            int(image.get_height() * (self.__MIN_WIDTH /
-                            float(width))), gtk.gdk.INTERP_HYPER
-                    )
+                    height = int(image.get_height() *
+                                 (self.__MIN_WIDTH / float(width)))
+                    image = image.scale_simple(
+                        self.__MIN_WIDTH, height, gtk.gdk.INTERP_HYPER)
                 self.__tb2.insert(iterator, "\n\n")
                 self.__tb2.insert_pixbuf(iterator, image)
 
         if biography:
             self.__tb2.insert_with_tags_by_name(iterator,
-                    "\n\n%s\n" % biography, "color")
+                "\n\n%s\n" % biography, "color")
 
     @blautil.idle
     def __clear(self):
         self.__tb.delete(
-                self.__tb.get_start_iter(), self.__tb.get_end_iter())
+            self.__tb.get_start_iter(), self.__tb.get_end_iter())
         self.__tb2.delete(
-                self.__tb2.get_start_iter(), self.__tb2.get_end_iter())
+            self.__tb2.get_start_iter(), self.__tb2.get_end_iter())
 
     def update_view(self, view):
         path = self.__treeview.get_selection().get_selected_rows()[-1][0][0]
-        if view == path: return True
+        if view == path:
+            return True
         self.__treeview.set_cursor((view,))
 
     def update_colors(self):
@@ -381,32 +421,34 @@ class BlaSidePane(gtk.VBox):
         for tv, tag in textviews:
             if blacfg.getboolean("colors", "overwrite"):
                 color = gtk.gdk.Color(
-                        blacfg.getstring("colors", "background"))
+                    blacfg.getstring("colors", "background"))
                 tv.modify_base(gtk.STATE_NORMAL, color)
 
                 color = gtk.gdk.Color(
-                        blacfg.getstring("colors", "selected.rows"))
+                    blacfg.getstring("colors", "selected.rows"))
                 tv.modify_base(gtk.STATE_ACTIVE, color)
                 tv.modify_base(gtk.STATE_SELECTED, color)
 
                 color = gtk.gdk.Color(
-                        blacfg.getstring("colors", "active.text"))
+                    blacfg.getstring("colors", "active.text"))
                 tv.modify_text(gtk.STATE_SELECTED, color)
                 tv.modify_text(gtk.STATE_ACTIVE, color)
-                tag.set_property("foreground-gdk", color)
+                tag.set_property("foreground_gdk", color)
             else:
                 tv.modify_style(self.__style)
-                tag.set_property("foreground-gdk",
-                        self.__style.fg[gtk.STATE_NORMAL])
-        self.cover_display.update_colors()
+                tag.set_property("foreground_gdk",
+                    self.__style.fg[gtk.STATE_NORMAL])
+        self.__cover_display.update_colors()
+
+    def update_count(self, widget, view, count):
+        model = self.__treeview.get_model()
+        model[view][1] = count
 
     def update_track(self):
         def worker(track):
             self.__update_track(track)
-            # TODO: use the timestamp to make sure that old metadata requests
-            #       are ignored
-            type(self).timestamp = gobject.get_current_time()
-            self.fetcher.start(track)
+            self.fetcher.fetch_lyrics_and_bio(track, self.__timestamp)
+            self.__cover_display.fetch_cover()
             return False
 
         gobject.source_remove(self.__tid)
@@ -414,18 +456,19 @@ class BlaSidePane(gtk.VBox):
         track = player.get_track()
         state = player.get_state()
 
-        if track == self.track: return
-        self.__clear()
-        if state == blaconst.STATE_STOPPED or player.radio:
-            type(self).track = None
-            self.cover_display.update(blaconst.COVER, False)
-        else:
-            self.__tid = gobject.timeout_add(self.__delay, worker, track)
-            type(self).track = track
+        if track == self.track:
+            return
 
-    def update_count(self, widget, view, count):
-        model = self.__treeview.get_model()
-        model[view][1] = count
+        self.__clear()
+        self.__timestamp = gobject.get_current_time()
+
+        # TODO: don't fetch anything if we're playing a video
+        if state == blaconst.STATE_STOPPED or player.radio:
+            BlaSidePane.track = None
+            self.__cover_display.update(blaconst.COVER, False)
+        else:
+            self.__tid = gobject.timeout_add(self.__DELAY, worker, track)
+            BlaSidePane.track = track
 
 class BlaView(gtk.HPaned):
 #    class __metaclass__(gobject.GObjectMeta):
