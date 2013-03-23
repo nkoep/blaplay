@@ -120,6 +120,7 @@ MENU = """
             <menuitem action="Playlists"/>
             <menuitem action="Queue"/>
             <menuitem action="Radio"/>
+            <menuitem action="Video"/>
             <menuitem action="RecommendedEvents"/>
             <menuitem action="NewReleases"/>
             <separator/>
@@ -154,7 +155,7 @@ MENU_EDIT = _builder(
                                  "ByAlbumArtist", "ByGenre"]))
 MENU_ORDER = _builder("/Menu/PlayOrder/%s",
                       ["OrderNormal", "OrderRepeat", "OrderShuffle"])
-MENU_VIEWS = _builder("/Menu/View/%s", ["Playlists", "Queue", "Radio",
+MENU_VIEWS = _builder("/Menu/View/%s", ["Playlists", "Queue", "Radio", "Video",
                                         "RecommendedEvents", "NewReleases"])
 del _builder
 
@@ -167,7 +168,8 @@ BROWSER_LIBRARY, BROWSER_FILESYSTEM = xrange(2)
  ACTION_EXPAND_COLLAPSE) = xrange(4)
 
 # View constants
-VIEW_PLAYLISTS, VIEW_QUEUE, VIEW_RADIO, VIEW_EVENTS, VIEW_RELEASES = xrange(5)
+(VIEW_PLAYLISTS, VIEW_QUEUE, VIEW_RADIO, VIEW_VIDEO, VIEW_EVENTS,
+ VIEW_RELEASES) = xrange(6)
 (SELECT_ALL, SELECT_COMPLEMENT, SELECT_BY_ARTISTS, SELECT_BY_ALBUMS,
  SELECT_BY_ALBUM_ARTISTS, SELECT_BY_GENRES) = xrange(6)
 

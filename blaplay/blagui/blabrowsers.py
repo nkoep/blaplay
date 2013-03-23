@@ -802,6 +802,10 @@ class BlaFileBrowser(gtk.VBox):
                 if f.startswith("."):
                     continue
                 path = os.path.join(self.__directory, f)
+                # TODO: use this instead (profile the overhead first though):
+                #         f = gio.File(path)
+                #         info = f.query_info("standard::content-type")
+                #         mimetype = info.get_content_type()
                 mimetype = gio.content_type_guess(path)
                 try:
                     pb = self.__pixbufs[mimetype]
@@ -822,6 +826,7 @@ class BlaFileBrowser(gtk.VBox):
         except AttributeError:
             pass
 
+        # FIXME: this seems to cease working after handling an event
         self.__monitor = gio.File(self.__directory).monitor_directory(
             flags=gio.FILE_MONITOR_NONE)
         self.__monitor.connect("changed", self.__process_event)

@@ -169,6 +169,8 @@ def is_accel(event, accel):
 # TODO: move this to its own file
 class BlaTray(gtk.StatusIcon):
     def __init__(self, window):
+        # TODO: add support for scroll-events
+
         super(BlaTray, self).__init__()
         self.set_from_icon_name(blaconst.APPNAME)
         self.set_visible(

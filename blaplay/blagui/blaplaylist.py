@@ -729,10 +729,6 @@ class BlaQueue(blaguiutils.BlaScrolledWindow):
 
     clipboard = []
 
-    @property
-    def name(self):
-        return "Queue"
-
     def __init__(self):
         super(BlaQueue, self).__init__()
         type(self).__instance = self
@@ -1090,6 +1086,10 @@ class BlaQueue(blaguiutils.BlaScrolledWindow):
     @classmethod
     def queue_n_items(cls):
         return len(cls.__treeview.get_model())
+
+    @property
+    def name(self):
+        return "Queue"
 
 class BlaPlaylist(gtk.VBox):
     __layout = (
@@ -2198,10 +2198,6 @@ class BlaPlaylistManager(gtk.Notebook):
     current = None      # Reference to the currently active playlist
     clipboard = []      # List of items after a cut/copy operation
 
-    @property
-    def name(self):
-        return "Playlists"
-
     def __init__(self):
         super(BlaPlaylistManager, self).__init__()
         type(self).__instance = self
@@ -2651,11 +2647,15 @@ class BlaPlaylistManager(gtk.Notebook):
 
             if active_playlist is not None:
                 self.set_current_page(active_playlist)
+                # FIXME: exceptions here sometimes
                 playlist = self.get_nth_page(active_playlist)
                 type(self).current = playlist.get_item_from_path(current)
                 self.current.select()
 
-            BlaQueue.restore(queue)
+            try:
+                BlaQueue.restore(queue)
+            except:
+                pass
 
         # FIXME: weird to handle this here. do this with a pipe instead
 #        try:
@@ -2708,11 +2708,11 @@ class BlaPlaylistManager(gtk.Notebook):
                 list_name += " (%d)" % idx
 
         playlist = BlaPlaylist(list_name)
-        page_num = cls.__instance.append_page(playlist, playlist.get_name())
-        cls.__instance.child_set_property(playlist, "reorderable", True)
+        cls.__instance.append_page(playlist, playlist.get_name())
+        cls.__instance.set_tab_reorderable(playlist, True)
 
         if focus:
-            cls.__instance.set_current_page(page_num)
+            cls.focus_playlist(playlist)
 
         return playlist
 
@@ -2937,4 +2937,8 @@ class BlaPlaylistManager(gtk.Notebook):
         if (blacfg.getint("general", "view") == blaconst.VIEW_PLAYLISTS and
             playlist == cls.get_current_playlist()):
             playlist.jump_to_playing_track()
+
+    @property
+    def name(self):
+        return "Playlists"
 

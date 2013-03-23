@@ -84,7 +84,8 @@ class BlaPlayer(gobject.GObject):
         "track_changed": blautil.signal(0),
         "track_stopped": blautil.signal(0),
         "new_buffer": blautil.signal(1),
-        "seek": blautil.signal(0)
+        "seek": blautil.signal(0),
+        "get_xid": blautil.signal(0)
     }
 
     __bin = None
@@ -107,6 +108,7 @@ class BlaPlayer(gobject.GObject):
                 "and gst-plugins-good are installed.")
             return False
 
+        # TODO: rename bin_ to audio_sink
         bin_ = gst.Bin()
 
         filt = gst.element_factory_make("capsfilter")
@@ -144,20 +146,27 @@ class BlaPlayer(gobject.GObject):
         gst.element_link_many(tee, self.__volume, sink)
         gst.element_link_many(tee, queue, appsink)
 
+        self.__fake_sink = gst.element_factory_make("fakesink")
+        self.__video_sink = gst.element_factory_make("xvimagesink")
+        self.__video_sink.set_property("force_aspect_ratio", True)
+
         self.__bin = gst.element_factory_make("playbin2")
         self.__bin.set_property("audio_sink", bin_)
         self.__bin.set_property("buffer_duration", 500 * gst.MSECOND)
-        self.__bin.set_property("video_sink", None)
-        GST_PLAY_FLAG_VIDEO = 1 << 0
-        GST_PLAY_FLAG_TEXT = 1 << 2
-        flags = self.__bin.get_property("flags")
-        flags &= ~(GST_PLAY_FLAG_VIDEO | GST_PLAY_FLAG_TEXT)
-        self.__bin.set_property("flags", flags)
+        self.__bin.set_property("video_sink", self.__fake_sink)
+#        GST_PLAY_FLAG_VIDEO = 1 << 0
+#        GST_PLAY_FLAG_TEXT = 1 << 2
+#        flags = self.__bin.get_property("flags")
+#        flags &= ~(GST_PLAY_FLAG_VIDEO | GST_PLAY_FLAG_TEXT)
+#        self.__bin.set_property("flags", flags)
+
         self.__bin.connect("about_to_finish", self.__about_to_finish)
         self.__bin.set_state(gst.STATE_READY)
 
         bus = self.__bin.get_bus()
         bus.add_signal_watch()
+        bus.enable_sync_message_emission()
+        bus.connect("sync_message::element", lambda *x: self.emit("get_xid"))
         self.__busid = bus.connect("message", self.__message)
 
         if blacfg.getboolean("player", "muted"):
@@ -207,9 +216,11 @@ class BlaPlayer(gobject.GObject):
             self.stop()
             err, debug = message.parse_error()
             from blaplay.blagui import blaguiutils
-            blaguiutils.error_dialog("Error", "%s" % err)
+            blaguiutils.error_dialog("Error", str(err))
 
     def __parse_tags(self, tags):
+        # TODO: use these when playing a video as well
+
         MAPPING = {
             "location": "station",
             "organization": "organization",
@@ -227,6 +238,16 @@ class BlaPlayer(gobject.GObject):
             if key in ["organization", "location", "title"]:
                 self.__station[MAPPING[key]] = value
         gobject.idle_add(self.emit, "state_changed")
+
+    def set_xwindow_id(self, window_id):
+        try:
+            if window_id == 0:
+                self.__bin.set_property("video_sink", self.__fake_sink)
+            else:
+                self.__bin.set_property("video_sink", self.__video_sink)
+                self.__video_sink.set_xwindow_id(window_id)
+        except AttributeError:
+            pass
 
     def set_equalizer_value(self, band, value):
         if blacfg.getboolean("player", "use.equalizer"):
@@ -348,7 +369,7 @@ class BlaPlayer(gobject.GObject):
         self.__station = station
         self.__uri = None
         self.__bin.set_state(gst.STATE_NULL)
-        self.__bin.set_property("uri", "%s" % self.__station.location)
+        self.__bin.set_property("uri", self.__station.location)
         self.__bin.set_state(gst.STATE_PAUSED)
         self.__state = blaconst.STATE_PAUSED
         self.emit("track_changed")

@@ -30,6 +30,7 @@ from blaplay.blautil import blametadata
 from blaplay.blagui import blaguiutils
 from blaplaylist import BlaPlaylistManager, BlaQueue
 from blastatusbar import BlaStatusbar
+from blavideo import BlaVideo
 from blaradio import BlaRadio
 from blaeventbrowser import BlaEventBrowser
 from blareleasebrowser import BlaReleaseBrowser
@@ -254,11 +255,11 @@ class BlaSidePane(gtk.VBox):
         self.__treeview.get_selection().connect(
                 "changed", self.__selection_changed)
 
-        self.__cover_display = BlaSidePane.BlaCoverDisplay()
+        self.cover_display = BlaSidePane.BlaCoverDisplay()
 
         hbox = gtk.HBox(spacing=5)
         hbox.pack_start(viewport, expand=True)
-        hbox.pack_start(self.__cover_display, expand=False)
+        hbox.pack_start(self.cover_display, expand=False)
 
         notebook.append_page(sw, gtk.Label("Lyrics"))
         notebook.append_page(sw2, gtk.Label("Biography"))
@@ -287,7 +288,7 @@ class BlaSidePane(gtk.VBox):
         self.fetcher.connect_object(
                 "lyrics", BlaSidePane.__update_lyrics, self)
         self.fetcher.connect("cover", lambda fetcher, cover, force_download:
-                self.__cover_display.update(cover, force_download))
+                self.cover_display.update(cover, force_download))
         self.fetcher.connect_object(
                 "biography", BlaSidePane.__update_biography, self)
 
@@ -397,7 +398,7 @@ class BlaSidePane(gtk.VBox):
                 tv.modify_style(self.__style)
                 tag.set_property("foreground-gdk",
                         self.__style.fg[gtk.STATE_NORMAL])
-        self.__cover_display.update_colors()
+        self.cover_display.update_colors()
 
     def update_track(self):
         def worker(track):
@@ -417,7 +418,7 @@ class BlaSidePane(gtk.VBox):
         self.__clear()
         if state == blaconst.STATE_STOPPED or player.radio:
             type(self).track = None
-            self.__cover_display.update(blaconst.COVER, False)
+            self.cover_display.update(blaconst.COVER, False)
         else:
             self.__tid = gobject.timeout_add(self.__delay, worker, track)
             type(self).track = track
@@ -427,20 +428,41 @@ class BlaSidePane(gtk.VBox):
         model[view][1] = count
 
 class BlaView(gtk.HPaned):
+#    class __metaclass__(gobject.GObjectMeta):
+#        def __new__(mcs, name, bases, dict_):
+#            for attr in """clear select cut copy paste remove remove_duplicates
+#                           remove_invalid_tracks""".split():
+#                @classmethod
+#                def func(cls, *args):
+#                    view = blacfg.getint("general", "view")
+#                    if view in [blaconst.VIEW_PLAYLISTS, blaconst.VIEW_QUEUE]:
+#                        getattr(cls.views[view], attr)(*args)
+#                dict_[attr] = func
+#            return gobject.GObjectMeta.__new__(mcs, name, bases, dict_)
+
     def __init__(self):
         super(BlaView, self).__init__()
         type(self).views = [BlaPlaylistManager(), BlaQueue(), BlaRadio(),
-                BlaEventBrowser(), BlaReleaseBrowser()]
+                            BlaVideo(), BlaEventBrowser(), BlaReleaseBrowser()]
         type(self).__container = gtk.Viewport()
         self.__container.set_shadow_type(gtk.SHADOW_NONE)
         type(self).__side_pane = BlaSidePane(self.views)
 
         player.connect(
-                "state_changed", lambda *x: self.__side_pane.update_track())
-        [view.connect("count_changed", self.__side_pane.update_count)
-                for view in self.views]
-        [view.restore() for view in self.views
-                if view != self.views[blaconst.VIEW_QUEUE]]
+            "state_changed", lambda *x: self.__side_pane.update_track())
+        for view in self.views:
+            view.connect("count_changed", self.__side_pane.update_count)
+        # FIXME: make this more generic. for instance, define a baseclass for
+        #        views which implements an empty `init()' method we can invoke
+        #        here. maybe do this with a class decorator so we can pass the
+        #        name in when defining the class
+        for view in self.views:
+            if view == self.views[blaconst.VIEW_QUEUE]:
+                continue
+            try:
+                view.restore()
+            except AttributeError:
+                pass
 
         self.show_all()
         self.__container.show_all()
@@ -459,14 +481,32 @@ class BlaView(gtk.HPaned):
     def update_view(cls, view, init=False):
         blacfg.set("general", "view", view)
 
+#        # TODO: reparent the video da first before swapping the views
+#        if view != blaconst.VIEW_VIDEO:
+#            cls.views[blaconst.VIEW_VIDEO].get_drawingarea().reparent(
+#                cls.__side_pane.cover_display)
+
         child = cls.__container.get_child()
-        if child is not None: cls.__container.remove(child)
+        # FIXME: removing the video view will unmap the drawingarea, causing
+        #        the x server to panic if we're currently rendering a video.
+        #        the view is not destroyed as we still have references to it,
+        #        for instance in the views list of the class object. one
+        #        sensible solution might be to reparent the drawingarea to the
+        #        sidepane which usually displays album covers. that would also
+        #        make sure the user has a visual cue that he's actually playing
+        #        a video at the time.
+        if child is not None:
+            cls.__container.remove(child)
         child = cls.views[view]
-        if child.get_parent() is not None: child.unparent()
+        if child.get_parent() is not None:
+            child.unparent()
         cls.__container.add(child)
 
-        try: child.update_statusbar()
-        except AttributeError: BlaStatusbar.set_view_info(view, "")
+        # TODO: create views via decorator which provides empty implementations
+        try:
+            child.update_statusbar()
+        except AttributeError:
+            BlaStatusbar.set_view_info(view, "")
 
         # not all menu items are available for all views so update them
         # accordingly
@@ -500,7 +540,6 @@ class BlaView(gtk.HPaned):
         view = blacfg.getint("general", "view")
         if view in [blaconst.VIEW_PLAYLISTS, blaconst.VIEW_QUEUE]:
             cls.views[view].copy()
-        return False
 
     @classmethod
     def paste(cls, *args):

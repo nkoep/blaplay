@@ -38,6 +38,8 @@ from blaabout import BlaAbout
 
 
 class BlaMainWindow(blaguiutils.BlaBaseWindow):
+    __BORDER_WIDTH = 3
+
     def __init__(self):
         super(BlaMainWindow, self).__init__(gtk.WINDOW_TOPLEVEL)
 
@@ -168,6 +170,7 @@ class BlaMainWindow(blaguiutils.BlaBaseWindow):
              blaconst.VIEW_PLAYLISTS),
             ("Queue", None, "_Queue", None, "", blaconst.VIEW_QUEUE),
             ("Radio", None, "R_adio", None, "", blaconst.VIEW_RADIO),
+            ("Video", None, "_Video", None, "", blaconst.VIEW_VIDEO),
             ("RecommendedEvents", None, "_Recommended events", None, "",
              blaconst.VIEW_EVENTS),
             ("NewReleases", None, "_New releases", None, "",
@@ -215,8 +218,8 @@ class BlaMainWindow(blaguiutils.BlaBaseWindow):
 
         # Create a vbox for the toolbar, browser and playlist view. This allows
         # for setting a border around those items which excludes the menubar.
-        vbox = gtk.VBox(spacing=2)
-        vbox.set_border_width(2)
+        vbox = gtk.VBox()
+        vbox.set_border_width(self.__BORDER_WIDTH)
         vbox.pack_start(self.__toolbar, expand=False)
         vbox.pack_start(hpane)
         vbox.pack_start(self.__statusbar, expand=False)
@@ -255,6 +258,23 @@ class BlaMainWindow(blaguiutils.BlaBaseWindow):
         blagui.tray.set_tooltip(tooltip)
         if not blacfg.getboolean("general", "tray.tooltip"):
             blagui.tray.set_has_tooltip(False)
+
+    def set_interface_visible(self, state):
+        """
+        Hides everything except for the main view. This is needed to support
+        fullscreen playback of videos.
+        """
+
+        # FIXME: rather use the toggle methods. for example, this will always
+        #        restore the statusbar state even if the user doesn't wanna
+        #        see it to begin with
+        blagui.uimanager.get_widget("/Menu").set_visible(state)
+        width = self.__BORDER_WIDTH if state else 0
+        self.child.get_children()[-1].set_border_width(width)
+        self.__toolbar.set_visible(state)
+        self.__browsers.set_visibility(state)
+        self.__view.set_show_side_pane(state)
+        self.__statusbar.set_visibility(state)
 
     def raise_window(self):
         self.present()

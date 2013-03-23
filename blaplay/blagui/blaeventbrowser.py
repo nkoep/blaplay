@@ -59,7 +59,7 @@ class BlaEvent(object):
 
     def get_image(self, restore=False):
         image_base = os.path.join(
-                blaconst.EVENTS, ("%s" % self.event_name).replace(" ", "_"))
+            blaconst.EVENTS, self.event_name.replace(" ", "_"))
         pixbuf = path = None
         for ext in ["jpg", "png"]:
             try:
@@ -110,8 +110,6 @@ class BlaEventBrowser(blaguiutils.BlaScrolledWindow):
     __count_recommended = 0
     __count_all = 0
     __lock = blautil.BlaLock(strict=True)
-
-    name = property(lambda self: "Events")
 
     def __init__(self):
         super(BlaEventBrowser, self).__init__()
@@ -269,8 +267,7 @@ class BlaEventBrowser(blaguiutils.BlaScrolledWindow):
         self.__treeview.connect("row_activated", self.__row_activated)
         self.__treeview.connect(
                 "button_press_event", self.__button_press_event)
-        self.__models = [
-                gtk.ListStore(gobject.TYPE_PYOBJECT) for x in xrange(2)]
+        self.__models = map(gtk.ListStore, [gobject.TYPE_PYOBJECT] * 2)
         self.__treeview.set_model(self.__models[active])
         vbox.pack_start(self.__treeview, expand=True, padding=10)
 
@@ -349,6 +346,7 @@ class BlaEventBrowser(blaguiutils.BlaScrolledWindow):
             country = blacfg.getstring("general", "events.country")
             city = blacfg.getstring("general", "events.city")
 
+            # TODO: these don't always seem to timeout properly sometimes
             events = (
                 blafm.get_events(limit=limit, recommended=True),
                 blafm.get_events(limit=limit, recommended=False,
@@ -450,4 +448,8 @@ class BlaEventBrowser(blaguiutils.BlaScrolledWindow):
         # check for new events now and every two hours
         self.__update_models()
         gobject.timeout_add(2 * 3600 * 1000, self.__update_models)
+
+    @property
+    def name(self):
+        return "Events"
 

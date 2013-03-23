@@ -168,8 +168,6 @@ class BlaReleaseBrowser(blaguiutils.BlaScrolledWindow):
     __count_recommended = 0
     __lock = blautil.BlaLock(strict=True)
 
-    name = property(lambda self: "New Releases")
-
     def __init__(self):
         super(BlaReleaseBrowser, self).__init__()
         self.set_shadow_type(gtk.SHADOW_NONE)
@@ -252,8 +250,7 @@ class BlaReleaseBrowser(blaguiutils.BlaScrolledWindow):
         self.__treeview.connect("row_activated", self.__row_activated)
         self.__treeview.connect(
                 "button_press_event", self.__button_press_event)
-        self.__models = [gtk.ListStore(gobject.TYPE_PYOBJECT)
-                for x in xrange(2)]
+        self.__models = map(gtk.ListStore, [gobject.TYPE_PYOBJECT] * 2)
         self.__treeview.set_model(self.__models[active])
         vbox.pack_start(self.__treeview, expand=True, padding=10)
 
@@ -279,6 +276,7 @@ class BlaReleaseBrowser(blaguiutils.BlaScrolledWindow):
 
         with self.__lock:
             images = set()
+            # TODO: these don't always seem to timeout properly sometimes
             releases = (blafm.get_new_releases(),
                     blafm.get_new_releases(recommended=True))
             active = blacfg.getint("general", "releases.filter")
@@ -401,4 +399,8 @@ class BlaReleaseBrowser(blaguiutils.BlaScrolledWindow):
         # check for new releases now and every two hours
         self.__update_models()
         gobject.timeout_add(2 * 3600 * 1000, self.__update_models)
+
+    @property
+    def name(self):
+        return "New Releases"
 
