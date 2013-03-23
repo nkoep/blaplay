@@ -567,12 +567,9 @@ class BlaPreferences(blaguiutils.BlaUniqueWindow):
                     blacfg.getstring("lastfm", "ignore.pattern"))
             self.__ignore_entry.set_tooltip_text("Comma-separated list")
 
-            disable_nowplaying = gtk.CheckButton("Don't submit \"Listening "
-                    "now\" messages")
-            disable_nowplaying.set_active(
-                    not blacfg.getboolean("lastfm", "nowplaying"))
-            disable_nowplaying.connect(
-                    "toggled", self.__disable_nowplaying_changed)
+            nowplaying = gtk.CheckButton("Submit \"Listening now\" messages")
+            nowplaying.set_active(blacfg.getboolean("lastfm", "now.playing"))
+            nowplaying.connect("toggled", self.__nowplaying_changed)
 
             count = 0
             pairs = [
@@ -581,7 +578,6 @@ class BlaPreferences(blaguiutils.BlaUniqueWindow):
             ]
 
             table = gtk.Table(rows=len(pairs), columns=2, homogeneous=False)
-
             count = 0
             for label, widget in pairs:
                 label = gtk.Label("%s:" % label)
@@ -593,7 +589,7 @@ class BlaPreferences(blaguiutils.BlaUniqueWindow):
 
             self.pack_start(scrobble, expand=False)
             self.pack_start(table, expand=False)
-            self.pack_start(disable_nowplaying, expand=False)
+            self.pack_start(nowplaying, expand=False)
 
         def __save(self, *args):
             blacfg.set("lastfm", "user", self.__user_entry.get_text())
@@ -603,9 +599,9 @@ class BlaPreferences(blaguiutils.BlaUniqueWindow):
         def __scrobble_changed(self, checkbutton):
             blacfg.setboolean("lastfm", "scrobble", checkbutton.get_active())
 
-        def __disable_nowplaying_changed(self, checkbutton):
-            blacfg.setboolean(
-                    "lastfm", "nowplaying", not checkbutton.get_active())
+        def __nowplaying_changed(self, checkbutton):
+            blacfg.setboolean("lastfm", "now.playing",
+                              checkbutton.get_active())
 
     def __init__(self, *args):
         if self.is_not_unique(): return

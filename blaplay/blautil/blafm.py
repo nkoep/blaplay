@@ -458,7 +458,7 @@ class BlaScrobbler(object):
             return
         if (not track[ARTIST] or not track[TITLE] or track[LENGTH] < 30 or
             not blacfg.getboolean("lastfm", "scrobble") or
-            not blacfg.getboolean("lastfm", "nowplaying")):
+            not blacfg.getboolean("lastfm", "now.playing")):
             return
 
         session_key = self.get_session_key()
@@ -481,8 +481,8 @@ class BlaScrobbler(object):
         params.append(("api_sig", api_signature))
         error, response = post_message(params)
         if error:
-            print_d("Failed to update nowplaying: %s (error %d)" % (
-                    response, error))
+            print_d("Failed to update nowplaying: %s (error %d)" %
+                    (response, error))
 
     def __query_status(self):
         state = player.get_state()

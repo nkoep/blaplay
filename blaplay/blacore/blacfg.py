@@ -83,7 +83,7 @@ def init():
             "user": "",
             "sessionkey": "",
             "scrobble": "yes",
-            "nowplaying": "yes",
+            "now.playing": "yes",
             "ignore.pattern": ""
         },
         "colors": {
