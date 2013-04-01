@@ -169,3 +169,7 @@ class BlaTrack(dict):
     def sampling_rate(self):
         return "%d Hz" % self[SAMPLING_RATE] if self[SAMPLING_RATE] else ""
 
+    @property
+    def is_video(self):
+        return "video" in blautil.get_mimetype(self[URI])
+

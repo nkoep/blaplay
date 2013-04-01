@@ -32,6 +32,7 @@ import ctypes
 import time
 
 import gobject
+import gio
 import gtk
 
 KEY, PREV, NEXT = xrange(3)
@@ -84,6 +85,11 @@ def resolve_uri(uri):
     uri = urlparse.urlparse(uri).path
     uri = os.path.abspath(urllib.url2pathname(uri))
     return uri
+
+def get_mimetype(path):
+    file_ = gio.File(path)
+    info = file_.query_info("standard::content_type")
+    return info.get_content_type()
 
 def md5(string):
     m = hashlib.md5()
