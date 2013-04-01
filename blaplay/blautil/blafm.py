@@ -266,8 +266,8 @@ def get_events(limit, recommended, city="", country=""):
             raise TypeError
         events = response["event"]
     except (TypeError, KeyError):
-        print_d("Failed to retrieve recommended events: %s (error %d)"
-                % (response, error))
+        print_d("Failed to retrieve recommended events: %s (error %d)" %
+                (response, error))
     return events
 
 def get_new_releases(recommended=False):
@@ -288,8 +288,8 @@ def get_new_releases(recommended=False):
             raise TypeError
         releases = response["album"]
     except (TypeError, KeyError):
-        print_d("Failed to get new releases: %s (error %d)"
-                % (response, error))
+        print_d("Failed to get new releases: %s (error %d)" %
+                (response, error))
     return releases
 
 def get_request_token():
@@ -299,8 +299,8 @@ def get_request_token():
         token = response
     else:
         token = None
-        print_d("Failed to retrieve request token: %s (error %d)"
-                % (response, error))
+        print_d("Failed to retrieve request token: %s (error %d)" %
+                (response, error))
     return token
 
 def sign_api_call(params):

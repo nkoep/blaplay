@@ -57,8 +57,8 @@ COVER = os.path.join(IMAGES_PATH, "cover.svg")
 # last.fm
 LASTFM_APIKEY = "38fcb93ce36693485715ea4197de49de"
 LASTFM_SECRET = "18503e42d49e15bcd709bbdecdcf8682"
-LASTFM_BASEURL = ("http://ws.audioscrobbler.com/2.0/?api_key=%s&format=json"
-        % LASTFM_APIKEY)
+LASTFM_BASEURL = ("http://ws.audioscrobbler.com/2.0/?api_key=%s&format=json" %
+                  LASTFM_APIKEY)
 LASTFM_LOGO = os.path.join(IMAGES_PATH, "lastfm.gif")
 
 # Player constants

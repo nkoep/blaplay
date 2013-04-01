@@ -464,6 +464,7 @@ class BlaLibraryBrowser(gtk.VBox):
         self.__update_treeview()
 
     def __update_treeview(self, *args):
+        # TODO: do this in a process/thread
         def check_children(model, iterator, query):
             iter_has_child = model.iter_has_child
             iter_children = model.iter_children

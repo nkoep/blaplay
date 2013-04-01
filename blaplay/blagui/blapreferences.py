@@ -452,10 +452,10 @@ class BlaPreferences(blaguiutils.BlaUniqueWindow):
             for s in self.__scales: values.append(s.get_value())
             values[band] = scale.get_value()
 
-            blacfg.set("equalizer.profiles", profile_name,
-                    ("%.1f, " * (blaconst.EQUALIZER_BANDS-1) + "%.1f")
-                    % tuple(values)
-            )
+            blacfg.set(
+                "equalizer.profiles", profile_name,
+                ("%.1f, " * (blaconst.EQUALIZER_BANDS-1) + "%.1f") %
+                tuple(values))
             blacfg.set("player", "equalizer.profile", profile_name)
 
             # update the specified band in the playback device
@@ -470,10 +470,10 @@ class BlaPreferences(blaguiutils.BlaUniqueWindow):
 
                 if not values:
                     values = [0.0] * blaconst.EQUALIZER_BANDS
-                    blacfg.set("equalizer.profiles", profile_name,
-                            ("%.1f, " * (blaconst.EQUALIZER_BANDS-1) + "%.1f")
-                            % tuple(values)
-                    )
+                    blacfg.set(
+                        "equalizer.profiles", profile_name,
+                        ("%.1f, " * (blaconst.EQUALIZER_BANDS-1) + "%.1f") %
+                        tuple(values))
 
                 for idx, s in enumerate(self.__scales):
                     s.set_value(values[idx])

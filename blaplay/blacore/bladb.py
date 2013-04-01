@@ -54,11 +54,11 @@ def update_library():
 
     library.update_library()
     pending_save = False
-    
+
     if BlaPlaylistManager is None:
         from blaplay.blagui.blaplaylist import BlaPlaylistManager
     BlaPlaylistManager.invalidate_visible_rows()
-    
+
     return False
 
 
@@ -573,8 +573,8 @@ class BlaLibrary(gobject.GObject):
         # monitoring.
         yield_interval = 25
 
-        print_i("Checking for changed library contents in: %r"
-                % blacfg.getdotliststr("library", "directories"))
+        print_i("Checking for changed library contents in: %r" %
+                blacfg.getdotliststr("library", "directories"))
 
         # update __tracks_ool dict first
         exists = os.path.exists
@@ -623,8 +623,8 @@ class BlaLibrary(gobject.GObject):
             if idx % yield_interval == 0:
                 yield True
 
-        print_i("%d files missing, %d new ones, %d updated"
-                % (missing, new_files, updated))
+        print_i("%d files missing, %d new ones, %d updated" %
+                (missing, new_files, updated))
 
         # Finally update the model for the library browser and playlists. The
         # GUI might not be fully initialized yet, so wait for that to happen

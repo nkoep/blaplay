@@ -276,7 +276,7 @@ class BlaReleaseBrowser(blaguiutils.BlaScrolledWindow):
 
         with self.__lock:
             images = set()
-            # TODO: these don't always seem to timeout properly sometimes
+            # TODO: these don't always seem to timeout properly
             releases = (blafm.get_new_releases(),
                     blafm.get_new_releases(recommended=True))
             active = blacfg.getint("general", "releases.filter")
@@ -361,8 +361,9 @@ class BlaReleaseBrowser(blaguiutils.BlaScrolledWindow):
         user = blacfg.getstring("lastfm", "user")
         if user:
             artist_history_url = os.path.basename(release.artist_url)
-            artist_history_url = ("http://www.last.fm/user/%s/library/music/%s"
-                    % (user, artist_history_url))
+            artist_history_url = (
+                "http://www.last.fm/user/%s/library/music/%s" %
+                (user, artist_history_url))
             items.append(("View artist history",
                     lambda *x: blautil.open_url(artist_history_url)))
 
