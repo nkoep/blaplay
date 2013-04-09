@@ -48,11 +48,3 @@ class Wav(BlaTrack):
 
         audio.close()
 
-    def _save(self):
-        # Since WAVE files don't support tags we just return True here without
-        # actually modifying the file. We also don't complain if a user tries
-        # to store metadata for a WAVE file since we can just keep that as
-        # metadata in our library. Obviously this data is transient and lost if
-        # a file is reparsed.
-        return True
-

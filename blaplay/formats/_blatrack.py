@@ -70,6 +70,12 @@ class BlaTrack(dict):
         except IndexError:
             return item
 
+    def _read_tags(self):
+        pass
+
+    def _save(self):
+        return True
+
     def _parse_info(self, info):
         self[SAMPLING_RATE] = info.sample_rate
 
@@ -125,6 +131,8 @@ class BlaTrack(dict):
         # a numerical identifier as defined in formats._identifiers.
         return list(set(self.keys()).difference(xrange(N_IDENTIFIERS)))
 
+    # TODO: cache properties which don't change over time
+
     def get_cover_basepath(self):
         if "" in [self[ARTIST], self[ALBUM]]:
             return ""
@@ -168,8 +176,4 @@ class BlaTrack(dict):
     @property
     def sampling_rate(self):
         return "%d Hz" % self[SAMPLING_RATE] if self[SAMPLING_RATE] else ""
-
-    @property
-    def is_video(self):
-        return "video" in blautil.get_mimetype(self[URI])
 

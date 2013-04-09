@@ -21,18 +21,28 @@ import gobject
 import gtk
 
 from blaplay.blacore import blaconst
+from blaplay import blautil
 
 cli_queue = None
 
 
-class Blaplay(object):
+class Blaplay(gobject.GObject):
+    __gsignals__ = {
+        "startup_complete": blautil.signal(0)
+    }
+
     __cleanup = []
 
     def __init__(self):
+        super(Blaplay, self).__init__()
         self.library = self.player = self.window = None
 
     def main(self):
+        def map_event(window, event):
+            self.emit("startup_complete")
+        self.window.connect("map_event", map_event)
         gobject.idle_add(self.window.show)
+        print_d("Entering the main loop")
         gtk.main()
 
     def register_for_cleanup(self, instance):
@@ -53,7 +63,6 @@ bla = Blaplay()
 
 def finish_startup():
     from blaplay.blacore import blacfg, bladb
-    from blaplay import blautil
 
     # Initialize the config.
     blacfg.init()
@@ -123,8 +132,14 @@ def finish_startup():
 def shutdown(window):
     print_d("Shutting down...")
 
-    bla.player.stop()
-
+    # FIXME: this is our gateway routine for shutting down blaplay, i.e.
+    #        shutdown always starts here. just calling the kill_threads
+    #        classmethod isn't enough to actually stop the threads. we also
+    #        need to join them. otherwise interpreter shutdown might be
+    #        initiated after leaving this function with threads still running.
+    #        occasionally, these wake up to find their containing module's
+    #        globals() dict wiped clean and start spitting out exceptions +
+    #        segfaults.
     from blaplay import blautil
     blautil.BlaThread.kill_threads()
 

@@ -65,6 +65,33 @@ def update_menu(view):
     for entry in blaconst.MENU_EDIT:
         uimanager.get_widget(entry).set_visible(state)
 
+def create_control_popup_menu():
+    import blaplay
+    player = blaplay.bla.player
+
+    menu = gtk.Menu()
+
+    if player.get_state() in [blaconst.STATE_PAUSED, blaconst.STATE_STOPPED]:
+        label = "Play"
+        stock = gtk.STOCK_MEDIA_PLAY
+    else:
+        label = "Pause"
+        stock = gtk.STOCK_MEDIA_PAUSE
+    items = [
+        (label, stock, player.play_pause),
+        ("Stop", gtk.STOCK_MEDIA_STOP, player.stop),
+        ("Previous", gtk.STOCK_MEDIA_PREVIOUS, player.previous),
+        ("Next", gtk.STOCK_MEDIA_NEXT, player.next)
+    ]
+    for label, stock, callback in items:
+        m = gtk.ImageMenuItem(stock)
+        m.set_label(label)
+        # Force early binding of `callback' by using default arguments.
+        m.connect("activate", lambda x, c=callback: c())
+        menu.append(m)
+
+    return menu
+
 def update_colors():
     # When the user chooses to overwrite the theme colors we set the name of
     # the affected widgets to blaconst.APPNAME in order for them to respect the
@@ -178,40 +205,29 @@ class BlaTray(gtk.StatusIcon):
         self.set_tooltip_text("Stopped")
         self.set_has_tooltip(
             blacfg.getboolean("general", "tray.tooltip"))
-        self.connect("activate", window.toggle_hide)
+        def activate(status_icon):
+            window.toggle_hide()
+        self.connect("activate", activate)
         self.connect("popup_menu", self.__tray_menu)
 
     def __tray_menu(self, icon, button, activation_time):
-        menu = gtk.Menu()
-
         import blaplay
-        player = blaplay.bla.player
-        window = blaplay.bla.window
 
-        items = [
-            ("Play/Pause", player.play_pause), ("Stop", player.stop),
-            ("Next", player.next), ("Previous", player.previous), (None, None),
-            ("last.fm", None), ("Quit", window.quit)
-        ]
+        menu = create_control_popup_menu()
+        menu.append(gtk.SeparatorMenuItem())
 
-        for label, callback in items:
-            if label and callback is None:
-                submenu = blafm.get_popup_menu()
-                if not submenu:
-                    continue
-                m = gtk.MenuItem(label)
-                m.set_submenu(submenu)
-                menu.append(m)
-                m = gtk.SeparatorMenuItem()
-            elif not label:
-                m = gtk.SeparatorMenuItem()
-            else:
-                m = gtk.MenuItem(label)
-                # Force early binding of `callback'. The functions used as
-                # callbacks here have different signatures so we use lambda
-                # expressions for convenience.
-                m.connect("activate", lambda x, c=callback: c())
+        # Add last.fm submenu.
+        submenu = blafm.create_popup_menu()
+        if submenu:
+            m = gtk.MenuItem("last.fm")
+            m.set_submenu(submenu)
             menu.append(m)
+            menu.append(gtk.SeparatorMenuItem())
+
+        # Add quit option.
+        m = gtk.MenuItem("Quit")
+        m.connect("activate", lambda *x: blaplay.bla.window.quit())
+        menu.append(m)
 
         menu.show_all()
         menu.popup(None, None, None, button, activation_time)

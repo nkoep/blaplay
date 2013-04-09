@@ -217,6 +217,7 @@ class BlaFetcher(gobject.GObject):
             return
 
         # TODO: wrap lyrics providers in their own class
+        #       http://www.plyrics.com/lyrics/balanceandcomposure/reflection.html
         resources = [
             # TODO: - add option for passing dict of replacements to the __download_feed method
             #       - don't escape ß for wikia

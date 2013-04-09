@@ -319,7 +319,7 @@ def popup(treeview, event, view_id, target):
     menu.append(gtk.SeparatorMenuItem())
 
     item = treeview.get_model()[path][0]
-    submenu = blafm.get_popup_menu(item.track)
+    submenu = blafm.create_popup_menu(item.track)
     if submenu:
         m = gtk.MenuItem("last.fm")
         m.set_submenu(submenu)
@@ -400,6 +400,7 @@ def create_items_from_uris(uris):
     return map(BlaListItem, uris)
 
 
+# TODO: make this a factory function
 class BlaQuery(object):
     def __init__(self, filter_string, regexp):
         self.__query_identifiers = [ARTIST, TITLE, ALBUM]
@@ -572,9 +573,11 @@ class BlaTreeView(blaguiutils.BlaTreeViewBase):
                 sort_order = None
         self.emit("sort_column", column_id, sort_order)
 
+# TODO: make this a "factory" function which returns the appropriate callable
+#       based on the given column_id
 class BlaEval(object):
     """
-    Class which maps track tags to column ids, i.e. it defines what is
+    Class which maps column ids to track tags, i.e. it defines what is
     displayed by cellrenderers given a specific column identifier.
     """
 
@@ -789,6 +792,7 @@ class BlaQueue(blaguiutils.BlaScrolledWindow):
         model = self.__treeview.get_model()
         paths = pickle.loads(selection_data.data)
 
+        # TODO: factor this out so we can use the same for the playlist
         if drop_info:
             path, pos = drop_info
             iterator = model.get_iter(path)
@@ -1302,7 +1306,7 @@ class BlaPlaylist(gtk.VBox):
             self.set_row(path, row_align=row_align, keep_selection=True,
                          set_cursor=False)
 
-        # Set sort indicators if necessary
+        # Set sort indicators if necessary.
         try:
             column_id, sort_order, sort_indicator = self.__sort_parameters
         except TypeError:
@@ -2636,9 +2640,10 @@ class BlaPlaylistManager(gtk.Notebook):
     def restore(self):
         print_i("Restoring playlists")
 
+        # FIXME: handle KeyError exceptions here as well
         try:
-            playlists, active_playlist, current, queue = \
-                blautil.deserialize_from_file(blaconst.PLAYLISTS_PATH)
+            playlists, active_playlist, current, queue = (
+                blautil.deserialize_from_file(blaconst.PLAYLISTS_PATH))
         except (TypeError, ValueError):
             self.add_playlist()
         else:

@@ -35,7 +35,7 @@ class Asf(BlaTrack):
         "WM/PartOfSet": DISC,
         "WM/Year": DATE,
 
-        # additional information that might be of interest
+        # Additional information that might be of interest.
         "WM/ISRC": "isrc",
         "WM/EncodedBy": "encoder",
         "WM/Publisher": "publisher",

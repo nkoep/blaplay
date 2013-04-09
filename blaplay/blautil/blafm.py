@@ -54,7 +54,7 @@ def init():
 def quote_url(url):
     return urllib2.quote(url.encode("utf-8"), safe=":/?=+&")
 
-def get_popup_menu(track=None):
+def create_popup_menu(track=None):
     user = blacfg.getstring("lastfm", "user")
     if track is None:
         track = player.get_track()
@@ -428,6 +428,7 @@ class BlaScrobbler(object):
             "last.fm authorization required", "In order to submit tracks to "
             "the last.fm scrobbler, blaplay needs to be authorized to use "
             "your account. Open the last.fm authorization page now?"):
+            # TODO: check if gtkwebkit is available and use a webview instead
             blautil.open_url(
                 "http://www.last.fm/api/auth/?api_key=%s&token=%s" % (
                 blaconst.LASTFM_APIKEY, cls.__token))
@@ -436,8 +437,8 @@ class BlaScrobbler(object):
     def __passes_ignore(self, track):
         tokens = map(
             str.strip,
-            filter(None, blacfg.getstring("lastfm",
-                                          "ignore.pattern").split(",")))
+            filter(None,
+                   blacfg.getstring("lastfm", "ignore.pattern").split(",")))
         res = [re.compile(t.decode("utf-8"), re.UNICODE | re.IGNORECASE)
                for t in tokens]
         for r in res:
@@ -448,8 +449,8 @@ class BlaScrobbler(object):
         return True
 
     @blautil.thread
-    def __update_now_playing(self, delay=False):
-        if delay:
+    def __update_now_playing(self, delayed=False):
+        if delayed:
             time.sleep(1)
 
         try:
@@ -581,11 +582,7 @@ class BlaScrobbler(object):
         self.__elapsed = 0
         self.__iterations = 0
         track = player.get_track()
-        try:
-            if player.radio:
-                raise KeyError
-            library[track.uri]
-        except (AttributeError, KeyError):
+        if not track or player.radio or player.video:
             return
 
         if self.__passes_ignore(track):
@@ -594,12 +591,15 @@ class BlaScrobbler(object):
                 self.__t.kill()
             except AttributeError:
                 pass
-            self.__t = self.__update_now_playing(delay=True)
+            self.__t = self.__update_now_playing(delayed=True)
             self.__start_time = int(time.time())
             self.__tid = gobject.timeout_add(1000, self.__query_status)
         else:
             self.__uri = None
-            print_d(
-                "Not submitting track \"%s - %s\" to the scrobbler queue" % (
-                track[ARTIST], track[TITLE]))
+            artist, title = track[ARTIST], track[TITLE]
+            if artist and title:
+                item = "%s - %s" % (artist, title)
+            else:
+                item = os.path.basename(track.uri)
+            print_d("Not submitting \"%s\" to the scrobbler queue" % item)
 

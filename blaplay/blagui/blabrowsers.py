@@ -892,7 +892,7 @@ class BlaBrowsers(gtk.VBox):
         self.show()
 
         self.update_tree_lines()
-        self.set_visibility(blacfg.getboolean("general", "browsers"))
+        self.set_visible(blacfg.getboolean("general", "browsers"))
 
         page_num = blacfg.getint("general", "browser.view")
         if page_num not in [0, 1]:
@@ -902,8 +902,8 @@ class BlaBrowsers(gtk.VBox):
             "switch_page",
             lambda *x: blacfg.set("general", "browser.view", x[-1]))
 
-    def set_visibility(self, state):
-        self.set_visible(state)
+    def set_visible(self, state):
+        super(BlaBrowsers, self).set_visible(state)
         blacfg.setboolean("general", "browsers", state)
 
     @classmethod

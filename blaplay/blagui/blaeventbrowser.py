@@ -154,7 +154,8 @@ class BlaEventBrowser(blaguiutils.BlaScrolledWindow):
         location = gtk.Label()
         country = blacfg.getstring("general", "events.country")
         city = blacfg.getstring("general", "events.city")
-        if not city: location.set_markup("<i>Unspecified</i>")
+        if not city:
+            location.set_markup("<i>Unspecified</i>")
         else:
             location.set_text(
                     ", ".join([city, country] if country else [city]))

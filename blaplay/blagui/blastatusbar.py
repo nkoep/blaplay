@@ -92,7 +92,7 @@ class BlaStatusbar(gtk.Table):
         BlaView.update_view(blacfg.getint("general", "view"))
 
         self.show_all()
-        self.set_visibility(blacfg.getboolean("general", "statusbar"))
+        self.set_visible(blacfg.getboolean("general", "statusbar"))
 
     def __changed(self, player):
         self.__state = player.get_state()
@@ -154,7 +154,7 @@ class BlaStatusbar(gtk.Table):
             cls.__instance.__position = cls.__instance.__convert_time(position)
         cls.__instance.__update_track_status()
 
-    def set_visibility(self, state, hide_progressbar=True):
+    def set_visible(self, state, hide_progressbar=True):
         if hide_progressbar:
             self.__pb.set_visible(False)
             self.__pb_label.set_visible(False)
@@ -162,7 +162,7 @@ class BlaStatusbar(gtk.Table):
             self.__pb.set_visible(True)
             self.__pb_label.set_visible(True)
 
-        self.set_visible(state)
+        super(BlaStatusbar, self).set_visible(state)
         blacfg.setboolean("general", "statusbar", state)
 
     def update_progress(self, library, arg):

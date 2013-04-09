@@ -46,8 +46,8 @@ class BlaVisualization(gtk.DrawingArea):
             except AttributeError:
                 pass
         self.connect("size_allocate", size_allocate)
-        self.set_visibility(blacfg.getboolean("general", "show.visualization"),
-                            quiet=True)
+        self.set_visible(blacfg.getboolean("general", "show.visualization"),
+                         quiet=True)
         self.show_all()
 
     def __disable(self):
@@ -143,7 +143,7 @@ class BlaVisualization(gtk.DrawingArea):
             pass
 
     @classmethod
-    def set_visibility(cls, state, quiet=False):
+    def set_visible(cls, state, quiet=False):
         blacfg.setboolean("general", "show.visualization", state)
         if not state:
             return cls.__instance.__disable()

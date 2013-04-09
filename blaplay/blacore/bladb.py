@@ -281,6 +281,8 @@ class BlaLibraryMonitor(gobject.GObject):
 
     @blautil.thread
     def add_directory(self, directory):
+        # TODO: this is largely identical to update_directories. combine the
+        #       two methods
         directories = self.__get_subdirectories(directory)
 
         with self.__lock:
@@ -321,8 +323,8 @@ class BlaLibraryMonitor(gobject.GObject):
                     flags=gio.FILE_MONITOR_NONE | gio.FILE_MONITOR_SEND_MOVED)
                 monitor.connect("changed", self.__queue_event)
                 self.__monitors[directory] = monitor
-
-        print_d("Now monitoring everything in: %r" % monitored_directories)
+        print_d("Now monitoring %d directories in: %r" %
+                (len(self.__monitors), monitored_directories))
         self.emit("initialized", directories)
 
 class BlaLibrary(gobject.GObject):
@@ -476,7 +478,7 @@ class BlaLibrary(gobject.GObject):
             if key == DATE:
                 organizer = organizer.split("-")[0]
             label = "%s - %s" % (
-                    track[ALBUM_ARTIST] or track[ARTIST], track[ALBUM] or "?")
+                track[ALBUM_ARTIST] or track[ARTIST], track[ALBUM] or "?")
             return [organizer, label], cls.__get_track_label(track)
 
     def __init__(self):
@@ -975,4 +977,3 @@ class BlaLibrary(gobject.GObject):
             map(remove_track, self.__tracks.iterkeys())
         self.update_library()
         self.__library_monitor.remove_directories(directory)
-

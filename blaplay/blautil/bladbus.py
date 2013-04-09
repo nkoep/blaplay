@@ -34,7 +34,9 @@ def setup_bus():
     BlaDBus(object_path=OBJECT_PATH, bus_name=bus_name)
 
 def query_bus(query, arg=None):
-    # FIXME: do this properly once we comply to MPRIS 2.2
+    # FIXME: - do this properly once we comply to MPRIS 2.2
+    #        - since we started using the gst module in the formats package
+    #          recently importing this here also imports gst
     from blaplay.formats._identifiers import ARTIST, TITLE, ALBUM, DATE, GENRE
 
     # Get a proxy to the bus object of the running blaplay instance.

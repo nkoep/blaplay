@@ -88,8 +88,10 @@ def resolve_uri(uri):
 
 def get_mimetype(path):
     file_ = gio.File(path)
-    info = file_.query_info("standard::content_type")
-    return info.get_content_type()
+    try:
+        return file_.query_info("standard::content-type").get_content_type()
+    except gio.Error:
+        return ""
 
 def md5(string):
     m = hashlib.md5()
@@ -272,36 +274,29 @@ class BlaThread(Thread):
         BlaThread.__threads = filter(BlaThread.is_alive, BlaThread.__threads)
         BlaThread.__threads.append(self)
 
-    def start(self):
-        self.__run_ = self.run
-        self.run = self.__run
-        Thread.start(self)
+    def run(self):
+        sys.settrace(self.__globaltrace)
+        Thread.run(self)
 
     def kill(self):
         self.__killed = True
 
     @classmethod
     def kill_threads(cls):
-        map(cls.kill, cls.__threads)
-
-    def __run(self):
-        sys.settrace(self.__globaltrace)
-        self.__run_()
-        self.run = self.__run_
+       map(cls.kill, cls.__threads)
 
     def __globaltrace(self, frame, event, arg):
         if event == "call":
             return self.__localtrace
+        else:
+            print_w("GLOBAL TRACE: " + event)
         return None
 
     def __localtrace(self, frame, event, arg):
-        try:
-            if self.__killed and event == "line":
-                BlaThread.__threads.remove(self)
-                raise SystemExit
-            return self.__localtrace
-        except AttributeError:
+        if self.__killed and event == "line":
+            BlaThread.__threads.remove(self)
             raise SystemExit
+        return self.__localtrace
 
 class BlaOrderedSet(collections.MutableSet):
     """

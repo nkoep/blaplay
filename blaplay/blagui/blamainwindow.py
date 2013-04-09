@@ -40,12 +40,36 @@ from blaabout import BlaAbout
 class BlaMainWindow(blaguiutils.BlaBaseWindow):
     __BORDER_WIDTH = 3
 
+    __is_fullscreen = False
+
     def __init__(self):
         super(BlaMainWindow, self).__init__(gtk.WINDOW_TOPLEVEL)
-
         self.set_resizable(True)
         self.connect("delete_event", self.__delete_event)
         self.enable_tracking(is_main_window=True)
+
+        # Set up the fullscreen window.
+        self.__fullscreen_window = gtk.Window()
+        def map_(window):
+            pass
+        self.__fullscreen_window.connect("map", map_)
+        self.__fullscreen_window.set_modal(True)
+        self.__fullscreen_window.set_transient_for(self)
+        self.__fullscreen_window.connect_object(
+            "window_state_event", BlaMainWindow.__window_state_event, self)
+        def key_press_event(window, event):
+            if blagui.is_accel(event, "Escape"):
+                window.child.emit("toggle_fullscreen")
+            elif blagui.is_accel(event, "space"):
+                player.play_pause()
+            elif blagui.is_accel(event, "<Ctrl>Q"):
+                self.quit()
+        self.__fullscreen_window.connect_object(
+            "key_press_event", key_press_event, self.__fullscreen_window)
+        # Realize the fullscreen window. If we don't do this here and reparent
+        # the drawingarea to it later that in turn will get unrealized again,
+        # causing bad X window errors.
+        self.__fullscreen_window.realize()
 
         # Install a global mouse hook. If connected callbacks don't consume the
         # event by returning True this hook gets called for every widget in the
@@ -216,7 +240,7 @@ class BlaMainWindow(blaguiutils.BlaBaseWindow):
                 pass
             pane.connect("notify", notify_cb, key)
 
-        # Create a vbox for the toolbar, browser and playlist view. This allows
+        # Create a vbox for the toolbar, hpane and the statusbar. This allows
         # for setting a border around those items which excludes the menubar.
         vbox = gtk.VBox()
         vbox.set_border_width(self.__BORDER_WIDTH)
@@ -230,6 +254,7 @@ class BlaMainWindow(blaguiutils.BlaBaseWindow):
         blagui.update_colors()
         self.child.show()
 
+        # We must keep a reference to this object.
         self.__keys = BlaKeys()
 
     def update_title(self, *args):
@@ -259,22 +284,22 @@ class BlaMainWindow(blaguiutils.BlaBaseWindow):
         if not blacfg.getboolean("general", "tray.tooltip"):
             blagui.tray.set_has_tooltip(False)
 
-    def set_interface_visible(self, state):
-        """
-        Hides everything except for the main view. This is needed to support
-        fullscreen playback of videos.
-        """
+    def set_fullscreen(self, da, parent):
+        # TODO: when minimizing to tray during fullscreen, reparent the da so
+        #       that when we call raise_window() again we won't be in
+        #       fullscreen anymore
 
-        # FIXME: rather use the toggle methods. for example, this will always
-        #        restore the statusbar state even if the user doesn't wanna
-        #        see it to begin with
-        blagui.uimanager.get_widget("/Menu").set_visible(state)
-        width = self.__BORDER_WIDTH if state else 0
-        self.child.get_children()[-1].set_border_width(width)
-        self.__toolbar.set_visible(state)
-        self.__browsers.set_visibility(state)
-        self.__view.set_show_side_pane(state)
-        self.__statusbar.set_visibility(state)
+        # When parent is None we want to go into fullscreen mode.
+        go_to_fullscreen = parent is None
+        if go_to_fullscreen:
+            self.__fullscreen_window.fullscreen()
+            da.reparent(self.__fullscreen_window)
+            self.__fullscreen_window.show_all()
+        else:
+            self.__fullscreen_window.unfullscreen()
+            da.reparent(parent)
+            self.__fullscreen_window.hide()
+        self.set_maximized(go_to_fullscreen)
 
     def raise_window(self):
         self.present()
@@ -282,24 +307,42 @@ class BlaMainWindow(blaguiutils.BlaBaseWindow):
             blagui.tray.set_visible(False)
         BlaVisualization.flush_buffers()
 
-    def toggle_hide(self, *args):
-        visible = self.get_visible()
-        blaguiutils.set_visible(not visible)
-        if visible:
+    def toggle_hide(self):
+        self.__hide_windows(self.get_visible())
+
+    def quit(self, *args):
+        # Hide the main window, the tray icon, and every other tracked window.
+        # Then destroy the main window which in turn initiates the actual
+        # shutdown sequence. We also need to stop playback here to avoid
+        # problems with gstreamer and bad X windows in case we're playing a
+        # video when shutting down.
+        # FIXME: just stopping the player isn't enough as gstreamer uses its
+        #        own playing thread. we somehow need to make sure it actually
+        #        stopped playing before we can destroy the GUI. we might be
+        #        able to fix it by hot-swapping the xvimagesink by a fakesink
+        player.stop()
+        self.hide()
+        self.__fullscreen_window.hide()
+        blaguiutils.set_visible(False)
+        blagui.tray.set_visible(False)
+        self.destroy()
+        return False
+
+    def __hide_windows(self, yes):
+        blaguiutils.set_visible(not yes)
+        if yes:
             self.hide()
             blagui.tray.set_visible(True)
         else:
             self.raise_window()
 
-    def quit(self, *args):
-        # Hide the main window, the tray icon, and every other tracked window.
-        # Then destroy the main window which in turn initiates the actual
-        # shutdown sequence.
-        self.hide()
-        blaguiutils.set_visible(False)
-        blagui.tray.set_visible(False)
-        self.destroy()
-        return False
+    def __window_state_event(self, event):
+        self.__is_fullscreen = bool(
+            event.new_window_state & gtk.gdk.WINDOW_STATE_FULLSCREEN)
+
+    @property
+    def is_fullscreen(self):
+        return self.__is_fullscreen
 
     def __delete_event(self, window, event):
         if blacfg.getboolean("general", "close.to.tray"):
@@ -309,7 +352,7 @@ class BlaMainWindow(blaguiutils.BlaBaseWindow):
 
     def __toggle_browsers(self, event):
         state = event.get_active()
-        self.__browsers.set_visibility(state)
+        self.__browsers.set_visible(state)
 
     def __toggle_tabs(self, event):
         self.__view.views[blaconst.VIEW_PLAYLISTS].show_tabs(
@@ -319,10 +362,10 @@ class BlaMainWindow(blaguiutils.BlaBaseWindow):
         self.__view.set_show_side_pane(event.get_active())
 
     def __toggle_statusbar(self, event):
-        self.__statusbar.set_visibility(event.get_active())
+        self.__statusbar.set_visible(event.get_active())
 
     def __toggle_visualization(self, event):
-        BlaVisualization.set_visibility(event.get_active())
+        BlaVisualization.set_visible(event.get_active())
 
     def __set_file_chooser_directory(self, diag):
         directory = blacfg.getstring("general", "filechooser.directory")

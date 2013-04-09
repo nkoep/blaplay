@@ -26,15 +26,27 @@ player = blaplay.bla.player
 library = blaplay.bla.library
 from blaplay.blacore import blaconst, blacfg
 from blaplay import blautil, blagui
+from blastatusbar import BlaStatusbar
 from blaplay.blautil import blametadata
 from blaplay.blagui import blaguiutils
-from blaplaylist import BlaPlaylistManager, BlaQueue
-from blastatusbar import BlaStatusbar
-from blavideo import BlaVideo
-from blaradio import BlaRadio
-from blaeventbrowser import BlaEventBrowser
-from blareleasebrowser import BlaReleaseBrowser
 from blaplay.formats._identifiers import *
+
+
+def View(name):
+    """Class decorator to implement views for the main window outlet."""
+
+    import inspect
+
+    def check_if_class(cls):
+        if not inspect.isclass(cls):
+            raise TypeError("%s is not a class object" % cls.__name__)
+
+    def view(cls):
+        check_if_class(cls)
+        cls.name = property(lambda self: name)
+        return cls
+
+    return view
 
 
 class BlaSidePane(gtk.VBox):
@@ -50,43 +62,55 @@ class BlaSidePane(gtk.VBox):
         __alpha = 1.0
         __cover = None
         __pb = None
+        __tid = -1
         __timestamp = -1
 
         def __init__(self):
             super(BlaSidePane.BlaCoverDisplay, self).__init__()
             self.set_shadow_type(gtk.SHADOW_IN)
-            self.connect("realize", lambda *x: self.update_colors())
+            self.connect_object(
+                "realize", BlaSidePane.BlaCoverDisplay.update_colors, self)
 
-            self.__da = gtk.DrawingArea()
-            self.__da.add_events(gtk.gdk.BUTTON_PRESS_MASK)
-            self.__da.connect_object(
-                "expose_event", BlaSidePane.BlaCoverDisplay.__expose, self)
-            self.__da.connect_object(
+            # Set up the drawing area.
+            self.__is_video_canvas = False
+            from blavideo import BlaVideoCanvas
+            drawing_area = BlaVideoCanvas()
+            self.__cid = drawing_area.connect_object(
+                "expose_event",
+                BlaSidePane.BlaCoverDisplay.__expose_event, self)
+            drawing_area.connect_object(
                 "button_press_event",
                 BlaSidePane.BlaCoverDisplay.__button_press_event, self)
-            self.add(self.__da)
+            self.add(drawing_area)
 
+            # Make sure the cover area is a square.
             def size_allocate(*args):
-                self.__img_size = self.__da.get_allocation()[-1]
-                self.__da.set_size_request(self.__img_size, self.__img_size)
+                height = self.get_allocation()[-1]
+                self.set_size_request(height, height)
                 if self.__cover is None:
                     self.__cover = blaconst.COVER
                 self.__prepare_cover(self.__cover)
             self.connect("size_allocate", size_allocate)
 
-        def __button_press_event(self, event):
-            def renew_timestamp():
-                # Update and return the new timestamp.
-                self.__timestamp = gobject.get_current_time()
-                return self.__timestamp
+            # We have to guarantee that the drawing_area is realized after
+            # startup, even if the side pane is set to hidden in the config.
+            def startup_complete(*args):
+                drawing_area.realize()
+            blaplay.bla.connect("startup_complete", startup_complete)
 
+        def __update_timestamp(self):
+            # Update and return the new timestamp.
+            self.__timestamp = gobject.get_current_time()
+            return self.__timestamp
+
+        def __button_press_event(self, event):
             def open_cover(*args):
                 blautil.open_with_filehandler(
                     self.__cover, "Failed to open image '%s'" % self.__cover)
 
             def fetch_cover(*args):
                 BlaSidePane.fetcher.fetch_cover(
-                    BlaSidePane.track, renew_timestamp())
+                    BlaSidePane.track, self.__update_timestamp())
 
             def set_cover(*args):
                 diag = gtk.FileChooserDialog(
@@ -99,10 +123,17 @@ class BlaSidePane(gtk.VBox):
                 diag.destroy()
 
                 if response == gtk.RESPONSE_OK and path:
-                    BlaSidePane.fetcher.set_cover(renew_timestamp(), path)
+                    BlaSidePane.fetcher.set_cover(
+                        self.__update_timestamp(), path)
 
             def delete_cover(*args):
-                BlaSidePane.fetcher.set_cover(renew_timestamp())
+                BlaSidePane.fetcher.set_cover(self.__update_timestamp())
+
+            # If the cover art display is used to display video delegate the
+            # button event to the default handler.
+            if (blacfg.getint("general", "view") != blaconst.VIEW_VIDEO and
+                player.video):
+                return False
 
             if (event.button == 1 and event.type == gtk.gdk._2BUTTON_PRESS and
                 self.__cover != blaconst.COVER):
@@ -118,8 +149,8 @@ class BlaSidePane(gtk.VBox):
                      os.path.dirname(self.__cover)), sensitive),
                     None,
                     ("Fetch cover", fetch_cover, True),
-                    ("Set cover...", lambda *x: set_cover(renew_timestamp()),
-                     True),
+                    ("Set cover...",
+                     lambda *x: set_cover(self.__update_timestamp()), True),
                     ("Delete cover", delete_cover, sensitive)
                 ]
                 track = BlaSidePane.track
@@ -142,7 +173,7 @@ class BlaSidePane(gtk.VBox):
                 menu.show_all()
                 menu.popup(None, None, None, event.button, event.time)
 
-            return False
+            return True
 
         def __prepare_cover(self, cover):
             try:
@@ -157,15 +188,25 @@ class BlaSidePane(gtk.VBox):
                     return False
                 pb = gtk.gdk.pixbuf_new_from_file(blaconst.COVER)
 
-            pb = pb.scale_simple(
-                self.__img_size, self.__img_size, gtk.gdk.INTERP_HYPER)
-            self.__pb_old = self.__pb
+            height = self.get_allocation()[-1]
+            pb = pb.scale_simple(height, height, gtk.gdk.INTERP_HYPER)
+            self.__pb_prev = self.__pb
             self.__pb = pb
             self.__cover = cover
+
             return True
 
-        def __expose(self, *args):
-            cr = self.__da.window.cairo_create()
+        def __expose_event(self, *args):
+            # FIXME: if the player is paused and the video canvas gets exposed
+            #        the last queued event paints the canvas in pure black
+            #        AFTER gstreamer repaints the last active frame of the
+            #        video. obviously, we want the last active frame to be seen
+            if self.__is_video_canvas and player.video:
+                # Be sure to cancel any crossfade animations.
+                self.__alpha = 0.0
+                return False
+
+            cr = self.child.window.cairo_create()
             cr.set_source_color(self.__bg_color)
             x, y, width, height = self.get_allocation()
 
@@ -176,7 +217,7 @@ class BlaSidePane(gtk.VBox):
                 return
 
             # Draw the old cover.
-            cr.set_source_pixbuf(self.__pb_old, 0, 0)
+            cr.set_source_pixbuf(self.__pb_prev, 0, 0)
             cr.paint_with_alpha(self.__alpha)
 
             # Draw the new cover.
@@ -187,24 +228,25 @@ class BlaSidePane(gtk.VBox):
             self.__alpha -= 0.05
 
         @blautil.idle
-        def update(self, timestamp, cover, force_download):
+        def update(self, timestamp, cover, force):
             def crossfade():
-                self.__da.queue_draw()
-                return self.__alpha > 0
+                if self.__alpha > 0.0:
+                    self.child.queue_draw()
+                    return True
+                return False
 
             if (timestamp != self.__timestamp or
-                cover == self.__cover and not force_download):
+                cover == self.__cover and not force or
+                not self.__prepare_cover(cover)):
                 return
-            if not self.__prepare_cover(cover):
-                return
+
             self.__alpha = 1.0
             # Use 25 ms intervals for an update rate of 40 fps.
             gobject.timeout_add(25, crossfade)
 
         def fetch_cover(self):
-            self.__timestamp = gobject.get_current_time()
             BlaSidePane.fetcher.fetch_cover(
-                BlaSidePane.track, self.__timestamp)
+                BlaSidePane.track, self.__update_timestamp())
 
         def update_colors(self):
             if blacfg.getboolean("colors", "overwrite"):
@@ -212,7 +254,24 @@ class BlaSidePane(gtk.VBox):
                     blacfg.getstring("colors", "background"))
             else:
                 self.__bg_color = self.get_style().bg[gtk.STATE_NORMAL]
-            self.__da.queue_draw()
+            self.child.queue_draw()
+
+        def use_as_video_canvas(self, yes):
+            if yes:
+                if not self.__is_video_canvas:
+                    self.__is_video_canvas = True
+                    self.__cover = None
+                    self.child.queue_draw()
+                    player.set_xwindow_id(self.child.window.xid)
+            else:
+                self.reset()
+
+        def reset(self):
+            self.__is_video_canvas = False
+            self.update(self.__update_timestamp(), blaconst.COVER, True)
+
+        def get_video_canvas(self):
+            return self.child
 
     def __init__(self, views):
         super(BlaSidePane, self).__init__(spacing=5)
@@ -220,7 +279,7 @@ class BlaSidePane(gtk.VBox):
         notebook = gtk.Notebook()
         notebook.set_scrollable(True)
 
-        # Create lyrics textview.
+        # Set up the lyrics textview.
         self.__tv = gtk.TextView()
         self.__tv.set_size_request(self.__MIN_WIDTH, -1)
         self.__tv.set_editable(False)
@@ -238,7 +297,8 @@ class BlaSidePane(gtk.VBox):
         self.__tb.create_tag("italic", style=pango.STYLE_ITALIC)
         self.__tag = self.__tb.create_tag("color")
 
-        # Create the biography textview.
+        # Set up the bio textview.
+        # TODO: give the textviews and textbuffers some more meaningful names
         self.__tv2 = gtk.TextView()
         self.__tv2.set_size_request(self.__MIN_WIDTH, -1)
         self.__tv2.set_editable(False)
@@ -289,7 +349,7 @@ class BlaSidePane(gtk.VBox):
 
         hbox = gtk.HBox(spacing=5)
         hbox.pack_start(viewport, expand=True)
-        hbox.pack_start(self.cover_display, expand=False)
+        hbox.pack_start(self.cover_display, expand=False, fill=True)
 
         notebook.append_page(sw, gtk.Label("Lyrics"))
         notebook.append_page(sw2, gtk.Label("Biography"))
@@ -321,9 +381,7 @@ class BlaSidePane(gtk.VBox):
         self.fetcher.connect_object(
             "biography", BlaSidePane.__update_biography, self)
         self.fetcher.connect_object(
-            "cover", type(self.__cover_display).update, self.__cover_display)
-
-        self.show_all()
+            "cover", type(self.cover_display).update, self.cover_display)
 
         page_num = blacfg.getint("general", "metadata.view")
         notebook.set_current_page(page_num)
@@ -438,7 +496,7 @@ class BlaSidePane(gtk.VBox):
                 tv.modify_style(self.__style)
                 tag.set_property("foreground_gdk",
                     self.__style.fg[gtk.STATE_NORMAL])
-        self.__cover_display.update_colors()
+        self.cover_display.update_colors()
 
     def update_count(self, widget, view, count):
         model = self.__treeview.get_model()
@@ -448,7 +506,7 @@ class BlaSidePane(gtk.VBox):
         def worker(track):
             self.__update_track(track)
             self.fetcher.fetch_lyrics_and_bio(track, self.__timestamp)
-            self.__cover_display.fetch_cover()
+            self.cover_display.fetch_cover()
             return False
 
         gobject.source_remove(self.__tid)
@@ -462,37 +520,49 @@ class BlaSidePane(gtk.VBox):
         self.__clear()
         self.__timestamp = gobject.get_current_time()
 
-        # TODO: don't fetch anything if we're playing a video
         if state == blaconst.STATE_STOPPED or player.radio:
             BlaSidePane.track = None
-            self.__cover_display.update(blaconst.COVER, False)
+            self.cover_display.reset()
         else:
             self.__tid = gobject.timeout_add(self.__DELAY, worker, track)
             BlaSidePane.track = track
 
 class BlaView(gtk.HPaned):
-#    class __metaclass__(gobject.GObjectMeta):
-#        def __new__(mcs, name, bases, dict_):
-#            for attr in """clear select cut copy paste remove remove_duplicates
-#                           remove_invalid_tracks""".split():
-#                @classmethod
-#                def func(cls, *args):
-#                    view = blacfg.getint("general", "view")
-#                    if view in [blaconst.VIEW_PLAYLISTS, blaconst.VIEW_QUEUE]:
-#                        getattr(cls.views[view], attr)(*args)
-#                dict_[attr] = func
-#            return gobject.GObjectMeta.__new__(mcs, name, bases, dict_)
-
     def __init__(self):
         super(BlaView, self).__init__()
-        type(self).views = [BlaPlaylistManager(), BlaQueue(), BlaRadio(),
-                            BlaVideo(), BlaEventBrowser(), BlaReleaseBrowser()]
+
+        from blaplaylist import BlaPlaylistManager, BlaQueue
+        from blavideo import BlaVideo
+        from blaradio import BlaRadio
+        from blaeventbrowser import BlaEventBrowser
+        from blareleasebrowser import BlaReleaseBrowser
+        type(self).views = [
+            BlaPlaylistManager(), BlaQueue(), BlaRadio(), BlaVideo(),
+            BlaEventBrowser(), BlaReleaseBrowser()]
+
         type(self).__container = gtk.Viewport()
         self.__container.set_shadow_type(gtk.SHADOW_NONE)
         type(self).__side_pane = BlaSidePane(self.views)
 
         player.connect(
             "state_changed", lambda *x: self.__side_pane.update_track())
+        # The sync handler gets called every time gstreamer needs an xwindow
+        # for rendering video.
+        def sync_handler():
+            view = blacfg.getint("general", "view")
+            if view == blaconst.VIEW_VIDEO:
+                element = self.views[blaconst.VIEW_VIDEO]
+            else:
+                element = self.__side_pane.cover_display
+                # Coerce the cover display into a video canvas.
+                element.use_as_video_canvas(True)
+            canvas = element.get_video_canvas()
+            if canvas.get_realized():
+                return canvas.window.xid
+            print_w("Drawing area for video playback not yet realized")
+            return 0
+        player.set_sync_handler(sync_handler)
+
         for view in self.views:
             view.connect("count_changed", self.__side_pane.update_count)
         # FIXME: make this more generic. for instance, define a baseclass for
@@ -507,9 +577,9 @@ class BlaView(gtk.HPaned):
             except AttributeError:
                 pass
 
-        self.show_all()
+        self.show()
         self.__container.show_all()
-        self.__side_pane.show()
+        self.__side_pane.show_all()
 
         self.pack1(self.__container, resize=True, shrink=False)
         self.pack2(self.__side_pane, resize=False, shrink=False)
@@ -522,28 +592,22 @@ class BlaView(gtk.HPaned):
 
     @classmethod
     def update_view(cls, view, init=False):
+        view_prev = blacfg.getint("general", "view")
         blacfg.set("general", "view", view)
 
-#        # TODO: reparent the video da first before swapping the views
-#        if view != blaconst.VIEW_VIDEO:
-#            cls.views[blaconst.VIEW_VIDEO].get_drawingarea().reparent(
-#                cls.__side_pane.cover_display)
-
         child = cls.__container.get_child()
-        # FIXME: removing the video view will unmap the drawingarea, causing
-        #        the x server to panic if we're currently rendering a video.
-        #        the view is not destroyed as we still have references to it,
-        #        for instance in the views list of the class object. one
-        #        sensible solution might be to reparent the drawingarea to the
-        #        sidepane which usually displays album covers. that would also
-        #        make sure the user has a visual cue that he's actually playing
-        #        a video at the time.
         if child is not None:
             cls.__container.remove(child)
         child = cls.views[view]
         if child.get_parent() is not None:
             child.unparent()
         cls.__container.add(child)
+
+        if player.video:
+            # If the previous view was the video view coerce the cover art
+            # display into acting as new video canvas.
+            cls.__side_pane.cover_display.use_as_video_canvas(
+                view != blaconst.VIEW_VIDEO)
 
         # TODO: create views via decorator which provides empty implementations
         try:

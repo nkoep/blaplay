@@ -103,13 +103,16 @@ class BlaBaseWindow(gtk.Window):
     called with `is_main_window=True'.
     """
 
+    __main_window = None
+
     def __init__(self, *args, **kwargs):
         super(BlaBaseWindow, self).__init__(*args, **kwargs)
         self.__position = (-1, -1)
         self.__size = (-1, -1)
-        self.__maximized = False
+        self.__maximized = self.__was_maximized = False
+        self.__is_main_window = False
 
-    def present(self, *args):
+    def present(self):
         # set the proper window state before presenting the window to the user.
         # this is necessary to avoid that the window appears in its default
         # state for a brief moment first
@@ -117,7 +120,11 @@ class BlaBaseWindow(gtk.Window):
         super(BlaBaseWindow, self).present()
 
     def enable_tracking(self, is_main_window=False):
+        if self.__main_window is not None and is_main_window:
+            raise ValueError("There can only be one main window")
         self.__is_main_window = is_main_window
+        if self.__is_main_window:
+            type(self).__main_window = self
         self.connect("configure_event", self.__configure_event)
         self.connect("window_state_event", self.__window_state_event)
         self.connect("map", self.__map)
@@ -140,7 +147,9 @@ class BlaBaseWindow(gtk.Window):
             event.new_window_state & gtk.gdk.WINDOW_STATE_MAXIMIZED)
         if event.new_window_state & gtk.gdk.WINDOW_STATE_WITHDRAWN:
             return
-        blacfg.setboolean("general", "maximized", self.__maximized)
+        if self.__is_main_window:
+            blacfg.setboolean("general", "maximized",
+                              self.__maximized and self.__was_maximized)
 
     def __map(self, *args):
         self.__restore_window_state()
@@ -164,7 +173,8 @@ class BlaBaseWindow(gtk.Window):
 
     def __restore_state(self):
         if self.__is_main_window:
-            self.__maximized = blacfg.getboolean("general", "maximized")
+            self.__maximized = self.__was_maximized = blacfg.getboolean(
+                "general", "maximized")
         if self.__maximized:
             self.maximize()
         else:
@@ -178,6 +188,15 @@ class BlaBaseWindow(gtk.Window):
         x, y = self.__position
         if x >= 0 and y >= 0:
             self.move(x, y)
+
+    def set_maximized(self, yes):
+        if yes:
+            self.__was_maximized = self.__maximized
+            self.maximize()
+        elif not self.__was_maximized:
+            # If the window was not already maximized before we maximized it
+            # restore the old state here, i.e. unmaximize the window again.
+            self.unmaximize()
 
 class BlaWindow(BlaBaseWindow):
     """ A window that binds the ^W accelerator to close. """
