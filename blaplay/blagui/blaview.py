@@ -216,13 +216,15 @@ class BlaSidePane(gtk.VBox):
             if not self.__pb:
                 return
 
+            alpha = blautil.clamp(0.0, 1.0, self.__alpha)
+
             # Draw the old cover.
             cr.set_source_pixbuf(self.__pb_prev, 0, 0)
-            cr.paint_with_alpha(self.__alpha)
+            cr.paint_with_alpha(alpha)
 
             # Draw the new cover.
             cr.set_source_pixbuf(self.__pb, 0, 0)
-            cr.paint_with_alpha(1.0 - self.__alpha)
+            cr.paint_with_alpha(1.0 - alpha)
 
             # Decrease the alpha value to create a linear fade between covers.
             self.__alpha -= 0.05

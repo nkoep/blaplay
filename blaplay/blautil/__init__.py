@@ -35,8 +35,11 @@ import gobject
 import gio
 import gtk
 
-KEY, PREV, NEXT = xrange(3)
 
+def clamp(min_, max_, value):
+    if min_ > max_:
+        raise ValueError("Lower bound must be smaller or equal to upper bound")
+    return max(min_, min(max_, value))
 
 def signal(n_args):
     return (gobject.SIGNAL_RUN_LAST, gobject.TYPE_NONE, (object,) * n_args)
@@ -301,8 +304,10 @@ class BlaThread(Thread):
 class BlaOrderedSet(collections.MutableSet):
     """
     set-like class which maintains the order in which elements were added.
-    Implementation from: http://code.activestate.com/recipes/576694
+    Modified version of http://code.activestate.com/recipes/576694
     """
+
+    __KEY, __PREV, __NEXT = xrange(3)
 
     def __init__(self, iterable=None):
         self.end = end = []
@@ -320,28 +325,29 @@ class BlaOrderedSet(collections.MutableSet):
     def add(self, key):
         if key not in self.map:
             end = self.end
-            curr = end[PREV]
-            curr[NEXT] = end[PREV] = self.map[key] = [key, curr, end]
+            curr = end[self.__PREV]
+            curr[self.__NEXT] = end[self.__PREV] = self.map[key] = [
+                key, curr, end]
 
     def discard(self, key):
         if key in self.map:
             key, prev, next = self.map.pop(key)
-            prev[NEXT] = next
-            next[PREV] = prev
+            prev[self.__NEXT] = next
+            next[self.__PREV] = prev
 
     def __iter__(self):
         end = self.end
-        curr = end[NEXT]
+        curr = end[self.__NEXT]
         while curr is not end:
-            yield curr[KEY]
-            curr = curr[NEXT]
+            yield curr[self.__KEY]
+            curr = curr[self.__NEXT]
 
     def __reversed__(self):
         end = self.end
-        curr = end[PREV]
+        curr = end[self.__PREV]
         while curr is not end:
-            yield curr[KEY]
-            curr = curr[PREV]
+            yield curr[self.__KEY]
+            curr = curr[self.__PREV]
 
     def pop(self, last=True):
         if not self:
