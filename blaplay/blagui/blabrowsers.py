@@ -48,11 +48,11 @@ class BlaCellRenderer(blaguiutils.BlaCellRendererBase):
 
     def get_layout(self, *args):
         if len(args) == 1:
-            tv, text = args[0], ""
+            treeview, text = args[0], ""
         else:
-            tv, text = args
+            treeview, text = args
 
-        context = tv.get_pango_context()
+        context = treeview.get_pango_context()
         layout = pango.Layout(context)
         fdesc = gtk.widget_get_default_style().font_desc
         layout.set_font_description(fdesc)
@@ -272,7 +272,7 @@ class BlaTreeView(blaguiutils.BlaTreeViewBase):
             resolve = False
 
         name = model[path][2]
-        # TODO: defer calling get_tracks() when it's actually needed, i.e.
+        # TODO: defer calling get_tracks() until it's actually needed, i.e.
         #       when an "activate" callback is invoked
         tracks = self.get_tracks()
         directory = list(set(map(dirname, tracks)))
@@ -349,10 +349,179 @@ class BlaQuery(object):
         return True
 
 class BlaLibraryBrowser(gtk.VBox):
+    __cid = -1
     __fid = -1
     __filter_parameters = []
     __expanded_rows = []
     __model = None
+
+    class BlaLibraryModel(object):
+        # FIXME: for a library of 9000~ tracks creating an instance of the
+        #        model increases the interpreter's memory use by roughly 4 MB
+        #        every time. would this be better with a "lazy" model, i.e.
+        #        synthesizing nodes on row expansion? this could suffer from
+        #        performance issues. one way to fix it might be pushing the
+        #        tree creation to cpython using cython
+
+        __layout = [
+            gobject.TYPE_STRING,    # uri
+            gobject.TYPE_STRING,    # label (with child count if present)
+            gobject.TYPE_STRING,    # label
+            gobject.TYPE_BOOLEAN    # visibility value for filtering
+        ]
+
+        def __new__(cls, view):
+            # TODO: add a proper search tree implementation with sorted leaf
+            #       nodes so we don't have to wrap the resulting model in a
+            #       gtk.TreeModelSort() instance. also get rid of the
+            #       gtk.TreeModelFilter() instance. in most cases it's probably
+            #       faster to populate a new model after filtering the library
+            #       offline. for this, pass in a BlaQuery instance to the
+            #       constructor which we can use to filter the library.
+            #       finally, since we can then simply return a gtk.TreeModel()
+            #       instance, rename __new__ to __init__ and derive this class
+            #       from gtk.TreeModel directly. even though it seems to be
+            #       possible to derive and instantiate gtk.TreeModelFilter
+            #       instances by now, we don't need to anymore if we don't use
+            #       gtk's filtering capabilities (cf. playlists).
+
+            def get_iterator(model, iterators, comps):
+                d = iterators
+                iterator = None
+                for comp in comps:
+                    try:
+                        iterator, d = d[comp]
+                    except KeyError:
+                        d[comp] = [
+                            model.append(iterator, ["", comp, comp, True]), {}]
+                        iterator, d = d[comp]
+                return iterator
+
+            model = gtk.TreeStore(*cls.__layout)
+
+            if view == blaconst.ORGANIZE_BY_DIRECTORY:
+                cb = cls.__organize_by_directory
+            elif view == blaconst.ORGANIZE_BY_ARTIST:
+                cb = cls.__organize_by_artist
+            elif view == blaconst.ORGANIZE_BY_ARTIST_ALBUM:
+                cb = cls.__organize_by_artist_album
+            elif view == blaconst.ORGANIZE_BY_ALBUM:
+                cb = cls.__organize_by_album
+            elif view in [blaconst.ORGANIZE_BY_GENRE,
+                          blaconst.ORGANIZE_BY_YEAR]:
+                def cb(uri, comps):
+                    return cls.__organize_by_genre_year(uri, comps, view=view)
+            else:
+                raise NotImplementedError("Invalid library view")
+
+            iterators = {}
+            old_iterator, old_comps = None, None
+            append = model.append
+
+            for uri in filter(cls.__get_filter(), library):
+                track = library[uri]
+                comps, leaf = cb(uri, track)
+
+                if old_comps is not None and comps == old_comps:
+                    iterator = old_iterator
+                else:
+                    iterator = get_iterator(model, iterators, comps)
+
+                append(iterator, [uri, leaf, leaf, True])
+
+                old_iterator = iterator
+                old_comps = comps
+
+            filt = model.filter_new()
+            filt.set_visible_column(3)
+            sort = gtk.TreeModelSort(filt)
+            sort.set_sort_column_id(2, gtk.SORT_ASCENDING)
+            return sort
+
+        @classmethod
+        def __get_filter(cls):
+            # This returns a filter function which URIs have to pass in order
+            # for them to be considered in the library browser.
+            def get_regexp(string):
+                tokens = [t.replace(".", "\.").replace("*", ".*")
+                          for t in map(str.strip, string.split(","))]
+                return re.compile(r"(%s)" % "|".join(tokens))
+
+            restrict_re = get_regexp(
+                blacfg.getstring("library", "restrict.to").strip())
+            exclude_string = blacfg.getstring("library", "exclude").strip()
+            if exclude_string:
+                exclude_re = get_regexp(exclude_string)
+                def filt(s):
+                    return restrict_re.match(s) and not exclude_re.match(s)
+            else:
+                filt = restrict_re.match
+            return filt
+
+        @classmethod
+        def __get_track_label(cls, track):
+            # FIXME: - get rid of the int() calls
+            #        - set the disc number prefix AFTER setting the track
+            #          number to make sure we don't get a label with a proper
+            #          disc number and a missing track number
+
+            # ValueError is raised if the int() call fails.
+            try:
+                label = "%d." % int(track[DISC].split("/")[0])
+            except ValueError:
+                label = ""
+            try:
+                label += "%02d. " % int(track[TRACK].split("/")[0])
+            except ValueError:
+                pass
+            artist = (track[ALBUM_ARTIST] or track[PERFORMER] or
+                      track[ARTIST] or track[COMPOSER])
+            if track[ARTIST] and artist != track[ARTIST]:
+                label += "%s - " % track[ARTIST]
+            return "%s%s" % (label, track[TITLE] or track.basename)
+
+        @classmethod
+        def __organize_by_directory(cls, uri, track):
+            if not track[MONITORED_DIRECTORY]:
+                raise ValueError("Trying to include track in the library "
+                                 "browser that has no monitored directory")
+            directory = os.path.dirname(
+                track.uri)[len(track[MONITORED_DIRECTORY])+1:]
+            comps = directory.split("/")
+            if comps == [""]:
+                comps = ["bla"]
+            else:
+                comps.insert(0, "bla")
+            return comps, os.path.basename(track.uri)
+
+        @classmethod
+        def __organize_by_artist(cls, uri, track):
+            return ([track[ARTIST] or "?", track[ALBUM] or "?"],
+                    cls.__get_track_label(track))
+
+        @classmethod
+        def __organize_by_artist_album(cls, uri, track):
+            artist = (track[ALBUM_ARTIST] or track[PERFORMER] or
+                      track[ARTIST] or "?")
+            return (["%s - %s" % (artist, track[ALBUM] or "?")],
+                    cls.__get_track_label(track))
+
+        @classmethod
+        def __organize_by_album(cls, uri, track):
+            return [track[ALBUM] or "?"], cls.__get_track_label(track)
+
+        @classmethod
+        def __organize_by_genre_year(cls, uri, track, view):
+            if view == blaconst.ORGANIZE_BY_GENRE:
+                key = GENRE
+            else:
+                key = DATE
+            organizer = track[key].capitalize() or "?"
+            if key == DATE:
+                organizer = organizer.split("-")[0]
+            label = "%s - %s" % (
+                track[ALBUM_ARTIST] or track[ARTIST], track[ALBUM] or "?")
+            return [organizer, label], cls.__get_track_label(track)
 
     def __init__(self, parent):
         super(BlaLibraryBrowser, self).__init__()
@@ -396,12 +565,14 @@ class BlaLibraryBrowser(gtk.VBox):
         entry.set_icon_from_stock(gtk.ENTRY_ICON_SECONDARY, gtk.STOCK_CLEAR)
         entry.connect("icon_release", lambda *x: x[0].delete_text(0, -1))
         entry.connect("changed", self.__update_filter_parameters)
-        entry.connect("activate", self.__update_treeview)
+        entry.connect_object(
+            "activate", BlaLibraryBrowser.__update_treeview, self)
 
         button = gtk.Button()
         button.add(
             gtk.image_new_from_stock(gtk.STOCK_FIND, gtk.ICON_SIZE_BUTTON))
-        button.connect("clicked", self.__update_treeview)
+        button.connect_object(
+            "clicked", BlaLibraryBrowser.__update_treeview, self)
 
         alignment = gtk.Alignment()
         alignment.add(gtk.Label("Filter:"))
@@ -418,18 +589,26 @@ class BlaLibraryBrowser(gtk.VBox):
 
         self.update_colors()
 
-        library.connect(
-            "update_library_browser", self.__update_library_contents)
-        library.request_model(blacfg.getint("library", "organize.by"))
+        def queue_model_update(*args):
+            self.__queue_model_update(blacfg.getint("library", "organize.by"))
+        library.connect("library_changed", queue_model_update)
+        queue_model_update()
+
+    def __queue_model_update(self, view):
+        def create_model():
+            print_d("Updating library browser")
+            model = BlaLibraryBrowser.BlaLibraryModel(view)
+            self.__expanded_rows = []
+            self.__update_treeview(model)
+            return False
+        gobject.source_remove(self.__cid)
+        self.__cid = gobject.idle_add(create_model)
 
     def __update_filter_parameters(self, entry):
         self.__filter_parameters = entry.get_text().strip().split()
         if (blacfg.getboolean("playlist", "search.after.timeout") or
             not self.__filter_parameters):
-            try:
-                gobject.source_remove(self.__fid)
-            except AttributeError:
-                pass
+            gobject.source_remove(self.__fid)
             def activate():
                 entry.activate()
                 return False
@@ -456,14 +635,7 @@ class BlaLibraryBrowser(gtk.VBox):
         if not path in self.__expanded_rows:
             self.__expanded_rows.append(path)
 
-    def __update_library_contents(self, library, model):
-        print_d("Updating library browser")
-        self.__expanded_rows = []
-        self.__model = model
-        self.__update_treeview()
-
-    def __update_treeview(self, *args):
-        # TODO: do this in a process/thread
+    def __update_treeview(self, model=None):
         def check_children(model, iterator, query):
             iter_has_child = model.iter_has_child
             iter_children = model.iter_children
@@ -484,8 +656,9 @@ class BlaLibraryBrowser(gtk.VBox):
                     else:
                         count_sub += 1
                         model[iterator][3] = True
-                        # FIXME: can't we just evaluate the child count in a
-                        #        cell_data_func?
+                        # TODO: do this with a cell data function once we
+                        #       sorted out the mess that is BlaBaseTreeView in
+                        #       blaguiutils
                         model[iterator][1] = "%s (%d)" % (
                             model[iterator][2], count)
                 else:
@@ -496,7 +669,11 @@ class BlaLibraryBrowser(gtk.VBox):
                 iterator = iter_next(iterator)
             return count_local + count_sub
 
-        filt = self.__model.get_model()
+        if model is None:
+            sort = self.__treeview.get_model()
+        else:
+            sort = model
+        filt = sort.get_model() # The model is actually a filter.
         model = filt.get_model()
         iterator = model.get_iter_first()
         query = BlaQuery(self.__filter_parameters).query
@@ -504,8 +681,7 @@ class BlaLibraryBrowser(gtk.VBox):
 
         self.__treeview.freeze_notify()
         self.__treeview.freeze_child_notify()
-        self.__treeview.set_model(None)
-        self.__treeview.set_model(self.__model)
+        self.__treeview.set_model(sort)
         organize_by = blacfg.getint("library", "organize.by")
         if (organize_by == blaconst.ORGANIZE_BY_DIRECTORY and
             model.get_iter_first()):
@@ -516,7 +692,7 @@ class BlaLibraryBrowser(gtk.VBox):
     def __organize_by_changed(self, combobox):
         view = combobox.get_active()
         blacfg.set("library", "organize.by", view)
-        library.request_model(view)
+        self.__queue_model_update(view)
 
     def update_colors(self):
         column = self.__treeview.get_column(0)
@@ -530,6 +706,15 @@ class BlaLibraryBrowser(gtk.VBox):
 
         column.pack_start(renderer, expand=True)
         column.add_attribute(renderer, "text", 1)
+        # TODO: this is how we'd ideally do things
+        # def cdf(column, cell, model, iterator):
+        #     n_children = model.iter_n_children(iterator)
+        #     if n_children > 0:
+        #         text = "%s (%d)" % (model[iterator][2], n_children)
+        #     else:
+        #         text = model[iterator][2]
+        #     renderer.set_property("text", text)
+        # column.set_cell_data_func(renderer, cdf)
 
     def update_tree_lines(self):
         self.__treeview.set_enable_tree_lines(

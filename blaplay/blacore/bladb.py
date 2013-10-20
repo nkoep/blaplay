@@ -330,7 +330,7 @@ class BlaLibraryMonitor(gobject.GObject):
 class BlaLibrary(gobject.GObject):
     __gsignals__ = {
         "progress": blautil.signal(1),
-        "update_library_browser": blautil.signal(1)
+        "library_changed": blautil.signal(0)
     }
 
     __monitored_directories = []
@@ -340,146 +340,6 @@ class BlaLibrary(gobject.GObject):
     __tracks_ool = {}
     __playlists = []
     __lock = blautil.BlaLock(strict=True)
-
-    class BlaLibraryModel(object):
-        # FIXME: for a library of 9000~ tracks creating an instance of the
-        #        model increases the interpreter's memory use by roughly 4 MB
-        #        every time. would this be better with a "lazy" model, i.e.
-        #        synthesizing nodes on row expansion? this could suffer from
-        #        performance issues. one way to fix it might be pushing the
-        #        tree creation to cpython using cython
-
-        # TODO: move this to blabrowser. it really doesn't make much sense to
-        #       create the model in the library context as the model should
-        #       only make sense to anything gtk related anyway
-
-        __layout = [
-            gobject.TYPE_STRING,    # uri
-            gobject.TYPE_STRING,    # label (with child count if present)
-            gobject.TYPE_STRING,    # label
-            gobject.TYPE_BOOLEAN    # visibility value for filtering
-        ]
-
-        def __new__(cls, view, tracks, filt):
-            def get_iterator(model, iterators, comps):
-                d = iterators
-                iterator = None
-                for comp in comps:
-                    try:
-                        iterator, d = d[comp]
-                    except KeyError:
-                        d[comp] = [
-                            model.append(iterator, ["", comp, comp, True]), {}]
-                        iterator, d = d[comp]
-                return iterator
-
-            model = gtk.TreeStore(*cls.__layout)
-
-            if view == blaconst.ORGANIZE_BY_DIRECTORY:
-                cb = cls.__organize_by_directory
-            elif view == blaconst.ORGANIZE_BY_ARTIST:
-                cb = cls.__organize_by_artist
-            elif view == blaconst.ORGANIZE_BY_ARTIST_ALBUM:
-                cb = cls.__organize_by_artist_album
-            elif view == blaconst.ORGANIZE_BY_ALBUM:
-                cb = cls.__organize_by_album
-            elif view in [blaconst.ORGANIZE_BY_GENRE,
-                    blaconst.ORGANIZE_BY_YEAR]:
-                cb = (lambda uri, comps: cls.__organize_by_genre_year(
-                    uri, comps, view=view))
-            else:
-                raise NotImplementedError
-
-            iterators = {}
-            old_iterator, old_comps = None, None
-            append = model.append
-
-            for uri, track in tracks.iteritems():
-                if not filt(os.path.basename(uri)):
-                    continue
-
-                comps, leaf = cb(uri, track)
-
-                if old_comps is not None and comps == old_comps:
-                    iterator = old_iterator
-                else:
-                    iterator = get_iterator(model, iterators, comps)
-
-                append(iterator, [uri, leaf, leaf, True])
-
-                old_iterator = iterator
-                old_comps = comps
-
-            filt = model.filter_new()
-            filt.set_visible_column(3)
-            sort = gtk.TreeModelSort(filt)
-            sort.set_sort_column_id(2, gtk.SORT_ASCENDING)
-            return sort
-
-        @classmethod
-        def __get_track_label(cls, track):
-            # FIXME: - get rid of the int() calls
-            #        - set the disc number prefix AFTER setting the track
-            #          number to make sure we don't get a label with a proper
-            #          disc number and a missing track number
-
-            # ValueError is raised if the int() call fails.
-            try:
-                label = "%d." % int(track[DISC].split("/")[0])
-            except ValueError:
-                label = ""
-            try:
-                label += "%02d. " % int(track[TRACK].split("/")[0])
-            except ValueError:
-                pass
-            artist = (track[ALBUM_ARTIST] or track[PERFORMER] or
-                      track[ARTIST] or track[COMPOSER])
-            if track[ARTIST] and artist != track[ARTIST]:
-                label += "%s - " % track[ARTIST]
-            return "%s%s" % (label, track[TITLE] or track.basename)
-
-        @classmethod
-        def __organize_by_directory(cls, uri, track):
-            if not track[MONITORED_DIRECTORY]:
-                raise ValueError("Trying to include track in the library "
-                                 "browser that has no monitored directory")
-            directory = os.path.dirname(
-                track.uri)[len(track[MONITORED_DIRECTORY])+1:]
-            comps = directory.split("/")
-            if comps == [""]:
-                comps = ["bla"]
-            else:
-                comps.insert(0, "bla")
-            return comps, os.path.basename(track.uri)
-
-        @classmethod
-        def __organize_by_artist(cls, uri, track):
-            return ([track[ARTIST] or "?", track[ALBUM] or "?"],
-                    cls.__get_track_label(track))
-
-        @classmethod
-        def __organize_by_artist_album(cls, uri, track):
-            artist = (track[ALBUM_ARTIST] or track[PERFORMER] or
-                      track[ARTIST] or "?")
-            return (["%s - %s" % (artist, track[ALBUM] or "?")],
-                    cls.__get_track_label(track))
-
-        @classmethod
-        def __organize_by_album(cls, uri, track):
-            return [track[ALBUM] or "?"], cls.__get_track_label(track)
-
-        @classmethod
-        def __organize_by_genre_year(cls, uri, track, view):
-            if view == blaconst.ORGANIZE_BY_GENRE:
-                key = GENRE
-            else:
-                key = DATE
-            organizer = track[key].capitalize() or "?"
-            if key == DATE:
-                organizer = organizer.split("-")[0]
-            label = "%s - %s" % (
-                track[ALBUM_ARTIST] or track[ARTIST], track[ALBUM] or "?")
-            return [organizer, label], cls.__get_track_label(track)
 
     def __init__(self):
         super(BlaLibrary, self).__init__()
@@ -637,23 +497,6 @@ class BlaLibrary(gobject.GObject):
             update_library()
         yield False
 
-    def __get_filter(self):
-        def get_regexp(string):
-            tokens = [t.replace(".", "\.").replace("*", ".*")
-                      for t in map(str.strip, string.split(","))]
-            return re.compile(r"(%s)" % "|".join(tokens))
-
-        restrict_re = get_regexp(
-            blacfg.getstring("library", "restrict.to").strip())
-        exclude_string = blacfg.getstring("library", "exclude").strip()
-        if exclude_string:
-            exclude_re = get_regexp(exclude_string)
-            def filt(s):
-                return restrict_re.match(s) and not exclude_re.match(s)
-        else:
-            filt = restrict_re.match
-        return filt
-
     def add_tracks(self, uris):
         count = 0
         filt = self.__extension_filter
@@ -748,28 +591,11 @@ class BlaLibrary(gobject.GObject):
             self.__tracks_ool[uri] = track
             del self.__tracks[uri]
 
-    def request_model(self, view):
-        def create_model():
-            model = BlaLibrary.BlaLibraryModel(
-                    view, self.__tracks, self.__get_filter())
-            self.emit("update_library_browser", model)
-            return False
-        try:
-            gobject.source_remove(self.__cid)
-        except AttributeError:
-            pass
-        self.__cid = gobject.idle_add(create_model)
-
     def update_library(self):
-        model = BlaLibrary.BlaLibraryModel(
-                blacfg.getint("library", "organize.by"), self.__tracks,
-                self.__get_filter()
-        )
-        self.emit("update_library_browser", model)
-
+        self.emit("library_changed")
         self.__save_library()
-        self.__monitored_directories = map(os.path.realpath,
-                blacfg.getdotliststr("library", "directories"))
+        self.__monitored_directories = map(
+            os.path.realpath, blacfg.getdotliststr("library", "directories"))
         return False
 
     def save_ool_tracks(self, uris):
