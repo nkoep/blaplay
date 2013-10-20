@@ -103,8 +103,8 @@ class BlaCellRenderer(blaguiutils.BlaCellRendererBase):
         layout.set_font_description(widget.get_style().font_desc)
         width, height = layout.get_pixel_size()
 
-        if (flags == (gtk.CELL_RENDERER_SELECTED|gtk.CELL_RENDERER_PRELIT) or
-            flags == gtk.CELL_RENDERER_SELECTED):
+        use_highlight_color = flags & gtk.CELL_RENDERER_SELECTED
+        if use_highlight_color:
             color = gtk.gdk.color_parse(selected_row_color)
         else:
             color = gtk.gdk.color_parse(background_color)
@@ -117,8 +117,7 @@ class BlaCellRenderer(blaguiutils.BlaCellRendererBase):
         pc_context.fill()
 
         # Set font, font color and the text to render
-        if (flags == (gtk.CELL_RENDERER_SELECTED|gtk.CELL_RENDERER_PRELIT) or
-            flags == gtk.CELL_RENDERER_SELECTED):
+        if use_highlight_color:
             color = gtk.gdk.color_parse(active_text_color)
         else:
             color = gtk.gdk.color_parse(text_color)
@@ -129,7 +128,7 @@ class BlaCellRenderer(blaguiutils.BlaCellRendererBase):
 class BlaTreeView(blaguiutils.BlaTreeViewBase):
     def __init__(self, parent, multicol, browser_id):
         super(BlaTreeView, self).__init__(
-                multicol=multicol, renderer=0, text_column=1)
+            multicol=multicol, renderer=0, text_column=1)
 
         self.__parent = parent
         self.__browser_id = browser_id
@@ -230,7 +229,7 @@ class BlaTreeView(blaguiutils.BlaTreeViewBase):
         path = self.get_path_at_pos(*map(int, [event.x, event.y]))[0]
 
         # Handle LMB events
-        if event.button == 1 and action == 3:
+        if event.button == 1 and action == blaconst.ACTION_EXPAND_COLLAPSE:
             if self.row_expanded(path):
                 self.collapse_row(path)
             else:
