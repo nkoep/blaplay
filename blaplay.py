@@ -75,7 +75,7 @@ def parse_args():
         "information and exit\n   %%a: artist\n   %%t: "
         "title\n   %%b: album\n   %%y: year"
         "\n   %%g: genre\n   %%c: cover", action="append")
-    parser.add_argument("-d", "--debug", action="store_true",
+    parser.add_argument("-d", "--debug", action="count",
                         help="print debug messages")
     parser.add_argument("-q", "--quiet", action="store_true",
                         help="only print fatal messages")
@@ -89,17 +89,24 @@ def parse_args():
     return vars(parser.parse_args())
 
 def init_logging(args):
-    import __builtin__
     import logging
 
     format_ = "*** %%(levelname)s%s: %%(message)s"
-    if args["debug"]:
-        format_ %= " (%(filename)s:%(lineno)d)"
+
+    debug = args["debug"]
+    if debug:
+        if debug == 1:
+            format_ %= " (%(filename)s:%(lineno)d)"
+        elif debug == 2:
+            format_ %= " (%(asctime)s, %(filename)s:%(lineno)d)"
+        else:
+            raise SystemExit("Maximum debug level is 2")
         level = logging.DEBUG
     else:
         format_ %= ""
         level = logging.INFO
-    logging.basicConfig(format=format_, level=level)
+    logging.basicConfig(format=format_, level=level,
+            datefmt="%a %b %d %H:%M:%S %Y")
 
     colors = [
         (logging.INFO, "32"), (logging.DEBUG, "34"),
@@ -114,10 +121,10 @@ def init_logging(args):
         logging.critical(msg)
         raise SystemExit
 
-    __builtin__.__dict__["print_d"] = logging.debug
-    __builtin__.__dict__["print_i"] = logging.info
-    __builtin__.__dict__["print_w"] = logging.warning
-    __builtin__.__dict__["print_c"] = critical
+    __builtins__.__dict__["print_d"] = logging.debug
+    __builtins__.__dict__["print_i"] = logging.info
+    __builtins__.__dict__["print_w"] = logging.warning
+    __builtins__.__dict__["print_c"] = critical
 
 def process_args(args):
     from blaplay.blautil import bladbus
