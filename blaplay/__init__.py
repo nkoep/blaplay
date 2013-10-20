@@ -122,10 +122,6 @@ def finish_startup():
     except AttributeError:
         pass
 
-    # FIXME: rather just save it when it actually changed
-    # Schedule periodic saving of the config.
-    gobject.timeout_add(blaconst.CFG_TIMEOUT * 60 * 1000, blacfg.save, False)
-
     # Finally, start the main loop.
     bla.main()
 

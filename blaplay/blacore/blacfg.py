@@ -15,213 +15,217 @@
 # Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
 from ConfigParser import RawConfigParser, NoOptionError, NoSectionError
-cfg = RawConfigParser()
+
+import gobject
 
 import blaconst
+from blaplay import blautil
 
-last_save = None
 
-
-def init():
-    print_i("Loading config")
-
-    init = {
-        "general": {
-            "size": "",
-            "position": "",
-            "maximized": "no",
-            "pane.pos.left": "",
-            "pane.pos.right": "",
-            "always.show.tray": "yes",
-            "close.to.tray": "yes",
-            "tray.tooltip": "yes",
-            "browsers": "yes",
-            "playlist.tabs": "yes",
-            "draw.tree.lines": "yes",
-            "statusbar": "yes",
-            "side.pane": "yes",
-            "filesystem.directory": "",
-            "filechooser.directory": "",
-            "view": blaconst.VIEW_PLAYLISTS,
-            "browser.view": blaconst.BROWSER_LIBRARY,
-            "metadata.view": blaconst.METADATA_LYRICS,
-            "play.order": blaconst.ORDER_NORMAL,
-            "columns.playlist": "",
-            "columns.queue": "",
-            "cursor.follows.playback": "yes",
-            "queue.remove.when.activated": "yes",
-            "search.after.timeout": "no",
-            "show.visualization": "yes",
-            "visualization": "",
-            "releases.filter": blaconst.NEW_RELEASES_FROM_LIBRARY,
-            "events.country": "",
-            "events.city": "",
-            "events.filter": blaconst.EVENTS_RECOMMENDED,
-            "events.limit": 25
-        },
-        "player": {
-            "logarithmic.volume.scale": "no",
-            "use.equalizer": "no",
-            "equalizer.profile": "",
-            "volume": "1.0",
-            "muted": "no"
-        },
-        "equalizer.profiles": {
-        },
-        "library": {
-            "directories": "",
-            "restrict.to": "*",
-            "exclude": "",
-            "organize.by": blaconst.ORGANIZE_BY_DIRECTORY,
-            "doubleclick.action": blaconst.ACTION_SEND_TO_CURRENT,
-            "middleclick.action": blaconst.ACTION_ADD_TO_CURRENT,
-            "return.action": blaconst.ACTION_SEND_TO_NEW,
-            "custom.browser": "yes",
-            "update.on.startup": "yes"
-        },
-        "lastfm": {
-            "user": "",
-            "sessionkey": "",
-            "scrobble": "yes",
-            "now.playing": "yes",
-            "ignore.pattern": ""
-        },
-        "colors": {
-            "overwrite": "no",
-            "background": "#313131",
-            "highlight": "#A51F1C",
-            "alternate.rows": "#2E2E2E",
-            "selected.rows": "#525252",
-            "text": "#FAFAFA",
-            "active.text": "#FAFAFA"
-        }
+class BlaCfg(RawConfigParser, gobject.GObject):
+    __metaclass__ = blautil.BlaSingleton
+    __gsignals__ = {
+        "changed": blautil.signal(0)
     }
 
-    for section, values in init.iteritems():
-        cfg.add_section(section)
-        for key, value in values.iteritems():
-            cfg.set(section, key, value)
+    __tid = -1
 
-    if not cfg.read(blaconst.CFG_PATH):
-        cfg.read("%s.bak" % blaconst.CFG_PATH)
+    def __init__(self):
+        RawConfigParser.__init__(self)
+        gobject.GObject.__init__(self)
 
-def getstring(section, key):
-    try:
-        return str(cfg.get(section, key))
-    except (ValueError, NoSectionError, NoOptionError):
-        return None
+    def init(self):
+        print_i("Loading config")
 
-def getint(section, key):
-    try:
-        return int(float(cfg.get(section, key)))
-    except (ValueError, NoSectionError, NoOptionError):
-        return None
+        default = {
+            "general": {
+                "size": "",
+                "position": "",
+                "maximized": "no",
+                "pane.pos.left": "",
+                "pane.pos.right": "",
+                "always.show.tray": "yes",
+                "close.to.tray": "yes",
+                "tray.tooltip": "yes",
+                "browsers": "yes",
+                "playlist.tabs": "yes",
+                "draw.tree.lines": "yes",
+                "statusbar": "yes",
+                "side.pane": "yes",
+                "filesystem.directory": "",
+                "filechooser.directory": "",
+                "view": blaconst.VIEW_PLAYLISTS,
+                "browser.view": blaconst.BROWSER_LIBRARY,
+                "metadata.view": blaconst.METADATA_LYRICS,
+                "play.order": blaconst.ORDER_NORMAL,
+                "columns.playlist": "",
+                "columns.queue": "",
+                "cursor.follows.playback": "yes",
+                "queue.remove.when.activated": "yes",
+                "search.after.timeout": "no",
+                "show.visualization": "yes",
+                "visualization": "",
+                "releases.filter": blaconst.NEW_RELEASES_FROM_LIBRARY,
+                "events.country": "",
+                "events.city": "",
+                "events.filter": blaconst.EVENTS_RECOMMENDED,
+                "events.limit": 25
+            },
+            "player": {
+                "logarithmic.volume.scale": "no",
+                "use.equalizer": "no",
+                "equalizer.profile": "",
+                "volume": "1.0",
+                "muted": "no"
+            },
+            "equalizer.profiles": {
+            },
+            "library": {
+                "directories": "",
+                "restrict.to": "*",
+                "exclude": "",
+                "organize.by": blaconst.ORGANIZE_BY_DIRECTORY,
+                "doubleclick.action": blaconst.ACTION_SEND_TO_CURRENT,
+                "middleclick.action": blaconst.ACTION_ADD_TO_CURRENT,
+                "return.action": blaconst.ACTION_SEND_TO_NEW,
+                "custom.browser": "yes",
+                "update.on.startup": "yes"
+            },
+            "lastfm": {
+                "user": "",
+                "sessionkey": "",
+                "scrobble": "yes",
+                "now.playing": "yes",
+                "ignore.pattern": ""
+            },
+            "colors": {
+                "overwrite": "no",
+                "background": "#313131",
+                "highlight": "#A51F1C",
+                "alternate.rows": "#2E2E2E",
+                "selected.rows": "#525252",
+                "text": "#FAFAFA",
+                "active.text": "#FAFAFA"
+            }
+        }
 
-def getfloat(section, key):
-    try:
-        return float(cfg.get(section, key))
-    except (ValueError, NoSectionError, NoOptionError):
-        return None
+        for section, values in default.iteritems():
+            self.add_section(section)
+            for key, value in values.iteritems():
+                self.set(section, key, value)
 
-def getboolean(section, key):
-    try:
-        return cfg.getboolean(section, key)
-    except (ValueError, NoSectionError, NoOptionError):
-        return None
+        if not self.read(blaconst.CFG_PATH):
+            self.read("%s.bak" % blaconst.CFG_PATH)
 
-def getlistint(section, key):
-    try:
-        return map(int, cfg.get(section, key).split(","))
-    except (ValueError, NoSectionError, NoOptionError):
-        return None
+        def schedule_save(*args):
+            gobject.source_remove(self.__tid)
+            self.__tid = gobject.timeout_add(15000, self.save)
+        self.connect("changed", schedule_save)
 
-def getlistfloat(section, key):
-    try:
-        return map(float, cfg.get(section, key).split(","))
-    except (ValueError, NoSectionError, NoOptionError):
-        return None
-
-def getliststr(section, key):
-    try:
-        return filter(None, cfg.get(section, key).split(","))
-    except (ValueError, NoSectionError, NoOptionError):
-        return None
-    except AttributeError:
-        return []
-
-def getdotliststr(section, key):
-    try:
-        return filter(None, cfg.get(section, key).split(":"))
-    except (NoSectionError, NoOptionError):
-        return None
-    except AttributeError:
-        return []
-
-def set(section, key, value):
-    if not cfg.has_section(section):
-        cfg.add_section(section)
-    cfg.set(section, key, value)
-
-def setboolean(section, key, value):
-    if not cfg.has_section(section):
-        cfg.add_section(section)
-    if value:
-        cfg.set(section, key, "yes")
-    else:
-        cfg.set(section, key, "no")
-
-def save(force=True):
-    import os
-    import shutil
-    import tempfile
-    import time
-    global last_save
-
-    t = time.time()
-    if not force and last_save and (t-last_save) < blaconst.CFG_TIMEOUT * 60:
-        return True
-    last_save = t
-    print_d("Saving config")
-
-    # Write data to tempfile.
-    fd, tmp_path = tempfile.mkstemp()
-    with os.fdopen(fd, "w") as f:
-        cfg.write(f)
-
-    # Move the old file.
-    try:
-        shutil.move(blaconst.CFG_PATH, "%s.bak" % blaconst.CFG_PATH)
-    except IOError:
-        pass
-
-    # Nove the tempfile to the actual location and remove the backup file on
-    # success.
-    try:
-        shutil.move(tmp_path, blaconst.CFG_PATH)
-    except IOError:
-        pass
-    else:
+    # getter
+    def __get(self, section, key, context):
         try:
-            os.unlink("%s.bak" % blaconst.CFG_PATH)
-        except OSError:
+            return context(self.get(section, key))
+        except (ValueError, NoSectionError, NoOptionError):
+            return None
+
+    def getstring(self, section, key):
+        return self.__get(section, key, context=str)
+
+    def getint(self, section, key):
+        # The call int("1.2") raises a ValueError so convert to float first to
+        # be a bit more generous in terms of what constitutes an error.
+        return self.__get(section, key, context=lambda v: int(float(v)))
+
+    def getfloat(self, section, key):
+        return self.__get(section, key, context=float)
+
+    def getboolean(self, section, key):
+        try:
+            return super(BlaCfg, self).getboolean(section, key)
+        except (ValueError, NoSectionError, NoOptionError):
+            return None
+
+    def getlistint(self, section, key):
+        return self.__get(section, key,
+                          context=lambda v: map(int, v.split(",")))
+
+    def getlistfloat(self, section, key):
+        return self.__get(section, key,
+                          context=lambda v: map(float, v.split(",")))
+
+    def getliststr(self, section, key):
+        def context(v):
+            try:
+                return filter(None, v.split(","))
+            except AttributeError:
+                pass
+            return []
+        return self.__get(section, key, context=context)
+
+    def getdotliststr(self, section, key):
+        def context(v):
+            try:
+                return filter(None, v.split(":"))
+            except AttributeError:
+                pass
+            return []
+        return self.__get(section, key, context=context)
+
+    # setter
+    def set_(self, section, key, value):
+        if not self.has_section(section):
+            self.add_section(section)
+        super(BlaCfg, self).set(section, key, value)
+        self.emit("changed")
+    set = set_ # TODO: remove this eventually for PEP8 compliance
+
+    def setboolean(self, section, key, value):
+        if not self.has_section(section):
+            self.add_section(section)
+        if value:
+            self.set(section, key, "yes")
+        else:
+            self.set(section, key, "no")
+
+    def save(self):
+        import os
+        import shutil
+        import tempfile
+
+        print_d("Saving config")
+
+        # Write data to tempfile.
+        fd, tmp_path = tempfile.mkstemp()
+        with os.fdopen(fd, "w") as f:
+            self.write(f)
+
+        # Move the old file.
+        try:
+            shutil.move(blaconst.CFG_PATH, "%s.bak" % blaconst.CFG_PATH)
+        except IOError:
             pass
 
-    return True
+        # Move the tempfile to the actual location and remove the backup file
+        # on success.
+        try:
+            shutil.move(tmp_path, blaconst.CFG_PATH)
+        except IOError:
+            pass
+        else:
+            try:
+                os.unlink("%s.bak" % blaconst.CFG_PATH)
+            except OSError:
+                pass
 
-def add_section(section):
-    if not cfg.has_section(section):
-        cfg.add_section(section)
+        return False
 
-def delete_option(section, key):
-    if cfg.has_section(section) and cfg.has_option(section, key):
-        cfg.remove_option(section, key)
+    def delete_option(self, section, key):
+        if self.has_section(section) and self.has_option(section, key):
+            self.remove_option(section, key)
 
-def has_option(section, key):
-    if cfg.has_section(section) and cfg.has_option(section, key):
-        return True
-    return False
-
-def get_keys(section):
-    if cfg.has_section(section):
-        return cfg.items(section)
+    def get_keys(self, section):
+        if self.has_section(section):
+            return self.items(section)
+        return []
 

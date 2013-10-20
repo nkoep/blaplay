@@ -363,3 +363,14 @@ class BlaOrderedSet(collections.MutableSet):
     def __del__(self):
         self.clear()
 
+class BlaSingleton(gobject.GObjectMeta):
+    __instances = {}
+
+    def __call__(cls, *args, **kwargs):
+        try:
+            instance = cls.__instances[cls]
+        except KeyError:
+            instance = cls.__instances[cls] = super(
+                BlaSingleton, cls).__call__(*args, **kwargs)
+        return instance
+

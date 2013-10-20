@@ -26,7 +26,6 @@ AUTHORS = sorted(
     [AUTHOR])
 EMAIL = "niklas.koep@gmail.com"
 COPYRIGHT = "Copyright © 2012-2013 %s\n<%s>" % (AUTHOR, EMAIL)
-CFG_TIMEOUT = 30
 GST_REQUIRED_VERSION = "0.10"
 
 # Directories
