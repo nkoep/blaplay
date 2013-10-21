@@ -30,6 +30,7 @@ class BlaStatusbar(gtk.Table):
     __instance = None
 
     __state = blaconst.STATE_STOPPED
+    __state_string = "Stopped"
     __format = ""
     __bitrate = ""
     __sampling_rate = ""
@@ -49,7 +50,7 @@ class BlaStatusbar(gtk.Table):
         self.__pb = gtk.ProgressBar()
         self.__pb_label = gtk.Label("Scanning library:")
 
-        self.__track_info = gtk.Label("Stopped")
+        self.__track_info = gtk.Label(self.__state_string)
 
         hbox = gtk.HBox(spacing=10)
         hbox.pack_start(self.__pb_label, expand=False)
@@ -96,6 +97,7 @@ class BlaStatusbar(gtk.Table):
 
     def __changed(self, player):
         self.__state = player.get_state()
+        self.__state_string = player.get_state_string()
         if self.__state != blaconst.STATE_STOPPED:
             track = player.get_track()
             self.__format = track[FORMAT]
@@ -110,13 +112,9 @@ class BlaStatusbar(gtk.Table):
 
     def __update_track_status(self):
         with self.__lock:
-            if self.__state == blaconst.STATE_STOPPED:
-                self.__track_info.set_text("Stopped")
-            else:
-                if self.__state == blaconst.STATE_PAUSED: state = "Paused"
-                else: state = "Playing"
-
-                status = [state]
+            self.__track_info.set_text(self.__state_string)
+            if self.__state != blaconst.STATE_STOPPED:
+                status = [self.__state_string]
                 items = [self.__format, self.__bitrate, self.__sampling_rate,
                     self.__channel_mode]
                 for value in filter(None, items): status.append(value)

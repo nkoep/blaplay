@@ -299,6 +299,13 @@ class BlaPlayer(gobject.GObject):
     def get_state(self):
         return self.__state
 
+    def get_state_string(self):
+        if self.__state == blaconst.STATE_PLAYING:
+            return "Playing"
+        elif self.__state == blaconst.STATE_PAUSED:
+            return "Paused"
+        return "Stopped"
+
     # TODO: remove the playlist argument
     def play_track(self, playlist, uri):
         # FIXME: it's weird to set the uri here and play the track afterwards.
