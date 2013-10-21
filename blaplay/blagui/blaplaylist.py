@@ -2897,7 +2897,7 @@ class BlaPlaylistManager(gtk.Notebook):
         if choice not in [blaconst.TRACK_PREVIOUS, blaconst.TRACK_RANDOM]:
             item = BlaQueue.get_item()
 
-        if not item:
+        if item is None:
             playlist = self.get_active_playlist()
             if not playlist:
                 playlist = self.get_current_playlist()
@@ -2913,10 +2913,14 @@ class BlaPlaylistManager(gtk.Notebook):
             pass
 
         cls.current = item
-        if item:
-            cls.__instance.emit("play_track", item.uri)
+        try:
+            uri = item.uri
+        except AttributeError:
+            uri = None
+        else:
             if blacfg.getboolean("general", "cursor.follows.playback"):
                 item.select()
+        cls.__instance.emit("play_track", uri)
 
     @classmethod
     def get_playlists(cls):

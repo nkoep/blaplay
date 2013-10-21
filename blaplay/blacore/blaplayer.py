@@ -347,6 +347,21 @@ class BlaPlayer(gobject.GObject):
         self.emit("track_changed")
         self.emit("state_changed")
 
+    def pause(self):
+        if self.__state == blaconst.STATE_PAUSED:
+            self.__bin.set_state(gst.STATE_PLAYING)
+            self.__state = blaconst.STATE_PLAYING
+        elif self.__state == blaconst.STATE_PLAYING:
+            self.__bin.set_state(gst.STATE_PAUSED)
+            self.__state = blaconst.STATE_PAUSED
+        self.emit("state_changed")
+
+    def play_pause(self):
+        if self.__state == blaconst.STATE_STOPPED:
+            self.play()
+        else:
+            self.pause()
+
     def play_station(self, station):
         if not station:
             return self.stop()
@@ -360,27 +375,6 @@ class BlaPlayer(gobject.GObject):
         self.__bin.set_state(gst.STATE_PAUSED)
         self.__state = blaconst.STATE_PAUSED
         self.emit("track_changed")
-        self.emit("state_changed")
-
-    @property
-    def radio(self):
-        return bool(self.__station)
-
-    @property
-    def video(self):
-        try:
-            return self.__bin.get_property("n_video") > 0
-        except AttributeError:
-            pass
-        return False
-
-    def pause(self):
-        if self.__state == blaconst.STATE_PAUSED:
-            self.__bin.set_state(gst.STATE_PLAYING)
-            self.__state = blaconst.STATE_PLAYING
-        elif self.__state == blaconst.STATE_PLAYING:
-            self.__bin.set_state(gst.STATE_PAUSED)
-            self.__state = blaconst.STATE_PAUSED
         self.emit("state_changed")
 
     def stop(self):
@@ -426,9 +420,15 @@ class BlaPlayer(gobject.GObject):
             args = ("get_track", blaconst.TRACK_RANDOM, True)
         self.emit(*args)
 
-    def play_pause(self):
-        if self.__state == blaconst.STATE_STOPPED:
-            self.play()
-        else:
-            self.pause()
+    @property
+    def radio(self):
+        return bool(self.__station)
+
+    @property
+    def video(self):
+        try:
+            return self.__bin.get_property("n_video") > 0
+        except AttributeError:
+            pass
+        return False
 
