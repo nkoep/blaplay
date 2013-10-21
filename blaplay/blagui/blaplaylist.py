@@ -2809,7 +2809,7 @@ class BlaPlaylistManager(gtk.Notebook):
     @classmethod
     def send_to_current_playlist(cls, uris, resolve=False):
         playlist = cls.get_current_playlist()
-        if not playlist.modification_allowed(check_filter_state=False):
+        if not playlist.modification_allowed(check_filter_state=True):
             return
 
         if resolve:
