@@ -784,45 +784,41 @@ class BlaFileBrowser(gtk.VBox):
         # The toolbar
         table = gtk.Table(rows=1, columns=6, homogeneous=False)
 
-        back = gtk.Button()
-        back.add(
-            gtk.image_new_from_stock(gtk.STOCK_GO_BACK, gtk.ICON_SIZE_BUTTON))
-        back.set_relief(gtk.RELIEF_NONE)
-        back.connect(
-            "clicked", lambda *x: self.__update_from_history(backwards=True))
-        table.attach(back, 0, 1, 0, 1, xoptions=not gtk.EXPAND)
+        buttons = [
+            (gtk.STOCK_GO_BACK,
+             lambda *x: self.__update_from_history(backwards=True)),
+            (gtk.STOCK_GO_UP,
+             lambda *x: self.__update_model(
+                os.path.dirname(self.__directory))),
+            (gtk.STOCK_GO_FORWARD,
+             lambda *x: self.__update_from_history(backwards=False)),
+            (gtk.STOCK_HOME,
+             lambda *x: self.__update_model(os.path.expanduser("~")))
+        ]
 
-        up = gtk.Button()
-        up.add(
-            gtk.image_new_from_stock(gtk.STOCK_GO_UP, gtk.ICON_SIZE_BUTTON))
-        up.set_relief(gtk.RELIEF_NONE)
-        up.connect(
-            "clicked",
-            lambda *x: self.__update_model(os.path.dirname(self.__directory)))
-        table.attach(up, 1, 2, 0, 1, xoptions=not gtk.EXPAND)
+        def add_button(icon, callback, idx):
+            button = gtk.Button()
+            button.add(gtk.image_new_from_stock(icon, gtk.ICON_SIZE_BUTTON))
+            button.set_relief(gtk.RELIEF_NONE)
+            button.connect("clicked", callback)
+            table.attach(button, idx, idx+1, 0, 1, xoptions=not gtk.EXPAND)
 
-        forward = gtk.Button()
-        forward.add(
-            gtk.image_new_from_stock(gtk.STOCK_GO_FORWARD,
-                                     gtk.ICON_SIZE_BUTTON))
-        forward.set_relief(gtk.RELIEF_NONE)
-        forward.connect(
-            "clicked", lambda *x: self.__update_from_history(backwards=False))
-        table.attach(forward, 2, 3, 0, 1, xoptions=not gtk.EXPAND)
+        idx = 0
+        for icon, callback in buttons:
+            add_button(icon, callback, idx)
+            idx += 1
 
+        # Add the entry field separately.
         self.__entry = gtk.Entry()
         self.__entry.connect(
             "activate",
             lambda *x: self.__update_model(self.__entry.get_text()))
-        table.attach(self.__entry, 3, 4, 0, 1)
+        table.attach(self.__entry, idx, idx+1, 0, 1)
+        idx += 1
 
-        refresh = gtk.Button()
-        refresh.add(
-            gtk.image_new_from_stock(gtk.STOCK_REFRESH, gtk.ICON_SIZE_BUTTON))
-        refresh.set_relief(gtk.RELIEF_NONE)
-        refresh.connect(
-            "clicked", lambda *x: self.__update_model(refresh=True))
-        table.attach(refresh, 4, 5, 0, 1, xoptions=not gtk.EXPAND)
+        add_button(gtk.STOCK_REFRESH,
+                   lambda *x: self.__update_model(refresh=True), idx)
+
         vbox.pack_start(table, expand=False, fill=False)
 
         # The treeview
