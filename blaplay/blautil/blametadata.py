@@ -283,6 +283,9 @@ class BlaFetcher(gobject.GObject):
         cover = None
 
         image_base = track.get_cover_basepath()
+        if image_base is None:
+            return
+
         if not force_download:
             if os.path.isfile("%s.jpg" % image_base):
                 cover = "%s.jpg" % image_base
@@ -290,8 +293,7 @@ class BlaFetcher(gobject.GObject):
                 cover = "%s.png" % image_base
 
         if cover:
-            emit(cover)
-            return
+            return emit(cover)
 
         self.__tid = gobject.timeout_add(2000, emit, blaconst.COVER)
         cover = blafm.get_cover(track, image_base)
@@ -375,11 +377,12 @@ class BlaFetcher(gobject.GObject):
         # Remove any old images -- both user-set and downloaded.
         if path != blaconst.COVER:
             image_base = track.get_cover_basepath()
-            name = os.path.basename(image_base)
-            images = [
-                os.path.join(blaconst.COVERS, f)
-                for f in os.listdir(blaconst.COVERS) if f.startswith(name)]
-            map(os.unlink, images)
+            if image_base is not None:
+                name = os.path.basename(image_base)
+                images = [
+                    os.path.join(blaconst.COVERS, f)
+                    for f in os.listdir(blaconst.COVERS) if f.startswith(name)]
+                map(os.unlink, images)
 
         if path is not None:
             cover = "%s.%s" % (image_base, blautil.get_extension(path))

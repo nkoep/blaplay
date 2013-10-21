@@ -17,7 +17,6 @@
 import sys
 import os
 
-import dbus
 import dbus.service
 import dbus.mainloop.glib
 dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
@@ -101,6 +100,7 @@ class BlaDBus(dbus.service.Object):
     def get_tag(self, identifier):
         from blaplay.formats._identifiers import ARTIST, TITLE
 
+        # FIXME: check if track is None
         track = self.__player.get_track()
         ret = track[identifier]
         if not ret:
@@ -120,11 +120,9 @@ class BlaDBus(dbus.service.Object):
     def get_cover(self):
         track = self.__player.get_track()
         if track:
-            cover = track.get_cover_basepath()
-            if os.path.isfile("%s.jpg" % cover):
-                return ("%s.jpg" % cover)
-            elif os.path.isfile("%s.png" % cover):
-                return ("%s.png" % cover)
+            cover = track.get_cover_path()
+            if cover is not None:
+                return cover
         return ""
 
     @dbus.service.method(

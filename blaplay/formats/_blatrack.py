@@ -135,11 +135,20 @@ class BlaTrack(dict):
 
     def get_cover_basepath(self):
         if "" in [self[ARTIST], self[ALBUM]]:
-            return ""
+            return None
         base = "%s-%s" % (
             self[ARTIST].replace(" ", "_"), self[ALBUM].replace(" ", "_"))
         base = base.replace("/", "_")
         return os.path.join(blaconst.COVERS, base)
+
+    def get_cover_path(self):
+        basepath = self.get_cover_basepath()
+        if basepath is not None:
+            for ext in ["jpg", "png"]:
+                cover = "%s.%s" % (basepath, ext)
+                if os.path.isfile(cover):
+                    return cover
+        return None
 
     def get_lyrics_key(self):
         if "" in [self[ARTIST], self[TITLE]]:
