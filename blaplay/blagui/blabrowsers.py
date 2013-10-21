@@ -356,7 +356,7 @@ class BlaLibraryBrowser(gtk.VBox):
     __model = None
 
     class BlaLibraryModel(object):
-        # FIXME: for a library of 9000~ tracks creating an instance of the
+        # FIXME: for a library of ~9000 tracks creating an instance of the
         #        model increases the interpreter's memory use by roughly 4 MB
         #        every time. would this be better with a "lazy" model, i.e.
         #        synthesizing nodes on row expansion? this could suffer from
@@ -950,24 +950,26 @@ class BlaFileBrowser(gtk.VBox):
     def __update_model(self, directory=None, refresh=False,
                        add_to_history=True):
         if not refresh:
-            if directory and not directory.startswith("/"):
+            if directory is None:
+                print_w("Directory must not be None")
+                return False
+            directory = os.path.expanduser(directory)
+            # Got a relative path?
+            if not os.path.isabs(directory):
                 directory = os.path.join(self.__directory, directory)
-            if directory and not os.path.exists(directory):
+            if not os.path.exists(directory):
                 blaguiutils.error_dialog(
                     "Could not find \"%s\"." % directory,
                     "Please check the spelling and try again.")
                 return False
-
-            if not directory or not os.path.exists(directory):
-                self.__directory = os.path.expanduser("~")
-            else:
-                self.__directory = os.path.abspath(directory)
-
+            self.__directory = directory
             self.__entry.set_text(self.__directory)
             blacfg.set("general", "filesystem.directory", self.__directory)
             if add_to_history:
                 self.__history.add(self.__directory)
 
+        # FIXME: don't use gtk's model filter capabilities
+        # TODO: keep the selection after updating the model
         model = self.__filt.get_model()
         self.__treeview.freeze_child_notify()
         model.clear()
