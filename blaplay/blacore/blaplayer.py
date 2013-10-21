@@ -64,7 +64,7 @@ class BlaPlayer(gobject.GObject):
         "track_changed": blautil.signal(0),
         "track_stopped": blautil.signal(0),
         "new_buffer": blautil.signal(1),
-        "seek": blautil.signal(0)
+        "seeked": blautil.signal(1)
     }
 
     __bin = None
@@ -279,7 +279,7 @@ class BlaPlayer(gobject.GObject):
 
     def seek(self, pos):
         self.__bin.seek_simple(gst.FORMAT_TIME, gst.SEEK_FLAG_FLUSH, pos)
-        self.emit("seek")
+        self.emit("seeked", pos)
 
     def get_position(self):
         if not self.radio:

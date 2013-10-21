@@ -38,7 +38,7 @@ class BlaVisualization(gtk.DrawingArea):
             self)
 
         player.connect("track_changed", self.flush_buffers)
-        player.connect("seek", self.flush_buffers)
+        player.connect("seeked", self.flush_buffers)
         self.connect("expose_event", self.__expose)
         def size_allocate(drawingarea, allocation):
             try:
