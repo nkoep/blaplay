@@ -88,8 +88,7 @@ class BlaPlayer(gobject.GObject):
                 "and gst-plugins-good are installed.")
             return False
 
-        # TODO: rename bin_ to audio_sink
-        bin_ = gst.Bin()
+        audio_sink = gst.Bin()
 
         filt = gst.element_factory_make("capsfilter")
         filt.set_property(
@@ -117,10 +116,10 @@ class BlaPlayer(gobject.GObject):
         self.__volume = gst.element_factory_make("volume")
         elements = [filt, self.__equalizer, tee, queue, appsink,
                     self.__volume, sink]
-        map(bin_.add, elements)
+        map(audio_sink.add, elements)
 
         pad = elements[0].get_static_pad("sink")
-        bin_.add_pad(gst.GhostPad("sink", pad))
+        audio_sink.add_pad(gst.GhostPad("sink", pad))
 
         gst.element_link_many(filt, self.__equalizer, tee)
         gst.element_link_many(tee, self.__volume, sink)
@@ -130,7 +129,7 @@ class BlaPlayer(gobject.GObject):
         video_sink.set_property("force_aspect_ratio", True)
 
         self.__bin = gst.element_factory_make("playbin2")
-        self.__bin.set_property("audio_sink", bin_)
+        self.__bin.set_property("audio_sink", audio_sink)
         self.__bin.set_property("buffer_duration", 500 * gst.MSECOND)
         self.__bin.set_property("video_sink", video_sink)
 
