@@ -32,49 +32,6 @@ from blaplay.blagui import blaguiutils
 from blaplay.formats._identifiers import *
 
 
-def BlaViewMeta(view_name):
-    # This returns a metaclass which automatically -- among other things --
-    # attaches a view_name property that always returns the `view_name'
-    # argument. We use a metaclass for defining view classes for the main view
-    # outlet as it appears to be the most flexible way to add default
-    # properties and signals. The __gsignals__ attribute gets stripped from a
-    # class's __dict__ by gobject.GObjectMeta so we can't check for the
-    # existence of the `count_changed' signal except with a custom metaclass.
-    class _BlaViewMeta(blautil.BlaSingletonMeta):
-        def __new__(cls, name, bases, dct):
-            # Make sure at least one baseclass inherits from gobject.GObject.
-            if not any([issubclass(base, gobject.GObject) for base in bases]):
-                raise TypeError("%s does not inherit from gobject.GObject" %
-                                name)
-
-            # Add the view_name property.
-            if "view_name" in dct:
-                raise ValueError("View class %s already defines an attribute "
-                                 "'view_name'" % name)
-            dct["view_name"] = property(lambda self: view_name)
-
-            # Add the count_changed signal.
-            signals = dct.get("__gsignals__", {})
-            if False and "count_changed" in signals or "count-changed" in signals:
-                raise ValueError("Class %s already defines a 'count_changed' "
-                                 "signal" % name)
-            signals["count_changed"] = blautil.signal(2)
-            dct["__gsignals__"] = signals
-
-            # Add the init-function stub.
-            if "init" not in dct:
-                dct["init"] = lambda self: None
-
-            # Add default behavior for `update_statusbar()'.
-            if "update_statusbar" not in dct:
-                dct["update_statusbar"] = lambda s: BlaStatusbar.set_view_info(
-                    blacfg.getint("general", "view"), "")
-
-            return super(_BlaViewMeta, cls).__new__(cls, name, bases, dct)
-
-    return _BlaViewMeta
-
-
 class BlaSidePane(gtk.VBox):
     track = None
 
@@ -554,6 +511,48 @@ class BlaSidePane(gtk.VBox):
         else:
             self.__tid = gobject.timeout_add(self.__DELAY, worker, track)
             BlaSidePane.track = track
+
+def BlaViewMeta(view_name):
+    # This returns a metaclass which automatically -- among other things --
+    # attaches a view_name property that always returns the `view_name'
+    # argument. We use a metaclass for defining view classes for the main view
+    # outlet as it appears to be the most flexible way to add default
+    # properties and signals. The __gsignals__ attribute gets stripped from a
+    # class's __dict__ by gobject.GObjectMeta so we can't check for the
+    # existence of the `count_changed' signal except with a custom metaclass.
+    class _BlaViewMeta(blautil.BlaSingletonMeta):
+        def __new__(cls, name, bases, dct):
+            # Make sure at least one baseclass inherits from gobject.GObject.
+            if not any([issubclass(base, gobject.GObject) for base in bases]):
+                raise TypeError("%s does not inherit from gobject.GObject" %
+                                name)
+
+            # Add the view_name property.
+            if "view_name" in dct:
+                raise ValueError("View class %s already defines an attribute "
+                                 "'view_name'" % name)
+            dct["view_name"] = property(lambda self: view_name)
+
+            # Add the count_changed signal.
+            signals = dct.get("__gsignals__", {})
+            if "count_changed" in signals or "count-changed" in signals:
+                raise ValueError("Class %s already defines a 'count_changed' "
+                                 "signal" % name)
+            signals["count_changed"] = blautil.signal(2)
+            dct["__gsignals__"] = signals
+
+            # Add the init-function stub.
+            if "init" not in dct:
+                dct["init"] = lambda self: None
+
+            # Add default behavior for `update_statusbar()'.
+            if "update_statusbar" not in dct:
+                dct["update_statusbar"] = lambda s: BlaStatusbar.set_view_info(
+                    blacfg.getint("general", "view"), "")
+
+            return super(_BlaViewMeta, cls).__new__(cls, name, bases, dct)
+
+    return _BlaViewMeta
 
 class BlaView(gtk.HPaned):
     def __init__(self):
