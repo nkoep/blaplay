@@ -23,7 +23,7 @@ from blaplay import blautil
 
 
 class BlaCfg(RawConfigParser, gobject.GObject):
-    __metaclass__ = blautil.BlaSingleton
+    __metaclass__ = blautil.BlaSingletonMeta
     __gsignals__ = {
         "changed": blautil.signal(0)
     }
