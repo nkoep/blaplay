@@ -31,6 +31,7 @@ import blaplay
 from blaplay.blacore import blacfg, blaconst
 from blaplay import blautil
 from blaplay.blautil import blafm
+from blaview import BlaViewMeta
 from blaplay.blagui import blaguiutils
 
 IMAGE_SIZE = 65
@@ -161,9 +162,8 @@ class BlaRelease(object):
         return path
 
 class BlaReleaseBrowser(blaguiutils.BlaScrolledWindow):
-    __gsignals__ = {
-        "count_changed": blautil.signal(2)
-    }
+    __metaclass__ = BlaViewMeta("New Releases")
+
     __count_library = 0
     __count_recommended = 0
     __lock = blautil.BlaLock(strict=True)
@@ -383,7 +383,7 @@ class BlaReleaseBrowser(blaguiutils.BlaScrolledWindow):
         timedelta = datetime.timedelta(days=(week-1)*7+1)
         return date + timedelta, date + timedelta + datetime.timedelta(days=6)
 
-    def restore(self):
+    def init(self):
         releases = blautil.deserialize_from_file(blaconst.RELEASES_PATH)
         if releases:
             model = gtk.ListStore(gobject.TYPE_PYOBJECT)
@@ -400,8 +400,4 @@ class BlaReleaseBrowser(blaguiutils.BlaScrolledWindow):
         # check for new releases now and every two hours
         self.__update_models()
         gobject.timeout_add(2 * 3600 * 1000, self.__update_models)
-
-    @property
-    def name(self):
-        return "New Releases"
 

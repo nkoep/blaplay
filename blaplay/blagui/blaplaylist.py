@@ -35,6 +35,7 @@ player = blaplay.bla.player
 library = blaplay.bla.library
 from blaplay.blacore import blaconst, blacfg
 from blaplay import blautil, blagui
+from blaview import BlaViewMeta
 from blaplay.blautil import blafm
 from blastatusbar import BlaStatusbar
 from blatagedit import BlaTagedit
@@ -717,9 +718,7 @@ class BlaListItem(object):
             self.playlist.update_icon(clear=True)
 
 class BlaQueue(blaguiutils.BlaScrolledWindow):
-    __gsignals__ = {
-        "count_changed": blautil.signal(2)
-    }
+    __metaclass__ = BlaViewMeta("Queue")
 
     __layout = (
         gobject.TYPE_PYOBJECT,  # An instance of BlaListItem
@@ -1008,6 +1007,8 @@ class BlaQueue(blaguiutils.BlaScrolledWindow):
 
     @classmethod
     def restore(cls, items):
+        print_i("Restoring the play queue")
+
         if not items:
             return
 
@@ -1090,10 +1091,6 @@ class BlaQueue(blaguiutils.BlaScrolledWindow):
     @classmethod
     def queue_n_items(cls):
         return len(cls.__treeview.get_model())
-
-    @property
-    def name(self):
-        return "Queue"
 
 class BlaPlaylist(gtk.VBox):
     __layout = (
@@ -2193,9 +2190,10 @@ class BlaPlaylist(gtk.VBox):
             BlaTagedit(uris)
 
 class BlaPlaylistManager(gtk.Notebook):
+    __metaclass__ = BlaViewMeta("Playlists")
+
     __gsignals__ = {
-        "play_track": blautil.signal(1),
-        "count_changed": blautil.signal(2)
+        "play_track": blautil.signal(1)
     }
 
     __instance = None   # Instance of BlaPlaylist needed for classmethods
@@ -2637,7 +2635,7 @@ class BlaPlaylistManager(gtk.Notebook):
         else:
             save(path, type_)
 
-    def restore(self):
+    def init(self):
         print_i("Restoring playlists")
 
         # FIXME: handle KeyError exceptions here as well
@@ -2946,8 +2944,4 @@ class BlaPlaylistManager(gtk.Notebook):
         if (blacfg.getint("general", "view") == blaconst.VIEW_PLAYLISTS and
             playlist == cls.get_current_playlist()):
             playlist.jump_to_playing_track()
-
-    @property
-    def name(self):
-        return "Playlists"
 

@@ -21,7 +21,7 @@ import blaplay
 player = blaplay.bla.player
 from blaplay.blacore import blaconst, blacfg
 from blaplay import blautil, blagui
-from blaview import View
+from blaview import BlaViewMeta
 
 
 class BlaVideoCanvas(gtk.DrawingArea):
@@ -123,11 +123,9 @@ class BlaVideoCanvas(gtk.DrawingArea):
                 self.window.set_cursor(gtk.gdk.Cursor(gtk.gdk.BLANK_CURSOR))
         self.__tid = gobject.timeout_add(1500, hide_cursor)
 
-@View("Video")
 class BlaVideo(gtk.Viewport):
-    __gsignals__ = {
-        "count_changed": blautil.signal(2)
-    }
+    __metaclass__ = BlaViewMeta("Video")
+
     def __init__(self):
         super(BlaVideo, self).__init__()
 

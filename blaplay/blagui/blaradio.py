@@ -26,6 +26,7 @@ import blaplay
 player = blaplay.bla.player
 from blaplay.blacore import blacfg, blaconst
 from blaplay import blautil, blagui
+from blaview import BlaViewMeta
 from blaplay.formats._blatrack import BlaTrack
 from blaplay.formats._identifiers import LENGTH, TITLE
 from blaplay.blagui import blaguiutils
@@ -85,12 +86,9 @@ class BlaRadioStation(BlaTrack):
     location = property(lambda self: self["location"])
 
 class BlaRadio(gtk.VBox):
-    __gsignals__ = {
-        "count_changed": blautil.signal(2)
-    }
-    __current = None
+    __metaclass__ = BlaViewMeta("Internet Radio")
 
-    name = property(lambda self: "Internet Radio")
+    __current = None
 
     def __init__(self):
         super(BlaRadio, self).__init__(spacing=3)
@@ -352,7 +350,7 @@ class BlaRadio(gtk.VBox):
         if blagui.is_accel(event, "Delete"): self.__remove_stations()
         return False
 
-    def restore(self):
+    def init(self):
         try:
             self.__current, stations = blautil.deserialize_from_file(
                   blaconst.STATIONS_PATH)

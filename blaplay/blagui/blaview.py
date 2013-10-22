@@ -32,21 +32,47 @@ from blaplay.blagui import blaguiutils
 from blaplay.formats._identifiers import *
 
 
-def View(name):
-    """Class decorator to implement views for the main window outlet."""
+def BlaViewMeta(view_name):
+    # This returns a metaclass which automatically -- among other things --
+    # attaches a view_name property that always returns the `view_name'
+    # argument. We use a metaclass for defining view classes for the main view
+    # outlet as it appears to be the most flexible way to add default
+    # properties and signals. The __gsignals__ attribute gets stripped from a
+    # class's __dict__ by gobject.GObjectMeta so we can't check for the
+    # existence of the `count_changed' signal except with a custom metaclass.
+    class _BlaViewMeta(blautil.BlaSingletonMeta):
+        def __new__(cls, name, bases, dct):
+            # Make sure at least one baseclass inherits from gobject.GObject.
+            if not any([issubclass(base, gobject.GObject) for base in bases]):
+                raise TypeError("%s does not inherit from gobject.GObject" %
+                                name)
 
-    import inspect
+            # Add the view_name property.
+            if "view_name" in dct:
+                raise ValueError("View class %s already defines an attribute "
+                                 "'view_name'" % name)
+            dct["view_name"] = property(lambda self: view_name)
 
-    def check_if_class(cls):
-        if not inspect.isclass(cls):
-            raise TypeError("%s is not a class object" % cls.__name__)
+            # Add the count_changed signal.
+            signals = dct.get("__gsignals__", {})
+            if False and "count_changed" in signals or "count-changed" in signals:
+                raise ValueError("Class %s already defines a 'count_changed' "
+                                 "signal" % name)
+            signals["count_changed"] = blautil.signal(2)
+            dct["__gsignals__"] = signals
 
-    def view(cls):
-        check_if_class(cls)
-        cls.name = property(lambda self: name)
-        return cls
+            # Add the init-function stub.
+            if "init" not in dct:
+                dct["init"] = lambda self: None
 
-    return view
+            # Add default behavior for `update_statusbar()'.
+            if "update_statusbar" not in dct:
+                dct["update_statusbar"] = lambda s: BlaStatusbar.set_view_info(
+                    blacfg.getint("general", "view"), "")
+
+            return super(_BlaViewMeta, cls).__new__(cls, name, bases, dct)
+
+    return _BlaViewMeta
 
 
 class BlaSidePane(gtk.VBox):
@@ -341,7 +367,7 @@ class BlaSidePane(gtk.VBox):
         viewport.add(self.__treeview)
         model = gtk.ListStore(gobject.TYPE_STRING, gobject.TYPE_INT)
         self.__treeview.set_model(model)
-        [model.append([view.name, 0]) for view in views]
+        [model.append([view.view_name, 0]) for view in views]
         selection = self.__treeview.get_selection()
         selection.select_path(blacfg.getint("general", "view"))
         self.__treeview.get_selection().connect(
@@ -567,17 +593,7 @@ class BlaView(gtk.HPaned):
 
         for view in self.views:
             view.connect("count_changed", self.__side_pane.update_count)
-        # FIXME: make this more generic. for instance, define a baseclass for
-        #        views which implements an empty `init()' method we can invoke
-        #        here. maybe do this with a class decorator so we can pass the
-        #        name in when defining the class
-        for view in self.views:
-            if view == self.views[blaconst.VIEW_QUEUE]:
-                continue
-            try:
-                view.restore()
-            except AttributeError:
-                pass
+            view.init()
 
         self.show()
         self.__container.show_all()
@@ -610,12 +626,7 @@ class BlaView(gtk.HPaned):
             # display into acting as new video canvas.
             cls.__side_pane.cover_display.use_as_video_canvas(
                 view != blaconst.VIEW_VIDEO)
-
-        # TODO: create views via decorator which provides empty implementations
-        try:
-            child.update_statusbar()
-        except AttributeError:
-            BlaStatusbar.set_view_info(view, "")
+        child.update_statusbar()
 
         # not all menu items are available for all views so update them
         # accordingly

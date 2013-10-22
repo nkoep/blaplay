@@ -30,6 +30,7 @@ import blaplay
 from blaplay.blacore import blacfg, blaconst
 from blaplay import blautil
 from blaplay.blautil import blafm
+from blaview import BlaViewMeta
 from blaplay.blagui import blaguiutils
 from blareleasebrowser import IMAGE_SIZE, BlaCellRendererPixbuf
 
@@ -111,9 +112,8 @@ class BlaEvent(object):
         return path
 
 class BlaEventBrowser(blaguiutils.BlaScrolledWindow):
-    __gsignals__ = {
-        "count_changed": blautil.signal(2)
-    }
+    __metaclass__ = BlaViewMeta("Events")
+
     __count_recommended = 0
     __count_all = 0
     __lock = blautil.BlaLock(strict=True)
@@ -439,7 +439,7 @@ class BlaEventBrowser(blaguiutils.BlaScrolledWindow):
 
         return False
 
-    def restore(self):
+    def init(self):
         events = blautil.deserialize_from_file(blaconst.EVENTS_PATH)
         if events:
             model = gtk.ListStore(gobject.TYPE_PYOBJECT)
@@ -456,8 +456,4 @@ class BlaEventBrowser(blaguiutils.BlaScrolledWindow):
         # check for new events now and every two hours
         self.__update_models()
         gobject.timeout_add(2 * 3600 * 1000, self.__update_models)
-
-    @property
-    def name(self):
-        return "Events"
 
