@@ -276,6 +276,7 @@ class BlaFetcher(gobject.GObject):
     @blautil.thread
     def __fetch_cover(self, track, timestamp, force_download):
         def emit(cover):
+            gobject.source_remove(self.__tid)
             self.emit("cover", timestamp, cover, force_download)
             return False
 
@@ -292,12 +293,14 @@ class BlaFetcher(gobject.GObject):
             elif os.path.isfile("%s.png" % image_base):
                 cover = "%s.png" % image_base
 
-        if cover:
+        if cover is not None:
             return emit(cover)
 
         self.__tid = gobject.timeout_add(2000, emit, blaconst.COVER)
         cover = blafm.get_cover(track, image_base)
-        if not cover and not force_download:
+        # Don't try to get a cover from disk if we were specifically asked to
+        # download it.
+        if cover is None and not force_download:
             base = os.path.dirname(track.uri)
             images = [f for f in os.listdir(base)
                       if blautil.get_extension(f).lower() in ["jpg", "png"]]
@@ -317,8 +320,7 @@ class BlaFetcher(gobject.GObject):
                         image_base, blautil.get_extension(path))
                     shutil.copy(path, cover)
                     break
-        if cover:
-            gobject.source_remove(self.__tid)
+        if cover is not None:
             emit(cover)
 
     @blautil.thread

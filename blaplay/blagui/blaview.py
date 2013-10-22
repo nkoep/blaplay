@@ -93,7 +93,8 @@ class BlaSidePane(gtk.VBox):
 
             def fetch_cover(*args):
                 BlaSidePane.fetcher.fetch_cover(
-                    BlaSidePane.track, self.__update_timestamp())
+                    BlaSidePane.track, self.__update_timestamp(),
+                    force_download=True)
 
             def set_cover(*args):
                 diag = gtk.FileChooserDialog(
