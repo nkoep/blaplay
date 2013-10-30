@@ -369,6 +369,18 @@ class BlaOrderedSet(collections.MutableSet):
     def __del__(self):
         self.clear()
 
+# Note that assignment to an existing key is still possible by deleting the
+# relevant entry first. It's still a decent precautionary measure to avoid
+# accidental overrides of existing keys.
+class BlaFrozenDict(dict):
+    def setdefault(self, keys, default=None):
+        raise NotImplementedError("Method not supported")
+
+    def __setitem__(self, key, value):
+        if key in self:
+            raise ValueError("Entry for key '%s' already exists" % key)
+        super(BlaFrozenDict, self).__setitem__(key, value)
+
 class BlaSingletonMeta(gobject.GObjectMeta):
     __instances = {}
 

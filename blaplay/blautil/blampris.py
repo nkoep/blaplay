@@ -24,6 +24,7 @@ import dbus.mainloop.glib
 dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
 
 from blaplay.blacore import blacfg, blaconst
+from blaplay import blautil
 
 BUS_NAME = "org.mpris.MediaPlayer2.%s" % blaconst.APPNAME
 OBJECT_PATH = "/org/mpris/MediaPlayer2"
@@ -158,8 +159,8 @@ class BlaMpris(dbus.service.Object):
         # read/write properties. In the latter case the callback function must
         # accept an optional argument which defaults to None. For simplicity,
         # the argument has to be called `value'.
-        self.__properties = {
-            INTERFACE_BASE: {
+        self.__properties = blautil.BlaFrozenDict({
+            INTERFACE_BASE: blautil.BlaFrozenDict({
                 "CanQuit": lambda: True,
                 "Fullscreen": self.__fullscreen,
                 "CanSetFullscreen": self.__can_set_fullscreen,
@@ -170,8 +171,8 @@ class BlaMpris(dbus.service.Object):
                 # TODO: move this to blaconst?
                 "SupportedUriSchemes": lambda: ["file", "http", "dvd"],
                 "SupportedMimeTypes": self.__supported_mime_types
-            },
-            INTERFACE_PLAYER: {
+            }),
+            INTERFACE_PLAYER: blautil.BlaFrozenDict({
                 "PlaybackStatus": self.__bla.player.get_state_string,
                 "LoopStatus": self.__loop_status,
                 "Rate": lambda value=None: 1.0,
@@ -187,8 +188,8 @@ class BlaMpris(dbus.service.Object):
                 "CanPause": lambda: True,
                 "CanSeek": lambda: True,
                 "CanControl": lambda: True
-            }
-        }
+            })
+        })
         # Perform a very crude sanity check on the callback functions.
         import inspect
         def validate_callback(callback):
@@ -222,10 +223,19 @@ class BlaMpris(dbus.service.Object):
 
         # Propagate blaplay-specific events on the session bus which have an
         # appropriate analogon in the MPRIS2 specification.
+        player = self.__bla.player
         def seeked(player, pos):
             self.Seeked(pos / 1000)
             return False
-        self.__bla.player.connect("seeked", seeked)
+        player.connect("seeked", seeked)
+
+        # TODO: roll this into a generic callback
+        def state_changed(player):
+            property_name = "PlaybackStatus"
+            value = self.Get(INTERFACE_PLAYER, property_name)
+            self.PropertiesChanged(
+                INTERFACE_PLAYER, {property_name: value}, [])
+        player.connect("state_changed", state_changed)
 
     def __get_interface_properties(self, interface_name):
         try:
@@ -268,9 +278,10 @@ class BlaMpris(dbus.service.Object):
                          in_signature="s", out_signature="a{sv}")
     def GetAll(self, interface_name):
         interface_properties = self.__get_interface_properties(interface_name)
+        properties = {}
         for property_name, callback in interface_properties.items():
-            interface_properties[property_name] = callback()
-        return interface_properties
+            properties[property_name] = callback()
+        return properties
 
     # This is used to signal property changes. The method itself does not have
     # to implement anything.
