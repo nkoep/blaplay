@@ -377,6 +377,8 @@ class BlaSidePane(gtk.VBox):
                 "general", "metadata.view", page_num))
 
     def __popup_menu(self, treeview, event):
+        from blaplaylist import BlaQueue
+
         menu = gtk.Menu()
         m = gtk.MenuItem("Clear queue")
         m.connect("activate", lambda *x: BlaQueue.clear())
