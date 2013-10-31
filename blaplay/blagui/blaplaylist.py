@@ -1100,6 +1100,15 @@ class BlaPlaylist(gtk.VBox):
     __sort_parameters = None
     __fid = -1
 
+    class ListStoreSet(gtk.ListStore):
+        def __init__(self, *args):
+            super(BlaPlaylist.ListStoreSet, self).__init__(*args)
+            self.__set = set()
+
+        def append(self, row):
+            if row not in self.__set:
+                super(BlaPlaylist.ListStoreSet, self).append(row)
+
     class History(object):
         def __init__(self, playlist):
             super(BlaPlaylist.History, self).__init__()
@@ -1153,7 +1162,7 @@ class BlaPlaylist(gtk.VBox):
                 return self.__model.get_iter(path[0]-1)
             return None
 
-    def __init__(self, name="bla"):
+    def __init__(self, name):
         super(BlaPlaylist, self).__init__()
 
         self.__name = gtk.HBox()
@@ -1175,6 +1184,14 @@ class BlaPlaylist(gtk.VBox):
                 self.disable_search()
             return False
         self.__entry.connect("key_press_event", key_press_event)
+        completion = gtk.EntryCompletion()
+        completion.set_inline_completion(True)
+        completion.set_inline_selection(True)
+        completion.set_popup_completion(False)
+        completion.set_model(BlaPlaylist.ListStoreSet(gobject.TYPE_STRING))
+        completion.set_text_column(0)
+        self.__entry.set_completion(completion)
+        self.__entry.connect("activate", self.__filter)
 
         self.__regexp_button = gtk.ToggleButton(label="r\"\"")
         self.__regexp_button.set_tooltip_text(
@@ -1227,10 +1244,13 @@ class BlaPlaylist(gtk.VBox):
 
         update_columns(self.__treeview, view_id=blaconst.VIEW_PLAYLISTS)
         self.show()
-        self.__entry.connect("activate", self.__filter)
 
     def __reduce__(self):
-        return (self.__class__, (), self.__getstate__())
+        # This method can either return a string or a tuple. In the latter case
+        # it has to return a tuple consisting of a callable used to create the
+        # initial copy of the object, its default arguments, as well as the
+        # state as passed to __setstate__ upon deserialization.
+        return (self.__class__, ("bla",), self.__getstate__())
 
     def __getstate__(self):
         state = {
@@ -1248,9 +1268,7 @@ class BlaPlaylist(gtk.VBox):
         return state
 
     def __setstate__(self, state):
-        name = state.get("name", "")
-        if name:
-            self.set_name(name)
+        self.set_name(state.get("name", ""))
         if state.get("locked", False):
             self.toggle_lock()
         self.__all_items = state.get("all_items", [])
@@ -1401,6 +1419,11 @@ class BlaPlaylist(gtk.VBox):
 
         filter_string = self.__entry.get_text().strip()
         if filter_string:
+            # Add the search string to the completion model (it's subclassed
+            # to behave like a set).
+            completion_model = self.__entry.get_completion().get_model()
+            completion_model.append((filter_string,))
+
             self.__mode |= MODE_FILTERED
             query = BlaQuery(
                 filter_string, self.__regexp_button.get_active()).query
@@ -2653,8 +2676,10 @@ class BlaPlaylistManager(gtk.Notebook):
                 # FIXME: exceptions here sometimes
                 playlist = self.get_nth_page(active_playlist)
                 type(self).current = playlist.get_item_from_path(current)
-                self.current.select()
-
+                try:
+                    self.current.select()
+                except AttributeError:
+                    pass
             try:
                 BlaQueue.restore(queue)
             except:
@@ -2807,7 +2832,7 @@ class BlaPlaylistManager(gtk.Notebook):
     @classmethod
     def send_to_current_playlist(cls, uris, resolve=False):
         playlist = cls.get_current_playlist()
-        if not playlist.modification_allowed(check_filter_state=True):
+        if not playlist.modification_allowed():
             return
 
         if resolve:
