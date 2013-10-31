@@ -163,7 +163,7 @@ def columns_changed(treeview, view_id):
     elif view_id == blaconst.VIEW_QUEUE:
         view = "queue"
 
-    columns = [column.id for column in treeview.get_columns()]
+    columns = [column.id_ for column in treeview.get_columns()]
     blacfg.set("general", "columns.%s" % view, ", ".join(map(str, columns)))
 
 def popup(treeview, event, view_id, target):
@@ -658,7 +658,7 @@ class BlaColumn(gtk.TreeViewColumn):
         super(BlaColumn, self).__init__()
         self.set_sizing(gtk.TREE_VIEW_COLUMN_FIXED)
 
-        self.id = column_id
+        self.id_ = column_id
         self.set_reorderable(True)
 
         alignment = (0.5 if column_id == COLUMN_PLAYING else 1.0
@@ -1328,7 +1328,7 @@ class BlaPlaylist(gtk.VBox):
             pass
         else:
             for column in self.__treeview.get_columns():
-                if column.id == column_id:
+                if column.id_ == column_id:
                     break
             else:
                 sort_order = None
@@ -1970,7 +1970,7 @@ class BlaPlaylist(gtk.VBox):
 
     def sort(self, column_id, sort_order, scroll=False):
         for column in self.__treeview.get_columns():
-            if column.id == column_id:
+            if column.id_ == column_id:
                 break
         else:
             sort_order = None
