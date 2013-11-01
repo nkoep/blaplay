@@ -2370,18 +2370,29 @@ class BlaPlaylistManager(gtk.Notebook):
 
         vbox = gtk.VBox(spacing=5)
         vbox.set_border_width(10)
-        item = gtk.Entry()
-        item.set_text(default)
-        item.connect("activate", lambda *x: diag.response(gtk.RESPONSE_OK))
+        entry = gtk.Entry()
+        entry.set_text(default)
+        entry.connect("activate", lambda *x: diag.response(gtk.RESPONSE_OK))
         label = gtk.Label("Title:")
         label.set_alignment(xalign=0.0, yalign=0.5)
         vbox.pack_start(label)
-        vbox.pack_start(item)
+        vbox.pack_start(entry)
         diag.vbox.pack_start(vbox)
         diag.show_all()
-        response = diag.run()
 
-        name = item.get_text() if response == gtk.RESPONSE_OK else ""
+        # Run the dialog until we got a valid name or the user aborted.
+        name = ""
+        while True:
+            response = diag.run()
+            if response == gtk.RESPONSE_OK:
+                name = entry.get_text()
+                if not name.strip():
+                    blaguiutils.error_dialog(
+                        "Invalid playlist name", "A playlist name must not "
+                        "consist exclusively of whitespace characters.")
+                    continue
+            break
+
         diag.destroy()
         return name
 
