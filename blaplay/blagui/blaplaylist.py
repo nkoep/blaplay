@@ -1216,16 +1216,19 @@ class BlaPlaylist(gtk.VBox):
         self.__treeview.connect(
             "popup", popup, blaconst.VIEW_PLAYLISTS, self)
         self.__treeview.connect("key_press_event", self.__key_press_event)
-        self.__treeview.connect("drag_data_get", self.__drag_data_get)
-        self.__treeview.connect(
-            "drag_data_received", self.__drag_data_recv)
+        self.__treeview.connect_object("drag_data_get",
+                                       BlaPlaylist.__drag_data_get, self)
+        self.__treeview.connect_object("drag_data_received",
+                                       BlaPlaylist.__drag_data_recv, self)
 
-        # DND between playlists (including one and the same playlist)
+        # DND between playlists (includes playlist-internal DND)
         self.__treeview.enable_model_drag_source(
             gtk.gdk.BUTTON1_MASK,
-            [("tracks/playlist", gtk.TARGET_SAME_APP, 2)], gtk.gdk.ACTION_COPY)
+            [("tracks/playlist", gtk.TARGET_SAME_APP, 2)],
+            gtk.gdk.ACTION_COPY)
 
         # Receive drag and drop
+        # TODO: define some constants for the DND ids
         self.__treeview.enable_model_drag_dest(
             [("tracks/library", gtk.TARGET_SAME_APP, 0),
              ("tracks/filesystem", gtk.TARGET_SAME_APP, 1),
@@ -1344,7 +1347,7 @@ class BlaPlaylist(gtk.VBox):
     def __get_selection_and_row(self):
         row_align = 0.0
         selection = self.__treeview.get_selection()
-        selected_paths = selection.get_selected_rows()[-1]
+        selected_paths = self.get_selected_paths()
 
         # Get item of the row to scroll to.
         try:
@@ -1440,28 +1443,26 @@ class BlaPlaylist(gtk.VBox):
 
         self.__populate_model(scroll_item, row_align, selected_items)
 
-    def __drag_data_get(self, treeview, drag_context, selection_data, info,
-                        time):
+    def __drag_data_get(self, drag_context, selection_data, info, time):
         idx = BlaPlaylistManager.get_playlist_index(self)
-        data = pickle.dumps((treeview.get_selection().get_selected_rows()[-1],
-                            idx), pickle.HIGHEST_PROTOCOL)
+        data = pickle.dumps((self.get_selected_paths(), idx),
+                            pickle.HIGHEST_PROTOCOL)
         selection_data.set("", 8, data)
 
-    def __drag_data_recv(self, treeview, drag_context, x, y, selection_data,
-                         info, time):
+    def __drag_data_recv(self, drag_context, x, y, selection_data, info, time):
         if not self.modification_allowed():
             return
 
         data = None
-        treeview.grab_focus()
-        drop_info = treeview.get_dest_row_at_pos(x, y)
+        self.__treeview.grab_focus()
+        drop_info = self.__treeview.get_dest_row_at_pos(x, y)
 
         # DND from the library browser
         if info == 0:
             uris = pickle.loads(selection_data.data)
             items = create_items_from_uris(uris)
 
-        # DND between playlists
+        # DND between playlists (this case includes playlist-internal DND)
         elif info == 2:
             paths, idx = pickle.loads(selection_data.data)
 
@@ -1473,6 +1474,7 @@ class BlaPlaylist(gtk.VBox):
                     return
 
             playlist = BlaPlaylistManager.get_nth_playlist(idx)
+            # FIXME: what happens to the current track?
             items = playlist.get_items(paths=paths, remove=True)
             if drop_info:
                 path = self.get_path_from_item(item)
@@ -1492,7 +1494,8 @@ class BlaPlaylist(gtk.VBox):
 
     def __key_press_event(self, treeview, event):
         def delete():
-            items = self.get_items(remove=True)
+            paths = self.get_selected_paths()
+            items = self.get_items(paths, remove=True)
             if BlaPlaylistManager.current in items:
                 BlaPlaylistManager.current = None
 
@@ -1616,7 +1619,7 @@ class BlaPlaylist(gtk.VBox):
 
     def select(self, type_):
         selection = self.__treeview.get_selection()
-        selected_paths = selection.get_selected_rows()[-1]
+        selected_paths = self.get_selected_paths()
 
         if type_ == blaconst.SELECT_ALL:
             selection.select_all()
@@ -1659,7 +1662,7 @@ class BlaPlaylist(gtk.VBox):
         map(select_path, paths)
 
     def new_playlist(self, type_):
-        paths = self.__treeview.get_selection().get_selected_rows()[-1]
+        paths = self.get_selected_paths()
         items = self.get_items_from_paths(paths)
 
         if type_ != blaconst.PLAYLIST_FROM_SELECTION:
@@ -1695,7 +1698,7 @@ class BlaPlaylist(gtk.VBox):
         all_items = self.__all_items
         for idx, item in enumerate(items):
             # When a copied item is pasted into the same playlist multiple
-            # times make sure to always get a new id().
+            # times make sure it gets a new id by creating a shallow copy.
             if item.playlist == self:
                 items[idx] = copy(item)
             item.playlist = self
@@ -1708,7 +1711,7 @@ class BlaPlaylist(gtk.VBox):
                 # the selection in a treeview is empty. In this case we also
                 # want to append tracks to the playlist and thus raise a
                 # TypeError here to force path to be None.
-                if not self.__treeview.get_selection().get_selected_rows()[-1]:
+                if not self.get_selected_paths():
                     raise TypeError
                 path, column = self.__treeview.get_cursor()
             except TypeError:
@@ -1751,7 +1754,7 @@ class BlaPlaylist(gtk.VBox):
         for column in self.__treeview.get_columns():
             column.set_sort_indicator(False)
 
-        # Select added rows if requested
+        # Select the added rows if requested.
         if select_rows:
             selection = self.__treeview.get_selection()
             selection.unselect_all()
@@ -1766,8 +1769,7 @@ class BlaPlaylist(gtk.VBox):
     def insert(self, items, drop_info):
         # Due to the way playlist contents are handled to speed up filtering
         # and sorting, dealing with track insertion into our book-keeping lists
-        # is a rather fiddly task.
-
+        # is a rather fiddly task so be careful tampering with this function!
         if self.__mode & MODE_SORTED:
             list_ = self.__all_sorted
         else:
@@ -1777,76 +1779,71 @@ class BlaPlaylist(gtk.VBox):
             path, pos = drop_info
             if pos in [gtk.TREE_VIEW_DROP_BEFORE,
                        gtk.TREE_VIEW_DROP_INTO_OR_BEFORE]:
-                starting_point = path[0]
+                start = path[0]
             else:
-                starting_point = path[0] + 1
+                start = path[0]+1
         else:
-            starting_point = len(list_)
+            start = len(list_)
 
-        for idx, item in enumerate(items):
-            list_.insert(starting_point + idx, item)
+        # Make sure to insert into the list `list_' references by using slice
+        # notation to assign the new values.
+        list_[:] = list_[:start] + items + list_[start:]
 
+        # FIXME: this is the second check whether the list is sorted in this
+        #        function
         if self.__mode & MODE_SORTED:
-            if starting_point > 0:
-                item = list_[starting_point - 1]
-                starting_point = self.__all_items.index(item) + 1
+            if start > 0:
+                item = list_[start-1]
+                start = self.__all_items.index(item)+1
             else:
-                item = list_[starting_point + 1]
-                starting_point = self.__all_items.index(item)
+                item = list_[start+1]
+                start = self.__all_items.index(item)
 
-            for idx, item in enumerate(items):
-                self.__all_items.insert(starting_point + idx, item)
+            self.__all_items[:] = (self.__all_items[:start] + items +
+                                   self.__all_items[start:])
 
-        # Update playlist statistics
+        # Update the playlist statistics.
         self.__length += sum(
             [item.track[LENGTH] for item in items])
         self.__size += sum(
             [item.track[FILESIZE] for item in items])
 
-    def get_items(self, remove=False, paths=None):
+    def get_selected_paths(self):
+        return self.__treeview.get_selection().get_selected_rows()[-1]
+
+    def get_items(self, paths, remove=False):
         if remove and not self.modification_allowed():
             return []
 
-        items = []
+        items = self.get_items_from_paths(paths)
+        if remove:
+            self.__length -= sum(
+                [item.track[LENGTH] for item in items])
+            self.__size -= sum(
+                [item.track[FILESIZE] for item in items])
 
-        # If paths is not given return the currently selected rows.
-        if paths is None:
-            paths = self.__treeview.get_selection().get_selected_rows()[-1]
+            # Remove the rows from the model.
+            model = self.__freeze_treeview()
+            get_iter = model.get_iter
+            iterators = map(get_iter, paths)
+            remove = model.remove
+            map(remove, iterators)
+            self.__thaw_treeview()
 
-        if paths:
-            if isinstance(paths, tuple):
-                items, paths = paths
-            else:
-                items = self.get_items_from_paths(paths)
-
-            if remove:
-                self.__length -= sum(
-                    [item.track[LENGTH] for item in items])
-                self.__size -= sum(
-                    [item.track[FILESIZE] for item in items])
-
-                # Remove the rows from the model.
-                model = self.__freeze_treeview()
-                get_iter = model.get_iter
-                iterators = map(get_iter, paths)
-                remove = model.remove
-                map(remove, iterators)
-                self.__thaw_treeview()
-
-                # Remove items from the book-keeping lists.
-                lists = [self.__all_items]
-                if self.__mode & MODE_FILTERED:
-                    lists.append(self.__items)
-                    if self.__mode & MODE_SORTED:
-                        lists.append(self.__sorted)
+            # Remove items from the book-keeping lists.
+            lists = [self.__all_items]
+            if self.__mode & MODE_FILTERED:
+                lists.append(self.__items)
                 if self.__mode & MODE_SORTED:
-                    lists.append(self.__all_sorted)
+                    lists.append(self.__sorted)
+            if self.__mode & MODE_SORTED:
+                lists.append(self.__all_sorted)
 
-                for list_ in lists:
-                    remove = list_.remove
-                    map(remove, items)
+            for list_ in lists:
+                remove = list_.remove
+                map(remove, items)
 
-                BlaPlaylistManager.update_statusbar()
+            BlaPlaylistManager.update_statusbar()
         return items
 
     def remove_duplicates(self):
@@ -1855,7 +1852,7 @@ class BlaPlaylist(gtk.VBox):
             scroll_item, row_align, selected_items = \
                 self.__get_selection_and_row()
 
-            paths = self.__treeview.get_selection().get_selected_rows()[-1]
+            paths = self.get_selected_paths()
             selected_items = self.get_items_from_paths(paths)
 
             # Determine unique tracks
@@ -1910,7 +1907,7 @@ class BlaPlaylist(gtk.VBox):
                 if idx % 25 == 0:
                     yield True
 
-            paths = self.__treeview.get_selection().get_selected_rows()[-1]
+            paths = self.get_selected_paths()
             get_item_from_path = self.get_item_from_path
             selected_items = []
             for idx, path in enumerate(paths):
@@ -2026,11 +2023,9 @@ class BlaPlaylist(gtk.VBox):
     def update_uris(self, uris):
         for item in self.__all_items:
             try:
-                new_uri = uris[item.uri]
+                item.uri = uris[item.uri]
             except KeyError:
                 pass
-            else:
-                item.uri = new_uri
 
     def get_item(self, choice=blaconst.TRACK_PLAY, force_advance=True):
         def get_random(old=None):
@@ -2102,6 +2097,8 @@ class BlaPlaylist(gtk.VBox):
     def get_playlist_stats(self):
         items = (self.__items if self.__mode & MODE_FILTERED else
                  self.__all_items)
+        # TODO: maintain a __stats dict() in each playlist that stores this
+        #       info
         return (len(items), self.__size, self.__length)
 
     def update_icon(self, clear=False):
@@ -2146,7 +2143,8 @@ class BlaPlaylist(gtk.VBox):
         if not playlist.modification_allowed():
             return
 
-        items = self.get_items(remove=move)
+        paths = self.get_selected_paths()
+        items = self.get_items(paths, remove=move)
         if not items:
             return
         if not move:
@@ -2161,20 +2159,16 @@ class BlaPlaylist(gtk.VBox):
 
         count = blaconst.QUEUE_MAX_ITEMS - queue_n_items
         model, selection = self.__treeview.get_selection().get_selected_rows()
-        BlaQueue.queue_items([model[p][0] for p in selection[:count]])
+        BlaQueue.queue_items([model[path][0] for path in selection[:count]])
 
     def remove_from_queue(self, treeview):
         model, selection = treeview.get_selection().get_selected_rows()
-        BlaQueue.remove_items([model[p][0] for p in selection])
+        BlaQueue.remove_items([model[path][0] for path in selection])
 
     def jump_to_playing_track(self):
         current = BlaPlaylistManager.current
-        try:
-            if current is None:
-                raise KeyError
-            if current.uri != player.get_track().uri:
-                raise KeyError
-        except KeyError:
+        track = player.get_track()
+        if current is None or track is None or current.uri != track.uri:
             return
         self.set_row(self.get_path_from_item(current))
 
@@ -2182,7 +2176,7 @@ class BlaPlaylist(gtk.VBox):
                 set_cursor=True):
         # Wrap the actual heavy lifting in gobject.idle_add. If we decorate the
         # instance method itself we can't use kwargs anymore which is rather
-        # annoying for this particular method.
+        # annoying for this particular method due to the number of arguments.
         @blautil.idle
         def set_row():
             try:
@@ -2193,28 +2187,27 @@ class BlaPlaylist(gtk.VBox):
                 self.__treeview.scroll_to_cell(
                     path, use_align=True, row_align=row_align)
 
-            selection = self.__treeview.get_selection()
             if keep_selection:
-                selected_rows = selection.get_selected_rows()[-1]
+                paths = self.get_selected_paths()
             else:
-                selected_rows = []
+                paths = []
             if set_cursor:
                 self.__treeview.set_cursor(path)
-            if selected_rows:
-                select_path = selection.select_path
-                map(select_path, selected_rows)
+            if paths:
+                select_path = self.__treeview.get_selection().select_path
+                map(select_path, paths)
 
         if path:
             set_row()
 
     def show_properties(self):
-        uris = [item.uri for item in self.get_items(remove=False)]
+        paths = self.get_selected_paths()
+        uris = [item.uri for item in self.get_items(paths)]
         if uris:
             BlaTagedit(uris)
 
 class BlaPlaylistManager(gtk.Notebook):
     __metaclass__ = BlaViewMeta("Playlists")
-
     __gsignals__ = {
         "play_track": blautil.signal(1)
     }
@@ -2228,6 +2221,8 @@ class BlaPlaylistManager(gtk.Notebook):
         type(self).__instance = self
 
         self.set_scrollable(True)
+        # FIXME: some flags are wrong, for instance the last one has to be
+        #        gtk.TARGET_OTHER_APP
         targets = [
             ("tracks/library", gtk.TARGET_SAME_APP, 0),
             ("tracks/filesystem", gtk.TARGET_SAME_APP, 1),
@@ -2243,7 +2238,7 @@ class BlaPlaylistManager(gtk.Notebook):
         self.__lock_button.set_focus_on_click(False)
         self.__lock_button.add(
             gtk.image_new_from_stock(gtk.STOCK_DIALOG_AUTHENTICATION,
-            gtk.ICON_SIZE_MENU))
+                                     gtk.ICON_SIZE_MENU))
         style = gtk.RcStyle()
         style.xthickness = style.ythickness = 0
         self.__lock_button.modify_style(style)
@@ -2292,6 +2287,8 @@ class BlaPlaylistManager(gtk.Notebook):
         self.save()
 
     def __drag_data_recv(self, drag_context, x, y, selection_data, info, time):
+        # This gets called when DND operations end on the tab strip of the
+        # notebook's tab strip.
         resolve = select = False
 
         # DND from the library browser
@@ -2786,14 +2783,14 @@ class BlaPlaylistManager(gtk.Notebook):
 
     @classmethod
     def cut(cls, *args):
-        playlist = cls.get_current_playlist()
-        cls.clipboard = playlist.get_items(remove=True)
+        cls.clipboard = cls.remove()
         blagui.update_menu(blaconst.VIEW_PLAYLISTS)
 
     @classmethod
     def copy(cls, *args):
         playlist = cls.get_current_playlist()
-        cls.clipboard = map(copy, playlist.get_items(remove=False))
+        paths = playlist.get_selected_paths()
+        cls.clipboard = map(copy, playlist.get_items(paths))
         blagui.update_menu(blaconst.VIEW_PLAYLISTS)
 
     @classmethod
@@ -2806,7 +2803,8 @@ class BlaPlaylistManager(gtk.Notebook):
     @classmethod
     def remove(cls, *args):
         playlist = cls.get_current_playlist()
-        playlist.get_items(remove=True)
+        paths = playlist.get_selected_paths()
+        return playlist.get_items(paths, remove=True)
 
     @classmethod
     def clear(cls, *args):
