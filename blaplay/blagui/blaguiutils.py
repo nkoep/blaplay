@@ -199,8 +199,6 @@ class BlaBaseWindow(gtk.Window):
             self.unmaximize()
 
 class BlaWindow(BlaBaseWindow):
-    """ A window that binds the ^W accelerator to close. """
-
     __gsignals__ = {
         "close_accel": (gobject.SIGNAL_RUN_LAST | gobject.SIGNAL_ACTION,
                         gobject.TYPE_NONE, ())
@@ -307,35 +305,54 @@ class BlaTreeViewBase(gtk.TreeView):
         self.__multicol = kwargs.pop("multicol", False)
         self.__renderer = kwargs.pop("renderer", None)
         self.__text_column = kwargs.pop("text_column", None)
+        # TODO: rename to __empty_selection_allowed
         self.__allow_no_selection = kwargs.pop("allow_no_selection", True)
         set_button_event_handlers = kwargs.pop(
             "set_button_event_handlers", True)
 
         super(BlaTreeViewBase, self).__init__(*args, **kwargs)
+        type(self).instances.append(self)
+
         if blacfg.getboolean("colors", "overwrite") and self.__multicol:
             name = blaconst.STYLE_NAME
         else:
             name = ""
         self.set_name(name)
-        type(self).instances.append(self)
         self.set_enable_search(False)
+        self.set_fixed_height_mode(True)
+        self.get_selection().set_mode(gtk.SELECTION_MULTIPLE)
+
+        self.__pending = False
         if set_button_event_handlers:
             self.connect_object("button_press_event",
                                 BlaTreeViewBase.__button_press_event, self)
             self.connect_object("button_release_event",
                                 BlaTreeViewBase.__button_release_event, self)
-            self.connect_object("row_activated",
-                                BlaTreeViewBase.__row_activated, self)
-        self.connect_after("drag_begin", self.__drag_begin)
-        self.connect_object("drag_failed", BlaTreeViewBase.__drag_failed, self)
-        self.get_selection().set_mode(gtk.SELECTION_MULTIPLE)
-        self.__pending_event = None
 
-    def __row_activated(self, *args):
-        self.__pending_event = None
-        self.get_selection().set_select_function(lambda *x: True)
+        # Hook up signals for drag and drop.
+        def drag_begin(treeview, context):
+            context.set_icon_stock(gtk.STOCK_DND, 0, 0)
+            self.__dragging = True
+        self.connect_after("drag_begin", drag_begin)
+        def drag_failed(treeview, context, result):
+            self.__drag_aborted = True
+            self.__allow_selection(True)
+            # Eat the animation event in case a receiver rejects the drop.
+            return True
+        self.connect("drag_failed", drag_failed)
+        def drag_end(treeview, context):
+            self.__allow_selection(True)
+            self.__dragging = False
+        self.connect("drag_end", drag_end)
+        self.__dragging = False
+        self.__drag_aborted = False
+
+    def __allow_selection(self, yes):
+        self.get_selection().set_select_function(lambda *x: yes)
 
     def __accept_button_event(self, column, path, event, check_expander):
+        # TODO: get rid of this method and implement it only where necessary
+        #       (i.e. the library browser)
         if (not blacfg.getboolean("library", "custom.browser") or
             self.__multicol or self.__renderer is None):
             return True
@@ -372,79 +389,76 @@ class BlaTreeViewBase(gtk.TreeView):
         return False
 
     def __button_press_event(self, event):
-        self.grab_focus()
-
-        def unselect_all(selection):
-            selection.set_select_function(lambda *x: True)
-            selection.unselect_all()
-
-        selection = self.get_selection()
-        x, y = map(int, [event.x, event.y])
-        try:
-            path, column, cellx, celly = self.get_path_at_pos(x, y)
-        except TypeError:
-            if self.__allow_no_selection:
-                if event.button == 3:
-                    self.emit("popup", event)
-                if event.button == 2:
-                    return False
-                unselect_all(selection)
-            return True
-
-        if event.button == 1:
-            check_expander = True
-        else:
-            check_expander = False
-        if not self.__accept_button_event(column, path, event, check_expander):
-            unselect_all(selection)
-
-        self.grab_focus()
-        if event.button == 1:
-            if (selection.path_is_selected(path) and
-                not (event.state & (gtk.gdk.CONTROL_MASK|gtk.gdk.SHIFT_MASK))):
-                self.__pending_event = [x, y]
-                selection.set_select_function(lambda *args: False)
-                return False
-            elif event.type == gtk.gdk.BUTTON_PRESS:
-                if self.__allow_no_selection:
-                    self.__pending_event = None
-                    selection.set_select_function(lambda *args: True)
-                    return False
-
-        elif event.button == 2:
+        # Never block on double or triple click events.
+        if (event.type == gtk.gdk._2BUTTON_PRESS or
+            event.type == gtk.gdk._3BUTTON_PRESS):
+            self.__allow_selection(True)
             return False
 
+        if event.button not in [1, 2, 3]:
+            return True
+
+        self.grab_focus()
+        selection = self.get_selection()
+
+        x, y = map(int, [event.x, event.y])
+        try:
+            path, column = self.get_path_at_pos(x, y)[:2]
+        except TypeError:
+            # If the click event didn't hit a row check if we allow deselecting
+            # all rows in the view and do so if we do.
+            if self.__allow_no_selection:
+                self.__allow_selection(True)
+                selection.unselect_all()
+                if event.button == 3:
+                    self.emit("popup", event)
+            return True
+
+        # TODO: remove me
+        if not self.__accept_button_event(column, path, event,
+                                          check_expander=(event.button== 1)):
+            self.__allow_selection(True)
+            selection.unselect_all()
+
+        path_selected = selection.path_is_selected(path)
+        mod_active = event.get_state() & (
+            gtk.gdk.CONTROL_MASK | gtk.gdk.SHIFT_MASK)
+
+        if event.button == 1:
+            if path_selected and not mod_active:
+                self.__pending = True
+                self.__allow_selection(False)
+            else:
+                self.__pending = False
+                self.__allow_selection(True)
+
         elif event.button == 3:
-            if not selection.path_is_selected(path):
+            self.__allow_selection(True)
+            if not path_selected:
                 self.set_cursor(path, column, 0)
             else:
                 column.focus_cell(column.get_cell_renderers()[0])
             self.emit("popup", event)
+            return True
 
-        return True
+        return False
 
     def __button_release_event(self, event):
-        if self.__pending_event:
-            selection = self.get_selection()
-            oldevent = self.__pending_event
-            self.__pending_event = None
-            selection.set_select_function(lambda *x: True)
-            safezone = 10
-            if not (oldevent[0]-safezone <= event.x <= oldevent[0]+safezone and
-                    oldevent[1]-safezone <= event.y <= oldevent[1]+safezone):
-                return True
-            x, y = map(int, [event.x, event.y])
+        self.__allow_selection(True)
+        if (self.__pending and not self.__dragging and
+            not self.is_rubber_banding_active()):
+            self.__pending = False
+
+            # Ignore button release events after aborted DND operations.
+            if self.__drag_aborted:
+                self.__drag_aborted = False
+                return False
             try:
-                path, column, cellx, celly = self.get_path_at_pos(x, y)
+                path, column = self.get_path_at_pos(
+                    *map(int, [event.x, event.y]))[:2]
+                self.set_cursor(path, column, 0)
             except TypeError:
-                return True
-            self.set_cursor(path, column, 0)
+                pass
 
-    def __drag_begin(self, treeview, context):
-        context.set_icon_stock(gtk.STOCK_DND, 0, 0)
-
-    def __drag_failed(self, context, result):
-        # eat the event that triggers the animation of the dragged item when we
-        # release a drag and it's rejected by the drop area
-        return True
+        return False
 
