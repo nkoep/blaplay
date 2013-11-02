@@ -2221,13 +2221,11 @@ class BlaPlaylistManager(gtk.Notebook):
         type(self).__instance = self
 
         self.set_scrollable(True)
-        # FIXME: some flags are wrong, for instance the last one has to be
-        #        gtk.TARGET_OTHER_APP
         targets = [
             ("tracks/library", gtk.TARGET_SAME_APP, 0),
             ("tracks/filesystem", gtk.TARGET_SAME_APP, 1),
             ("tracks/playlist", gtk.TARGET_SAME_APP, 2),
-            ("text/uri-list", gtk.TARGET_SAME_APP, 3)
+            ("text/uri-list", gtk.TARGET_OTHER_APP, 3)
         ]
         self.drag_dest_set(gtk.DEST_DEFAULT_MOTION | gtk.DEST_DEFAULT_DROP,
                            targets, gtk.gdk.ACTION_COPY)
