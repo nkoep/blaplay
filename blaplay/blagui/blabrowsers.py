@@ -788,12 +788,12 @@ class BlaFileBrowser(gtk.VBox):
             (gtk.STOCK_GO_BACK,
              lambda *x: self.__update_from_history(backwards=True)),
             (gtk.STOCK_GO_UP,
-             lambda *x: self.__update_model(
+             lambda *x: self.__update_directory(
                 os.path.dirname(self.__directory))),
             (gtk.STOCK_GO_FORWARD,
              lambda *x: self.__update_from_history(backwards=False)),
             (gtk.STOCK_HOME,
-             lambda *x: self.__update_model(os.path.expanduser("~")))
+             lambda *x: self.__update_directory(os.path.expanduser("~")))
         ]
 
         def add_button(icon, callback, idx):
@@ -812,18 +812,29 @@ class BlaFileBrowser(gtk.VBox):
         self.__entry = gtk.Entry()
         self.__entry.connect(
             "activate",
-            lambda *x: self.__update_model(self.__entry.get_text()))
+            lambda *x: self.__update_directory(self.__entry.get_text()))
+        def key_press_event_entry(entry, event):
+            if (blagui.is_accel(event, "Escape") or
+                blagui.is_accel(event, "<Ctrl>L")):
+                self.__entry.select_region(-1, -1)
+                self.__treeview.grab_focus()
+                return True
+            elif (blagui.is_accel(event, "Up") or
+                  blagui.is_accel(event, "Down")):
+                return True
+            return False
+        self.__entry.connect("key_press_event", key_press_event_entry)
         table.attach(self.__entry, idx, idx+1, 0, 1)
         idx += 1
 
         add_button(gtk.STOCK_REFRESH,
-                   lambda *x: self.__update_model(refresh=True), idx)
+                   lambda *x: self.__update_directory(refresh=True), idx)
 
         vbox.pack_start(table, expand=False, fill=False)
 
         # The treeview
         self.__treeview = BlaTreeView(parent=parent, multicol=True,
-                browser_id=blaconst.BROWSER_FILESYSTEM)
+                                      browser_id=blaconst.BROWSER_FILESYSTEM)
         self.__treeview.set_enable_search(True)
         self.__treeview.set_search_column(2)
         self.__treeview.enable_model_drag_source(
@@ -832,6 +843,12 @@ class BlaFileBrowser(gtk.VBox):
             gtk.gdk.ACTION_COPY)
         self.__treeview.connect_object(
             "drag_data_get", BlaFileBrowser.__drag_data_get, self)
+        def key_press_event(treeview, event):
+            if blagui.is_accel(event, "<Ctrl>L"):
+                self.__entry.grab_focus()
+                return True
+            return False
+        self.__treeview.connect("key_press_event", key_press_event)
         model = gtk.ListStore(*self.__layout)
         self.__filt = model.filter_new()
         self.__filt.set_visible_func(self.__visible_func)
@@ -858,7 +875,8 @@ class BlaFileBrowser(gtk.VBox):
 
         self.__treeview.append_column(c)
 
-        # FIXME: what would be a more useful column? maybe remove it completely
+        # TODO: turn this into nemo's size column (for files, display the size,
+        #       for directories the number of items)
         # Last modified column
         c = gtk.TreeViewColumn()
         c.set_sizing(gtk.TREE_VIEW_COLUMN_FIXED)
@@ -877,7 +895,7 @@ class BlaFileBrowser(gtk.VBox):
 
         self.__treeview.append_column(c)
         self.__treeview.connect("row_activated", self.__open)
-        self.__update_model(self.__directory)
+        self.__update_directory(self.__directory)
         self.__treeview.columns_autosize()
 
         sw = blaguiutils.BlaScrolledWindow()
@@ -947,8 +965,8 @@ class BlaFileBrowser(gtk.VBox):
                 return False
             self.__fid = gobject.timeout_add(500, activate)
 
-    def __update_model(self, directory=None, refresh=False,
-                       add_to_history=True):
+    def __update_directory(self, directory=None, refresh=False,
+                           add_to_history=True):
         if not refresh:
             if directory is None:
                 print_w("Directory must not be None")
@@ -1020,8 +1038,8 @@ class BlaFileBrowser(gtk.VBox):
     def __process_event(self, monitor, filepath, other_filepath, type_):
         gobject.source_remove(self.__uid)
         self.__uid = gobject.timeout_add(
-            2000,
-            lambda *x: self.__update_model(refresh=True, add_to_history=False))
+            2000, lambda *x: self.__update_directory(refresh=True,
+                                                     add_to_history=False))
 
     def __update_from_history(self, backwards):
         if backwards:
@@ -1030,13 +1048,13 @@ class BlaFileBrowser(gtk.VBox):
             path = self.__history.get(next=True)
 
         if path:
-            self.__update_model(directory=path, add_to_history=False)
+            self.__update_directory(directory=path, add_to_history=False)
 
     def __open(self, treeview, path, column):
         model = treeview.get_model()
         entry = model[path][0]
         if os.path.isdir(entry):
-            model = self.__update_model(entry)
+            model = self.__update_directory(entry)
             return True
         return False
 
