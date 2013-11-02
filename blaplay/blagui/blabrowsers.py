@@ -537,7 +537,7 @@ class BlaLibraryBrowser(gtk.VBox):
 
         self.__treeview.enable_model_drag_source(
             gtk.gdk.BUTTON1_MASK,
-            [("tracks/library", gtk.TARGET_SAME_APP, 0)],
+            [blagui.DND_TARGETS[blagui.DND_LIBRARY]],
             gtk.gdk.ACTION_COPY)
         self.__treeview.connect_object(
             "drag_data_get", BlaLibraryBrowser.__drag_data_get, self)
@@ -839,7 +839,7 @@ class BlaFileBrowser(gtk.VBox):
         self.__treeview.set_search_column(2)
         self.__treeview.enable_model_drag_source(
             gtk.gdk.BUTTON1_MASK,
-            [("tracks/filesystem", gtk.TARGET_SAME_APP, 1)],
+            [blagui.DND_TARGETS[blagui.DND_FILESYSTEM]],
             gtk.gdk.ACTION_COPY)
         self.__treeview.connect_object(
             "drag_data_get", BlaFileBrowser.__drag_data_get, self)

@@ -169,13 +169,13 @@ class BlaRadio(gtk.VBox):
         self.pack_start(sw, expand=True)
 
         self.__treeview.enable_model_drag_dest([
-                ("radio", 0, 0),
-                ("text/uri-list", 0, 1),
-                ("text/plain", 0, 2),
-                ("TEXT", 0, 3),
-                ("STRING", 0, 4),
-                ("COMPOUND_TEXT", 0, 5),
-                ("UTF8_STRING", 0, 6)
+                ("radio", gtk.TARGET_OTHER_APP, 0),
+                ("text/uri-list", gtk.TARGET_OTHER_APP, 1),
+                ("text/plain", gtk.TARGET_OTHER_APP, 2),
+                ("TEXT", gtk.TARGET_OTHER_APP, 3),
+                ("STRING", gtk.TARGET_OTHER_APP, 4),
+                ("COMPOUND_TEXT", gtk.TARGET_OTHER_APP, 5),
+                ("UTF8_STRING", gtk.TARGET_OTHER_APP, 6)
                 ],
                 gtk.gdk.ACTION_COPY
         )

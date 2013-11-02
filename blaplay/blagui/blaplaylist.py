@@ -745,7 +745,8 @@ class BlaQueue(blaguiutils.BlaScrolledWindow):
         self.__treeview.enable_model_drag_dest(
             [("queue", 0, 3)], gtk.gdk.ACTION_COPY)
         self.__treeview.enable_model_drag_source(
-            gtk.gdk.BUTTON1_MASK, [("queue", gtk.TARGET_SAME_WIDGET, 3)],
+            gtk.gdk.BUTTON1_MASK,
+            [("queue", gtk.TARGET_SAME_WIDGET, 3)],
             gtk.gdk.ACTION_COPY)
 
         self.__treeview.connect("popup", popup, blaconst.VIEW_QUEUE, self)
@@ -1224,17 +1225,12 @@ class BlaPlaylist(gtk.VBox):
         # DND between playlists (includes playlist-internal DND)
         self.__treeview.enable_model_drag_source(
             gtk.gdk.BUTTON1_MASK,
-            [("tracks/playlist", gtk.TARGET_SAME_APP, 2)],
+            [blagui.DND_TARGETS[blagui.DND_PLAYLIST]],
             gtk.gdk.ACTION_COPY)
 
         # Receive drag and drop
-        # TODO: define some constants for the DND ids
-        self.__treeview.enable_model_drag_dest(
-            [("tracks/library", gtk.TARGET_SAME_APP, 0),
-             ("tracks/filesystem", gtk.TARGET_SAME_APP, 1),
-             ("tracks/playlist", gtk.TARGET_SAME_APP, 2),
-             ("text/uri-list", gtk.TARGET_OTHER_APP, 3)],
-            gtk.gdk.ACTION_COPY)
+        self.__treeview.enable_model_drag_dest(blagui.DND_TARGETS.values(),
+                                               gtk.gdk.ACTION_COPY)
 
         sw = blaguiutils.BlaScrolledWindow()
         sw.add(self.__treeview)
@@ -1458,12 +1454,12 @@ class BlaPlaylist(gtk.VBox):
         drop_info = self.__treeview.get_dest_row_at_pos(x, y)
 
         # DND from the library browser
-        if info == 0:
+        if info == blagui.DND_LIBRARY:
             uris = pickle.loads(selection_data.data)
             items = create_items_from_uris(uris)
 
         # DND between playlists (this case includes playlist-internal DND)
-        elif info == 2:
+        elif info == blagui.DND_PLAYLIST:
             paths, idx = pickle.loads(selection_data.data)
 
             if drop_info:
@@ -1481,7 +1477,7 @@ class BlaPlaylist(gtk.VBox):
                 drop_info = (path, pos)
 
         # DND from an external location or the filesystem browser
-        elif info in [1, 3]:
+        elif info == blagui.DND_FILESYSTEM or info == blagui.DND_EXTERNAL:
             uris = selection_data.data.strip("\n\r\x00")
             resolve_uri = blautil.resolve_uri
             uris = map(resolve_uri, uris.split())
@@ -2221,14 +2217,11 @@ class BlaPlaylistManager(gtk.Notebook):
         type(self).__instance = self
 
         self.set_scrollable(True)
-        targets = [
-            ("tracks/library", gtk.TARGET_SAME_APP, 0),
-            ("tracks/filesystem", gtk.TARGET_SAME_APP, 1),
-            ("tracks/playlist", gtk.TARGET_SAME_APP, 2),
-            ("text/uri-list", gtk.TARGET_OTHER_APP, 3)
-        ]
+
+        # Set up DND support for the tab strip.
         self.drag_dest_set(gtk.DEST_DEFAULT_MOTION | gtk.DEST_DEFAULT_DROP,
-                           targets, gtk.gdk.ACTION_COPY)
+                           blagui.DND_TARGETS.values(),
+                           gtk.gdk.ACTION_COPY)
 
         # Lock/Unlock playlist button
         self.__lock_button = gtk.Button()
@@ -2290,18 +2283,18 @@ class BlaPlaylistManager(gtk.Notebook):
         resolve = select = False
 
         # DND from the library browser
-        if info == 0:
+        if info == blagui.DND_LIBRARY:
             items = pickle.loads(selection_data.data)
 
         # DND from another playlist
-        elif info == 2:
+        elif info == blagui.DND_PLAYLIST:
             paths, idx = pickle.loads(selection_data.data)
             playlist = self.get_nth_page(idx)
             items = playlist.get_items(paths=paths, remove=True)
             select = True
 
         # DND from the filebrowser or an external source
-        elif info in [1, 3]:
+        elif info == blagui.DND_FILESYSTEM or info == blagui.DND_EXTERNAL:
             uris = selection_data.data.strip("\n\r\x00")
             resolve_uri = blautil.resolve_uri
             items = map(resolve_uri, uris.split())
