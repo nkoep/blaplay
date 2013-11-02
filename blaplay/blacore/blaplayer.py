@@ -284,7 +284,7 @@ class BlaPlayer(gobject.GObject):
         if not self.radio:
             try:
                 return self.__bin.query_position(gst.FORMAT_TIME, None)[0]
-            except gst.QueryError:
+            except (AttributeError, gst.QueryError):
                 pass
         return 0
 
