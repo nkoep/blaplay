@@ -17,7 +17,6 @@
 import os
 import cPickle as pickle
 import time
-import urllib
 import re
 
 import gobject
@@ -616,7 +615,8 @@ class BlaLibraryBrowser(gtk.VBox):
 
     def __drag_data_get(self, drag_context, selection_data, info, timestamp):
         data = self.__treeview.get_tracks()
-        # TODO: we could use set_uris() here as well
+        # TODO: we could use set_uris() here as well which would allow DND
+        #       from the library to external applications like file managers
         data = pickle.dumps(data, protocol=pickle.HIGHEST_PROTOCOL)
         selection_data.set("", 8, data)
 
@@ -1069,9 +1069,8 @@ class BlaFileBrowser(gtk.VBox):
 
     def __drag_data_get(self, drag_context, selection_data, info, timestamp):
         model, paths = self.__treeview.get_selection().get_selected_rows()
-        quote = urllib.quote
-        data = ["file://%s" % quote(model[path][0]) for path in paths]
-        selection_data.set_uris(data)
+        uris = blautil.filepaths2uris([model[path][0] for path in paths])
+        selection_data.set_uris(uris)
 
 class BlaBrowsers(gtk.VBox):
     def __init__(self):

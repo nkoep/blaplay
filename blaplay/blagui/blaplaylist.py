@@ -1225,7 +1225,8 @@ class BlaPlaylist(gtk.VBox):
         # DND between playlists (includes playlist-internal DND)
         self.__treeview.enable_model_drag_source(
             gtk.gdk.BUTTON1_MASK,
-            [blagui.DND_TARGETS[blagui.DND_PLAYLIST]],
+            [blagui.DND_TARGETS[blagui.DND_PLAYLIST],
+             blagui.DND_TARGETS[blagui.DND_URIS]],
             gtk.gdk.ACTION_COPY)
 
         # Receive drag and drop
@@ -1441,10 +1442,14 @@ class BlaPlaylist(gtk.VBox):
 
     def __drag_data_get(self, drag_context, selection_data, info, time):
         idx = BlaPlaylistManager.get_playlist_index(self)
-        data = pickle.dumps((self.get_selected_paths(), idx),
-                            pickle.HIGHEST_PROTOCOL)
-        # TODO: add support for delivering uris to external applications
-        selection_data.set("", 8, data)
+        paths = self.get_selected_paths()
+        if info == blagui.DND_PLAYLIST:
+            data = pickle.dumps((paths, idx), pickle.HIGHEST_PROTOCOL)
+            selection_data.set("", 8, data)
+        elif info == blagui.DND_URIS:
+            items = self.get_items_from_paths(paths)
+            uris = blautil.filepaths2uris([item.uri for item in items])
+            selection_data.set_uris(uris)
 
     def __drag_data_recv(self, drag_context, x, y, selection_data, info, time):
         if not self.modification_allowed():

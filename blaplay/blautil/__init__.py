@@ -113,6 +113,11 @@ def resolve_uris(uris):
         uris[idx] = uri
     return uris
 
+def filepaths2uris(paths):
+    quote = urllib.quote
+    urljoin = urlparse.urljoin
+    return [urljoin("file:", quote(filepath)) for filepath in paths]
+
 def get_mimetype(path):
     file_ = gio.File(path)
     try:
