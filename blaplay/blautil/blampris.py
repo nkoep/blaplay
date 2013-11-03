@@ -20,8 +20,6 @@ import os
 import dbus
 import dbus.service
 from dbus.exceptions import DBusException
-import dbus.mainloop.glib
-dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
 
 from blaplay.blacore import blacfg, blaconst
 from blaplay import blautil
