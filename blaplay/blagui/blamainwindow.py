@@ -316,16 +316,18 @@ class BlaMainWindow(blaguiutils.BlaBaseWindow):
         # shutdown sequence. We also need to stop playback here to avoid
         # problems with gstreamer and bad X windows in case we're playing a
         # video when shutting down.
-        # FIXME: just stopping the player isn't enough as gstreamer uses its
-        #        own playing thread. we somehow need to make sure it actually
-        #        stopped playing before we can destroy the GUI. we might be
-        #        able to fix it by hot-swapping the xvimagesink by a fakesink
+        print_d("Shutting down...")
+
         player.stop()
         self.hide()
         self.__fullscreen_window.hide()
+        # TODO: destroy all additional windows instead of just hiding them.
+        #       windows from which dialogs were run (which have their own event
+        #       loops) will cause segfaults otherwise
         blaguiutils.set_visible(False)
         blagui.tray.set_visible(False)
         self.destroy()
+
         return False
 
     def __hide_windows(self, yes):

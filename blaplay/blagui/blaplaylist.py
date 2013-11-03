@@ -2352,12 +2352,7 @@ class BlaPlaylistManager(gtk.Notebook):
         return False
 
     def __query_name(self, title, default=""):
-        diag = gtk.Dialog(
-            title=title, flags=(gtk.DIALOG_DESTROY_WITH_PARENT |
-                                gtk.DIALOG_MODAL),
-            buttons=(gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL, gtk.STOCK_OK,
-                     gtk.RESPONSE_OK))
-        diag.set_resizable(False)
+        diag = blaguiutils.BlaDialog(title=title)
 
         vbox = gtk.VBox(spacing=5)
         vbox.set_border_width(10)
@@ -2368,6 +2363,7 @@ class BlaPlaylistManager(gtk.Notebook):
         label.set_alignment(xalign=0.0, yalign=0.5)
         vbox.pack_start(label)
         vbox.pack_start(entry)
+
         diag.vbox.pack_start(vbox)
         diag.show_all()
 
@@ -2378,9 +2374,15 @@ class BlaPlaylistManager(gtk.Notebook):
             if response == gtk.RESPONSE_OK:
                 name = entry.get_text()
                 if not name.strip():
+                    # FIXME: if this dialog is present when we quit we get a
+                    #        weird assertion which doesn't seem to have
+                    #        anything to do with this line, followed by a
+                    #        segfault
                     blaguiutils.error_dialog(
-                        "Invalid playlist name", "A playlist name must not "
-                        "consist exclusively of whitespace characters.")
+                        text="Invalid playlist name",
+                        secondary_text="A playlist name must not consist "
+                                        "exclusively of whitespace "
+                                        "characters.")
                     continue
             break
 

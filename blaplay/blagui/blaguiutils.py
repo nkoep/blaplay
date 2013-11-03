@@ -21,46 +21,38 @@ import blaplay
 from blaplay.blacore import blaconst, blacfg
 from blaplay import blautil
 
+# TODO: move these to blabrowsers.py once the required code was moved out of
+#       BlaTreeViewBase
 PADDING_X, PADDING_Y, PADDING_WIDTH, PADDING_HEIGHT = -2, 0, 4, 0
 
 
-def question_dialog(text, secondary_text="", with_cancel_button=False):
-    kwargs = {
-        "flags": gtk.DIALOG_DESTROY_WITH_PARENT|gtk.DIALOG_MODAL,
-        "type": gtk.MESSAGE_QUESTION
-    }
-    if not with_cancel_button:
-        kwargs["buttons"] = gtk.BUTTONS_YES_NO
-    diag = gtk.MessageDialog(**kwargs)
-
-    if with_cancel_button:
-        diag.add_buttons(gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL, gtk.STOCK_NO,
-                         gtk.RESPONSE_NO, gtk.STOCK_YES, gtk.RESPONSE_YES)
-
+def _generic_dialog(text, secondary_text, **kwargs):
+    diag = BlaMessageDialog(**kwargs)
     diag.set_property("text", text)
     diag.set_property("secondary-text", secondary_text)
+    return diag
+
+def question_dialog(text, secondary_text="", with_cancel_button=False,
+                    parent=None):
+    buttons = [gtk.STOCK_NO, gtk.RESPONSE_NO, gtk.STOCK_YES, gtk.RESPONSE_YES]
+    if with_cancel_button:
+        buttons = [gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL] + buttons
+    diag = _generic_dialog(text, secondary_text, parent=parent,
+                           type=gtk.MESSAGE_QUESTION)
+    diag.add_buttons(*buttons)
     response = diag.run()
     diag.destroy()
+    return response
 
-    if with_cancel_button:
-        return response
-    return True if response == gtk.RESPONSE_YES else False
-
-def warning_dialog(text, secondary_text):
-    diag = gtk.MessageDialog(
-        flags=gtk.DIALOG_DESTROY_WITH_PARENT|gtk.DIALOG_MODAL,
-        type=gtk.MESSAGE_WARNING, buttons=gtk.BUTTONS_OK)
-    diag.set_property("text", text)
-    diag.set_property("secondary-text", secondary_text)
+def warning_dialog(text, secondary_text, parent=None):
+    diag = _generic_dialog(text, secondary_text, parent=parent,
+                           type=gtk.MESSAGE_WARNING, buttons=gtk.BUTTONS_OK)
     diag.run()
     diag.destroy()
 
-def error_dialog(text, secondary_text=""):
-    diag = gtk.MessageDialog(
-        flags=gtk.DIALOG_DESTROY_WITH_PARENT|gtk.DIALOG_MODAL,
-        type=gtk.MESSAGE_ERROR, buttons=gtk.BUTTONS_OK)
-    diag.set_property("text", text)
-    diag.set_property("secondary-text", secondary_text)
+def error_dialog(text, secondary_text="", parent=None):
+    diag = _generic_dialog(text, secondary_text, parent=parent,
+                           type=gtk.MESSAGE_ERROR, buttons=gtk.BUTTONS_OK)
     diag.run()
     diag.destroy()
 
@@ -72,10 +64,22 @@ def set_visible(state):
     map(f, BlaWindow.instances)
 
 
-class BlaScrolledWindow(gtk.ScrolledWindow):
-    def __init__(self):
-        super(BlaScrolledWindow, self).__init__()
-        self.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
+class BlaDialog(gtk.Dialog):
+    def __init__(self, *args, **kwargs):
+        kwargs["parent"] = kwargs.get("parent", None) or blaplay.bla.window
+        kwargs["flags"] = gtk.DIALOG_DESTROY_WITH_PARENT | gtk.DIALOG_MODAL
+        if "buttons" not in kwargs:
+            kwargs["buttons"] = (gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL,
+                                 gtk.STOCK_OK, gtk.RESPONSE_OK)
+        super(BlaDialog, self).__init__(*args, **kwargs)
+        self.set_resizable(False)
+
+class BlaMessageDialog(gtk.MessageDialog):
+    def __init__(self, *args, **kwargs):
+        kwargs["parent"] = kwargs.get("parent", None) or blaplay.bla.window
+        kwargs["flags"] = gtk.DIALOG_DESTROY_WITH_PARENT | gtk.DIALOG_MODAL
+        super(BlaMessageDialog, self).__init__(*args, **kwargs)
+        self.set_resizable(False)
 
 class BlaCellRendererBase(gtk.GenericCellRenderer):
     def __init__(self):
@@ -95,6 +99,12 @@ class BlaCellRendererBase(gtk.GenericCellRenderer):
 
     def do_get_property(self, prop):
         return getattr(self, prop.name)
+
+# TODO: move the window classes to their own file
+class BlaScrolledWindow(gtk.ScrolledWindow):
+    def __init__(self):
+        super(BlaScrolledWindow, self).__init__()
+        self.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
 
 class BlaBaseWindow(gtk.Window):
     """
@@ -195,13 +205,12 @@ class BlaBaseWindow(gtk.Window):
             self.maximize()
         elif not self.__was_maximized:
             # If the window was not already maximized before we maximized it
-            # restore the old state here, i.e. unmaximize the window again.
+            # restore the old state here, i.e. unmaximize the w/indow again.
             self.unmaximize()
 
 class BlaWindow(BlaBaseWindow):
     __gsignals__ = {
-        "close_accel": (gobject.SIGNAL_RUN_LAST | gobject.SIGNAL_ACTION,
-                        gobject.TYPE_NONE, ())
+        "close_accel": blautil.signal(0)
     }
 
     instances = []
@@ -214,7 +223,7 @@ class BlaWindow(BlaBaseWindow):
         close_on_escape = kwargs.pop("close_on_escape", True)
 
         super(BlaWindow, self).__init__(*args, **kwargs)
-        type(self).instances.append(self)
+        self.instances.append(self)
         if dialog:
             self.set_type_hint(gtk.gdk.WINDOW_TYPE_HINT_DIALOG)
         self.set_destroy_with_parent(True)
@@ -261,13 +270,14 @@ class BlaWindow(BlaBaseWindow):
 
     def __destroy(self, *args):
         try:
-            type(self).instances.remove(self)
+            self.instances.remove(self)
         except ValueError:
             return
 
     def do_close_accel(self):
         self.__clicked()
 
+# FIXME: use the BlaSingletonMeta metaclass from blautils instead
 class BlaUniqueWindow(BlaWindow):
     __window = None
 
@@ -311,7 +321,7 @@ class BlaTreeViewBase(gtk.TreeView):
             "set_button_event_handlers", True)
 
         super(BlaTreeViewBase, self).__init__(*args, **kwargs)
-        type(self).instances.append(self)
+        self.instances.append(self)
 
         if blacfg.getboolean("colors", "overwrite") and self.__multicol:
             name = blaconst.STYLE_NAME
@@ -319,7 +329,6 @@ class BlaTreeViewBase(gtk.TreeView):
             name = ""
         self.set_name(name)
         self.set_enable_search(False)
-        self.set_fixed_height_mode(True)
         self.get_selection().set_mode(gtk.SELECTION_MULTIPLE)
 
         self.__pending = False
@@ -401,9 +410,9 @@ class BlaTreeViewBase(gtk.TreeView):
         self.grab_focus()
         selection = self.get_selection()
 
-        x, y = map(int, [event.x, event.y])
         try:
-            path, column = self.get_path_at_pos(x, y)[:2]
+            path, column = self.get_path_at_pos(
+                *map(int, [event.x, event.y]))[:2]
         except TypeError:
             # If the click event didn't hit a row check if we allow deselecting
             # all rows in the view and do so if we do.
@@ -425,12 +434,14 @@ class BlaTreeViewBase(gtk.TreeView):
             gtk.gdk.CONTROL_MASK | gtk.gdk.SHIFT_MASK)
 
         if event.button == 1:
-            if path_selected and not mod_active:
-                self.__pending = True
-                self.__allow_selection(False)
-            else:
-                self.__pending = False
-                self.__allow_selection(True)
+            # The __pending variable is used to signal to the button release
+            # event handler that a normal button press event (no modifier)
+            # occured on an already selected path. This is the situation at the
+            # beginning of a DND operation. In this case we have to disallow
+            # that the default button press handler selects the clicked path,
+            # hence the negation of __pending when calling __allow_selection().
+            self.__pending = path_selected and not mod_active
+            self.__allow_selection(not self.__pending)
 
         elif event.button == 3:
             self.__allow_selection(True)
@@ -444,21 +455,27 @@ class BlaTreeViewBase(gtk.TreeView):
         return False
 
     def __button_release_event(self, event):
-        self.__allow_selection(True)
-        if (self.__pending and not self.__dragging and
-            not self.is_rubber_banding_active()):
-            self.__pending = False
+        if event.button not in [1, 2, 3]:
+            return True
 
-            # Ignore button release events after aborted DND operations.
-            if self.__drag_aborted:
-                self.__drag_aborted = False
-                return False
-            try:
-                path, column = self.get_path_at_pos(
-                    *map(int, [event.x, event.y]))[:2]
-                self.set_cursor(path, column, 0)
-            except TypeError:
-                pass
+        self.__allow_selection(True)
+
+        if (not self.__pending or self.__dragging or
+            self.is_rubber_banding_active()):
+            return False
+
+        # Ignore button release events after aborted DND operations.
+        if self.__drag_aborted:
+            self.__drag_aborted = False
+            return False
+        try:
+            path, column = self.get_path_at_pos(
+                *map(int, [event.x, event.y]))[:2]
+            self.set_cursor(path, column, 0)
+        except TypeError:
+            pass
+
+        self.__pending = False
 
         return False
 

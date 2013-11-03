@@ -294,12 +294,7 @@ class BlaEventBrowser(blaguiutils.BlaScrolledWindow):
         blautil.serialize_to_file(events, blaconst.EVENTS_PATH)
 
     def __change_location(self, button, location):
-        diag = gtk.Dialog(title="Change location",
-                buttons=(gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL,
-                gtk.STOCK_OK, gtk.RESPONSE_OK),
-                flags=gtk.DIALOG_DESTROY_WITH_PARENT|gtk.DIALOG_MODAL
-        )
-        diag.set_resizable(False)
+        diag = blaguiutils.BlaDialog(title="Change location")
 
         # country list
         country = blacfg.getstring("general", "events.country")

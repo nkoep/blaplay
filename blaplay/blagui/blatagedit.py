@@ -270,8 +270,10 @@ class BlaTagedit(blaguiutils.BlaWindow):
     def __apply_and_close(self, *args):
         response = gtk.RESPONSE_YES
         if self.__tracks:
-            response = blaguiutils.question_dialog("There are unsaved "
-                    "modifications.", "Save changes?", with_cancel_button=True)
+            response = blaguiutils.question_dialog(
+                text="There are unsaved modifications.",
+                secondary_text="Save changes?", with_cancel_button=True,
+                parent=self)
             if response == gtk.RESPONSE_YES: self.__apply()
         if response != gtk.RESPONSE_CANCEL: self.destroy()
 
@@ -316,7 +318,7 @@ class BlaTagedit(blaguiutils.BlaWindow):
         if l > 0 and succeeded != l:
             blaguiutils.warning_dialog("Failed to write tags on %d of %d "
                     "files." % ((l-succeeded), l), "This usually indicates "
-                    "missing resources."
+                    "missing resources.", parent=self
             )
 
     def __update_selection(self):
@@ -424,12 +426,8 @@ class BlaTagedit(blaguiutils.BlaWindow):
         else: renderer.set_property("text", value)
 
     def __add_tag(self, *args):
-        diag = gtk.Dialog(title="Add tag", buttons=(gtk.STOCK_CANCEL,
-                gtk.RESPONSE_CANCEL, gtk.STOCK_OK, gtk.RESPONSE_OK),
-                flags=gtk.DIALOG_DESTROY_WITH_PARENT|gtk.DIALOG_MODAL
-        )
+        diag = blaguiutils.BlaDialog(parent=self, title="Add tag")
         diag.set_size_request(250, -1)
-        diag.set_resizable(False)
 
         table = gtk.Table(columns=2, rows=2, homogeneous=False)
         entry_name = gtk.Entry()

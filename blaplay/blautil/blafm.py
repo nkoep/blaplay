@@ -424,11 +424,11 @@ class BlaScrobbler(object):
     @classmethod
     def __request_authorization(cls):
         from blaplay.blagui import blaguiutils
-        if blaguiutils.question_dialog(
+        response = blaguiutils.question_dialog(
             "last.fm authorization required", "In order to submit tracks to "
             "the last.fm scrobbler, blaplay needs to be authorized to use "
-            "your account. Open the last.fm authorization page now?"):
-            # TODO: check if gtkwebkit is available and use a webview instead
+            "your account. Open the last.fm authorization page now?")
+        if response == gtk.RESPONSE_YES:
             blautil.open_url(
                 "http://www.last.fm/api/auth/?api_key=%s&token=%s" % (
                 blaconst.LASTFM_APIKEY, cls.__token))

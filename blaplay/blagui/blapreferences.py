@@ -485,12 +485,8 @@ class BlaPreferences(blaguiutils.BlaUniqueWindow):
             player.enable_equalizer(True)
 
         def __new_profile(self, button, combobox):
-            diag = gtk.Dialog(title="New EQ profile",
-                    flags=gtk.DIALOG_DESTROY_WITH_PARENT|gtk.DIALOG_MODAL,
-                    buttons=(gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL,
-                    gtk.STOCK_OK, gtk.RESPONSE_OK)
-            )
-            diag.set_resizable(False)
+            diag = blaguiutils.BlaDialog(parent=self.get_toplevel(),
+                                         title="New EQ profile")
             vbox = gtk.VBox(spacing=5)
             vbox.set_border_width(10)
             entry = gtk.Entry()
@@ -508,12 +504,10 @@ class BlaPreferences(blaguiutils.BlaUniqueWindow):
 
             if response == gtk.RESPONSE_OK and profile_name:
                 if blacfg.has_option("equalizer.profiles",  profile_name):
-                    diag = gtk.Dialog(
-                            "Profile exists!", self,
-                            gtk.DIALOG_DESTROY_WITH_PARENT|gtk.DIALOG_MODAL,
-                            (gtk.STOCK_NO, gtk.RESPONSE_NO, gtk.STOCK_YES,
-                            gtk.RESPONSE_YES)
-                    )
+                    diag = blaguiutils.BlaDialog(
+                        parent=self.get_toplevel(), title="Profile exists!",
+                        buttons=(gtk.STOCK_NO, gtk.RESPONSE_NO,
+                                 gtk.STOCK_YES, gtk.RESPONSE_YES))
                     diag.vbox.pack_start(gtk.Label("Overwrite profile?"))
                     diag.show_all()
                     response = diag.run()
