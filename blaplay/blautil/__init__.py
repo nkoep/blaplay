@@ -42,7 +42,8 @@ def clamp(min_, max_, value):
     return max(min_, min(max_, value))
 
 def signal(n_args):
-    return (gobject.SIGNAL_RUN_LAST, gobject.TYPE_NONE, (object,) * n_args)
+    return (gobject.SIGNAL_RUN_LAST | gobject.SIGNAL_ACTION,
+            gobject.TYPE_NONE, (object,) * n_args)
 
 def thread(f):
     @functools.wraps(f)
