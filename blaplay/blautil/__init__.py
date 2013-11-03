@@ -45,39 +45,56 @@ def signal(n_args):
     return (gobject.SIGNAL_RUN_LAST | gobject.SIGNAL_ACTION,
             gobject.TYPE_NONE, (object,) * n_args)
 
-def thread(f):
-    @functools.wraps(f)
+def thread(func):
+    @functools.wraps(func)
     def wrapper(*args, **kwargs):
-        t = BlaThread(target=f, args=args, kwargs=kwargs)
+        t = BlaThread(target=func, args=args, kwargs=kwargs)
         t.daemon = True
         t.start()
         return t
     return wrapper
 
-def thread_nondaemonic(f):
-    @functools.wraps(f)
+def thread_nondaemonic(func):
+    @functools.wraps(func)
     def wrapper(*args, **kwargs):
-        t = Thread(target=f, args=args, kwargs=kwargs)
+        t = Thread(target=func, args=args, kwargs=kwargs)
         t.start()
         return t
     return wrapper
 
-# TODO: add optional argument to adjust the priority
-def idle(f):
-    @functools.wraps(f)
+def idle(func=None, **kwargs):
+    # There is one case we cannot avoid which is `@idle(some_callable)' as this
+    # looks like the regular use case
+    #   @idle
+    #   def some_func...
+    # to us. Every other misuse should be handled properly though.
+
+    if len(kwargs) > 1:
+        raise ValueError("Only one keyword argument allowed")
+    elif kwargs and "priority" not in kwargs:
+        raise ValueError("Invalid keyword argument '%s'" % kwargs.keys()[0])
+
+    if func is None:
+        if not kwargs:
+            raise ValueError("Keyword argument 'priority' expected")
+        def wrapper(func):
+            return idle(func, **kwargs)
+        return wrapper
+
+    @functools.wraps(func)
     def wrapper(*args):
-        gobject.idle_add(f, *args)
+        priority = kwargs.get("priority", gobject.PRIORITY_DEFAULT_IDLE)
+        gobject.idle_add(func, *args, priority=priority)
     return wrapper
 
-# There's nothing complicated about this decorator at all...
 def lock(lock_):
-    def func(f):
-        @functools.wraps(f)
+    def wrapper_(func):
+        @functools.wraps(func)
         def wrapper(*args, **kwargs):
             with lock_:
-                f(*args, **kwargs)
+                func(*args, **kwargs)
         return wrapper
-    return func
+    return wrapper_
 
 def toss_extension(filepath):
     return os.path.splitext(filepath)[0]
