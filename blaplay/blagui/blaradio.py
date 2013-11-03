@@ -235,9 +235,7 @@ class BlaRadio(gtk.VBox):
 
         # DND from an external location
         else:
-            uris = selection_data.data.strip("\n\r\x00")
-            resolve_uri = blautil.resolve_uri
-            uris = map(resolve_uri, uris.replace("\r", "").split("\n"))
+            uris = blautil.resolve_uris(selection_data.get_uris())
             map(self.__add_station, uris)
 
     def __update_rows(self):

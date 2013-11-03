@@ -24,12 +24,11 @@ from blaplay.blautil import blafm
 from blaguiutils import BlaTreeViewBase
 
 # DND constants
-DND_LIBRARY, DND_FILESYSTEM, DND_PLAYLIST, DND_EXTERNAL = xrange(4)
+DND_LIBRARY, DND_PLAYLIST, DND_URIS = xrange(3)
 DND_TARGETS = {
     DND_LIBRARY: ("tracks/library", gtk.TARGET_SAME_APP, DND_LIBRARY),
-    DND_FILESYSTEM: ("tracks/filesystem", gtk.TARGET_SAME_APP, DND_FILESYSTEM),
     DND_PLAYLIST: ("tracks/playlist", gtk.TARGET_SAME_APP, DND_PLAYLIST),
-    DND_EXTERNAL: ("text/uri-list", gtk.TARGET_OTHER_APP, DND_EXTERNAL)
+    DND_URIS: ("text/uri-list", 0, DND_URIS)
 }
 
 uimanager = None

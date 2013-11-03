@@ -102,10 +102,16 @@ def toss_extension(filepath):
 def get_extension(filepath):
     return filepath.split(".")[-1]
 
-def resolve_uri(uri):
-    uri = urlparse.urlparse(uri).path
-    uri = os.path.abspath(urllib.url2pathname(uri))
-    return uri
+def resolve_uris(uris):
+    # The argument might be a tuple or a list. Either way turn it into a new
+    # list so we don't mutate the iterable `uris' references when first calling
+    # this function.
+    uris = list(uris)
+    for idx, uri in enumerate(uris):
+        uri = urlparse.urlparse(uri).path
+        uri = os.path.abspath(urllib.url2pathname(uri))
+        uris[idx] = uri
+    return uris
 
 def get_mimetype(path):
     file_ = gio.File(path)

@@ -743,7 +743,7 @@ class BlaQueue(blaguiutils.BlaScrolledWindow):
         self.add(self.__treeview)
 
         self.__treeview.enable_model_drag_dest(
-            [("queue", 0, 3)], gtk.gdk.ACTION_COPY)
+            [("queue", gtk.TARGET_SAME_WIDGET, 3)], gtk.gdk.ACTION_COPY)
         self.__treeview.enable_model_drag_source(
             gtk.gdk.BUTTON1_MASK,
             [("queue", gtk.TARGET_SAME_WIDGET, 3)],
@@ -1443,6 +1443,7 @@ class BlaPlaylist(gtk.VBox):
         idx = BlaPlaylistManager.get_playlist_index(self)
         data = pickle.dumps((self.get_selected_paths(), idx),
                             pickle.HIGHEST_PROTOCOL)
+        # TODO: add support for delivering uris to external applications
         selection_data.set("", 8, data)
 
     def __drag_data_recv(self, drag_context, x, y, selection_data, info, time):
@@ -1476,12 +1477,10 @@ class BlaPlaylist(gtk.VBox):
                 path = self.get_path_from_item(item)
                 drop_info = (path, pos)
 
-        # DND from an external location or the filesystem browser
-        elif info == blagui.DND_FILESYSTEM or info == blagui.DND_EXTERNAL:
-            uris = selection_data.data.strip("\n\r\x00")
-            resolve_uri = blautil.resolve_uri
-            uris = map(resolve_uri, uris.split())
-            uris = library.parse_ool_uris(uris)
+        # DND from the filesystem browser or an external location
+        elif info == blagui.DND_URIS:
+            uris = library.parse_ool_uris(
+                blautil.resolve_uris(selection_data.get_uris()))
             items = create_items_from_uris(uris)
 
         # FIXME: if we don't add anything here GTK issues an assertion warning
@@ -2173,7 +2172,7 @@ class BlaPlaylist(gtk.VBox):
         # Wrap the actual heavy lifting in gobject.idle_add. If we decorate the
         # instance method itself we can't use kwargs anymore which is rather
         # annoying for this particular method due to the number of arguments.
-        @blautil.idle
+        @blautil.idle(priority=gobject.PRIORITY_HIGH)
         def set_row():
             try:
                 low, high = self.__treeview.get_visible_range()
@@ -2294,10 +2293,9 @@ class BlaPlaylistManager(gtk.Notebook):
             select = True
 
         # DND from the filebrowser or an external source
-        elif info == blagui.DND_FILESYSTEM or info == blagui.DND_EXTERNAL:
-            uris = selection_data.data.strip("\n\r\x00")
-            resolve_uri = blautil.resolve_uri
-            items = map(resolve_uri, uris.split())
+        elif info == blagui.DND_URIS:
+            items = blautil.resolve_uris(selection_data.get_uris())
+            # FIXME: find a better solution than the resolve flag
             resolve = True
 
         self.send_to_new_playlist(items, resolve=resolve, select=select)
@@ -2611,8 +2609,7 @@ class BlaPlaylistManager(gtk.Notebook):
         if uris is None:
             return False
 
-        resolve_uri = blautil.resolve_uri
-        uris = library.parse_ool_uris(map(resolve_uri, uris))
+        uris = library.parse_ool_uris(blautil.resolve_uris(uris))
         if uris is None:
             return False
         playlist = cls.__instance.add_playlist(focus=True, name=name)

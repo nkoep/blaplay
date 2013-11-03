@@ -616,6 +616,7 @@ class BlaLibraryBrowser(gtk.VBox):
 
     def __drag_data_get(self, drag_context, selection_data, info, timestamp):
         data = self.__treeview.get_tracks()
+        # TODO: we could use set_uris() here as well
         data = pickle.dumps(data, protocol=pickle.HIGHEST_PROTOCOL)
         selection_data.set("", 8, data)
 
@@ -839,7 +840,7 @@ class BlaFileBrowser(gtk.VBox):
         self.__treeview.set_search_column(2)
         self.__treeview.enable_model_drag_source(
             gtk.gdk.BUTTON1_MASK,
-            [blagui.DND_TARGETS[blagui.DND_FILESYSTEM]],
+            [blagui.DND_TARGETS[blagui.DND_URIS]],
             gtk.gdk.ACTION_COPY)
         self.__treeview.connect_object(
             "drag_data_get", BlaFileBrowser.__drag_data_get, self)
@@ -1070,7 +1071,7 @@ class BlaFileBrowser(gtk.VBox):
         model, paths = self.__treeview.get_selection().get_selected_rows()
         quote = urllib.quote
         data = ["file://%s" % quote(model[path][0]) for path in paths]
-        selection_data.set("tracks", 8, "\n".join(data))
+        selection_data.set_uris(data)
 
 class BlaBrowsers(gtk.VBox):
     def __init__(self):
