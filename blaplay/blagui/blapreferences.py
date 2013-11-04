@@ -24,12 +24,13 @@ player = blaplay.bla.player
 library = blaplay.bla.library
 from blaplay.blacore import blacfg, blaconst
 from blaplay import blagui
-from blaplay.blagui import blaguiutils
-from blaplay.blagui.blabrowsers import BlaBrowsers
-from blaplay.blagui.blavisualization import BlaVisualization
+from blawindows import BlaUniqueWindow, BlaScrolledWindow
+from blabrowsers import BlaBrowsers
+from blavisualization import BlaVisualization
+import blaguiutils
 
 
-class BlaPreferences(blaguiutils.BlaUniqueWindow):
+class BlaPreferences(BlaUniqueWindow):
     class GeneralSettings(gtk.VBox):
         def __init__(self):
             super(BlaPreferences.GeneralSettings, self).__init__(spacing=10)
@@ -177,7 +178,7 @@ class BlaPreferences(blaguiutils.BlaUniqueWindow):
             treeview.insert_column_with_attributes(
                     -1, "Directories", r, text=0)
 
-            sw = blaguiutils.BlaScrolledWindow()
+            sw = BlaScrolledWindow()
             sw.set_shadow_type(gtk.SHADOW_IN)
             sw.set_size_request(-1, 140)
             sw.add(treeview)

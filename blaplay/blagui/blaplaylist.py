@@ -35,12 +35,13 @@ player = blaplay.bla.player
 library = blaplay.bla.library
 from blaplay.blacore import blaconst, blacfg
 from blaplay import blautil, blagui
+from blaplay.formats._identifiers import *
 from blaview import BlaViewMeta
+from blawindows import BlaScrolledWindow
 from blaplay.blautil import blafm
 from blastatusbar import BlaStatusbar
 from blatagedit import BlaTagedit
-from blaplay.blagui import blaguiutils
-from blaplay.formats._identifiers import *
+import blaguiutils
 
 (COLUMN_QUEUE_POSITION, COLUMN_PLAYING, COLUMN_TRACK, COLUMN_ARTIST,
  COLUMN_TITLE, COLUMN_ALBUM, COLUMN_DURATION, COLUMN_ALBUM_ARTIST, COLUMN_YEAR,
@@ -717,7 +718,7 @@ class BlaListItem(object):
         if self.playlist:
             self.playlist.update_icon(clear=True)
 
-class BlaQueue(blaguiutils.BlaScrolledWindow):
+class BlaQueue(BlaScrolledWindow):
     __metaclass__ = BlaViewMeta("Queue")
 
     __layout = (
@@ -1233,7 +1234,7 @@ class BlaPlaylist(gtk.VBox):
         self.__treeview.enable_model_drag_dest(blagui.DND_TARGETS.values(),
                                                gtk.gdk.ACTION_COPY)
 
-        sw = blaguiutils.BlaScrolledWindow()
+        sw = BlaScrolledWindow()
         sw.add(self.__treeview)
 
         self.clear()

@@ -31,8 +31,9 @@ from blaplay.blacore import blacfg, blaconst
 from blaplay import blautil
 from blaplay.blautil import blafm
 from blaview import BlaViewMeta
-from blaplay.blagui import blaguiutils
+from blawindows import BlaScrolledWindow
 from blareleasebrowser import IMAGE_SIZE, BlaCellRendererPixbuf
+import blaguiutils
 
 class BlaEvent(object):
     __EMPTY_PIXBUF = gtk.gdk.Pixbuf(gtk.gdk.COLORSPACE_RGB, True, 8,
@@ -111,7 +112,7 @@ class BlaEvent(object):
         self.image = pixbuf or BlaEvent.__EMPTY_PIXBUF
         return path
 
-class BlaEventBrowser(blaguiutils.BlaScrolledWindow):
+class BlaEventBrowser(BlaScrolledWindow):
     __metaclass__ = BlaViewMeta("Events")
 
     __count_recommended = 0

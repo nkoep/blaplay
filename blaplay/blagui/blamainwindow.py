@@ -25,7 +25,7 @@ library = blaplay.bla.library
 from blaplay.blacore import blaconst, blacfg
 from blaplay import blautil, blagui
 from blaplay.formats._identifiers import *
-from blaplay.blagui import blaguiutils, blapreferences
+from blawindows import BlaBaseWindow
 from blakeys import BlaKeys
 from blatoolbar import BlaToolbar
 from blabrowsers import BlaBrowsers
@@ -35,9 +35,10 @@ from blaview import BlaView
 from blastatusbar import BlaStatusbar
 from blapreferences import BlaPreferences
 from blaabout import BlaAbout
+import blaguiutils
 
 
-class BlaMainWindow(blaguiutils.BlaBaseWindow):
+class BlaMainWindow(BlaBaseWindow):
     __BORDER_WIDTH = 3
 
     __is_fullscreen = False

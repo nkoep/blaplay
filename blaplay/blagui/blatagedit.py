@@ -26,9 +26,10 @@ import pango
 import blaplay
 library = blaplay.bla.library
 from blaplay import blautil, blagui
-from blaplay.blagui import blaguiutils
 from blaplay.formats._blatrack import BlaTrack
 from blaplay.formats._identifiers import *
+from blawindows import BlaWindow, BlaScrolledWindow
+import blaguiutils
 
 
 class BlaTreeView(gtk.TreeView):
@@ -149,7 +150,7 @@ class BlaTreeView(gtk.TreeView):
         self.__old_value = ""
         self.__old_path = None
 
-class BlaTagedit(blaguiutils.BlaWindow):
+class BlaTagedit(BlaWindow):
     def __init__(self, uris):
         super(BlaTagedit, self).__init__(with_closebutton=False,
                 with_cancelbutton=False, close_on_escape=False)
@@ -204,7 +205,7 @@ class BlaTagedit(blaguiutils.BlaWindow):
         paned = gtk.HPaned()
 
         # the file list
-        sw = blaguiutils.BlaScrolledWindow()
+        sw = BlaScrolledWindow()
         sw.set_shadow_type(gtk.SHADOW_OUT)
 
         self.__file_list = BlaTreeView(allow_no_selection=False)
@@ -504,7 +505,7 @@ class BlaTagedit(blaguiutils.BlaWindow):
         map(selection.select_path, paths)
 
     def __setup_page(self, is_editable):
-        sw = blaguiutils.BlaScrolledWindow()
+        sw = BlaScrolledWindow()
 
         model = gtk.ListStore(gobject.TYPE_PYOBJECT, gobject.TYPE_PYOBJECT)
         tv = BlaTreeView(model, is_editable=is_editable)

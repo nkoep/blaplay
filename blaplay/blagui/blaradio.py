@@ -27,9 +27,10 @@ player = blaplay.bla.player
 from blaplay.blacore import blacfg, blaconst
 from blaplay import blautil, blagui
 from blaview import BlaViewMeta
+from blawindows import BlaScrolledWindow
 from blaplay.formats._blatrack import BlaTrack
 from blaplay.formats._identifiers import LENGTH, TITLE
-from blaplay.blagui import blaguiutils
+import blaguiutils
 
 
 def parse_uri(uri):
@@ -161,7 +162,7 @@ class BlaRadio(gtk.VBox):
             c.set_cell_data_func(r, cell_data_func, identifier)
             self.__treeview.append_column(c)
 
-        sw = blaguiutils.BlaScrolledWindow()
+        sw = BlaScrolledWindow()
         sw.set_shadow_type(gtk.SHADOW_IN)
         sw.add(self.__treeview)
 

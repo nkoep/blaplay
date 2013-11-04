@@ -30,11 +30,12 @@ import blaplay
 library = blaplay.bla.library
 from blaplay.blacore import blaconst, blacfg
 from blaplay import blautil, blagui
+from blaplay.formats._identifiers import *
+from blawindows import BlaScrolledWindow
 from blaplaylist import BlaPlaylistManager, BlaQueue
 from blavisualization import BlaVisualization
 from blatagedit import BlaTagedit
-from blaplay.blagui import blaguiutils
-from blaplay.formats._identifiers import *
+import blaguiutils
 
 
 class BlaCellRenderer(blaguiutils.BlaCellRendererBase):
@@ -541,7 +542,7 @@ class BlaLibraryBrowser(gtk.VBox):
         self.__treeview.connect_object(
             "drag_data_get", BlaLibraryBrowser.__drag_data_get, self)
 
-        sw = blaguiutils.BlaScrolledWindow()
+        sw = BlaScrolledWindow()
         sw.add(self.__treeview)
 
         hbox = gtk.HBox()
@@ -899,7 +900,7 @@ class BlaFileBrowser(gtk.VBox):
         self.__update_directory(self.__directory)
         self.__treeview.columns_autosize()
 
-        sw = blaguiutils.BlaScrolledWindow()
+        sw = BlaScrolledWindow()
         sw.add(self.__treeview)
         vbox.pack_start(sw, expand=True)
 

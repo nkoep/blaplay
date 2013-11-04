@@ -26,10 +26,11 @@ player = blaplay.bla.player
 library = blaplay.bla.library
 from blaplay.blacore import blaconst, blacfg
 from blaplay import blautil, blagui
+from blaplay.formats._identifiers import *
+from blawindows import BlaScrolledWindow
 from blastatusbar import BlaStatusbar
 from blaplay.blautil import blametadata
-from blaplay.blagui import blaguiutils
-from blaplay.formats._identifiers import *
+import blaguiutils
 
 
 class BlaSidePane(gtk.VBox):
@@ -273,7 +274,7 @@ class BlaSidePane(gtk.VBox):
         self.__tv.set_wrap_mode(gtk.WRAP_WORD)
         self.__tv.set_justification(gtk.JUSTIFY_CENTER)
 
-        sw = blaguiutils.BlaScrolledWindow()
+        sw = BlaScrolledWindow()
         sw.set_shadow_type(gtk.SHADOW_NONE)
         sw.add(self.__tv)
         self.__style = self.__tv.get_modifier_style().copy()
@@ -292,7 +293,7 @@ class BlaSidePane(gtk.VBox):
         self.__tv2.set_wrap_mode(gtk.WRAP_WORD)
         self.__tv2.set_justification(gtk.JUSTIFY_CENTER)
 
-        sw2 = blaguiutils.BlaScrolledWindow()
+        sw2 = BlaScrolledWindow()
         sw2.set_shadow_type(gtk.SHADOW_NONE)
         sw2.add(self.__tv2)
         self.__tb2 = self.__tv2.get_buffer()

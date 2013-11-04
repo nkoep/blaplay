@@ -32,7 +32,8 @@ from blaplay.blacore import blacfg, blaconst
 from blaplay import blautil
 from blaplay.blautil import blafm
 from blaview import BlaViewMeta
-from blaplay.blagui import blaguiutils
+from blawindows import BlaScrolledWindow
+import blaguiutils
 
 IMAGE_SIZE = 65
 
@@ -161,7 +162,7 @@ class BlaRelease(object):
         self.cover = pixbuf or BlaRelease.__EMPTY_PIXBUF
         return path
 
-class BlaReleaseBrowser(blaguiutils.BlaScrolledWindow):
+class BlaReleaseBrowser(BlaScrolledWindow):
     __metaclass__ = BlaViewMeta("New Releases")
 
     __count_library = 0
