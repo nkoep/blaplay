@@ -616,6 +616,12 @@ class BlaView(gtk.HPaned):
         view_prev = blacfg.getint("general", "view")
         blacfg.set("general", "view", view)
 
+        if player.video:
+            # If the previous view was the video view coerce the cover art
+            # display into acting as new video canvas.
+            cls.__side_pane.cover_display.use_as_video_canvas(
+                view != blaconst.VIEW_VIDEO)
+
         child = cls.__container.get_child()
         if child is not None:
             cls.__container.remove(child)
@@ -623,12 +629,6 @@ class BlaView(gtk.HPaned):
         if child.get_parent() is not None:
             child.unparent()
         cls.__container.add(child)
-
-        if player.video:
-            # If the previous view was the video view coerce the cover art
-            # display into acting as new video canvas.
-            cls.__side_pane.cover_display.use_as_video_canvas(
-                view != blaconst.VIEW_VIDEO)
         child.update_statusbar()
 
         # not all menu items are available for all views so update them
