@@ -598,8 +598,6 @@ class BlaPreferences(blaguiutils.BlaUniqueWindow):
                               checkbutton.get_active())
 
     def __init__(self, *args):
-        if self.is_not_unique(): return
-
         super(BlaPreferences, self).__init__()
 
         self.set_resizable(False)

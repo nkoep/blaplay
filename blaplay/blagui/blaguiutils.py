@@ -277,32 +277,8 @@ class BlaWindow(BlaBaseWindow):
     def do_close_accel(self):
         self.__clicked()
 
-# FIXME: use the BlaSingletonMeta metaclass from blautils instead
 class BlaUniqueWindow(BlaWindow):
-    __window = None
-
-    def __new__(cls, *args):
-        window = cls.__window
-        if window is None:
-            return super(BlaUniqueWindow, cls).__new__(cls, *args)
-        window.present()
-        return window
-
-    @classmethod
-    def is_not_unique(cls):
-        if cls.__window:
-            return True
-
-    def __init__(self, *args, **kwargs):
-        if type(self).__window:
-            return
-        else:
-            type(self).__window = self
-        super(BlaUniqueWindow, self).__init__(*args, **kwargs)
-        self.connect_object("destroy", self.__destroy, self)
-
-    def __destroy(self, *args):
-        type(self).__window = None
+    __metaclass__ = blautil.BlaSingletonMeta
 
 class BlaTreeViewBase(gtk.TreeView):
     __gsignals__ = {
