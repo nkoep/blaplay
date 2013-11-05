@@ -302,8 +302,7 @@ class BlaMpris(dbus.service.Object):
     @dbus.service.method(dbus_interface=INTERFACE_BASE)
     def Quit(self):
         import blaplay
-        # TODO: is it necessary to pass window to shutdown()?
-        blaplay.shutdown(self.__bla.window)
+        blaplay.bla.shutdown()
 
     # Properties (these are handled via Get/GetAll/Set)
     def __fullscreen(self, value=None):

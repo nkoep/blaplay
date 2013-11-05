@@ -122,7 +122,8 @@ class BlaMainWindow(BlaBaseWindow):
              lambda *x: BlaPlaylistManager.add_playlist(focus=True)),
             ("RemovePlaylist", None, "Remove playlist", "<Ctrl>W", "",
              lambda *x: BlaPlaylistManager.remove_playlist()),
-            ("Quit", gtk.STOCK_QUIT, "_Quit", "<Ctrl>Q", "", self.quit),
+            ("Quit", gtk.STOCK_QUIT, "_Quit", "<Ctrl>Q", "",
+             lambda *x: blaplay.bla.shutdown()),
             ("Clear", None, "_Clear", None, "", BlaView.clear),
             ("LockUnlockPlaylist", None, "Lock/Unlock playlist", None, "",
              BlaPlaylistManager.toggle_lock_playlist),
@@ -312,23 +313,9 @@ class BlaMainWindow(BlaBaseWindow):
         self.__hide_windows(self.get_visible())
 
     def quit(self, *args):
-        # Hide the main window, the tray icon, and every other tracked window.
-        # Then destroy the main window which in turn initiates the actual
-        # shutdown sequence. We also need to stop playback here to avoid
-        # problems with gstreamer and bad X windows in case we're playing a
-        # video when shutting down.
-        print_d("Shutting down...")
-
-        player.stop()
         self.hide()
         self.__fullscreen_window.hide()
-        # TODO: destroy all additional windows instead of just hiding them.
-        #       windows from which dialogs were run (which have their own event
-        #       loops) will cause segfaults otherwise
-        blaguiutils.set_visible(False)
-        blagui.tray.set_visible(False)
         self.destroy()
-
         return False
 
     def __hide_windows(self, yes):

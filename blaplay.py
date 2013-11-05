@@ -33,19 +33,16 @@ def init_signals():
     def main_quit(*args):
         def idle_quit():
             import blaplay
-            try:
-                blaplay.bla.window.destroy()
-            except AttributeError:
-                pass
+            blaplay.bla.shutdown()
         gobject.idle_add(idle_quit, priority=gobject.PRIORITY_HIGH)
         return False
 
-    # Writing to a file descriptor that's monitored by gobject is buffered,
+    # Writing to a file descriptor which is monitored by gobject is buffered,
     # i.e. we can write to it here and the event gets handled as soon as a main
     # loop is started. We use this to defer shutdown requests during startup.
     r, w = os.pipe()
     gobject.io_add_watch(r, gobject.IO_IN, main_quit)
-    for sig in (signal.SIGTERM, signal.SIGINT, signal.SIGHUP):
+    for sig in [signal.SIGTERM, signal.SIGINT, signal.SIGHUP]:
         signal.signal(sig, lambda *x: os.write(w, "bla")) # What else?
 
 def parse_args():
@@ -145,7 +142,7 @@ def process_args(args):
             action = "replace"
 
         def normpath(uri):
-            os.path.normpath(os.path.abspath(uri))
+            return os.path.normpath(os.path.abspath(uri))
         # TODO: make cli_queue a FIFO we write to here. then connect a handler
         #       which monitors the FIFO in the main thread and adds tracks as
         #       they arrive

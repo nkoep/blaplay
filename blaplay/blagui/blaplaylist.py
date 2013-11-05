@@ -2665,29 +2665,25 @@ class BlaPlaylistManager(gtk.Notebook):
     def init(self):
         print_i("Restoring playlists")
 
-        # FIXME: handle KeyError exceptions here as well
         try:
             playlists, active_playlist, current, queue = (
                 blautil.deserialize_from_file(blaconst.PLAYLISTS_PATH))
         except (TypeError, ValueError):
-            self.add_playlist()
-        else:
+            playlists = []
+
+        if playlists:
             for playlist in playlists:
                 self.append_page(playlist, playlist.get_name())
 
             if active_playlist is not None:
                 self.set_current_page(active_playlist)
-                # FIXME: exceptions here sometimes
                 playlist = self.get_nth_page(active_playlist)
+            if current is not None:
                 type(self).current = playlist.get_item_from_path(current)
-                try:
-                    self.current.select()
-                except AttributeError:
-                    pass
-            try:
-                BlaQueue.restore(queue)
-            except:
-                pass
+                self.current.select()
+            BlaQueue.restore(queue)
+        else:
+            self.add_playlist()
 
         # FIXME: weird to handle this here. do this with a pipe instead
 #        try:
