@@ -1204,12 +1204,12 @@ class BlaPlaylist(gtk.VBox):
             gtk.image_new_from_stock(gtk.STOCK_FIND, gtk.ICON_SIZE_BUTTON))
         button.connect("clicked", self.__filter)
 
-        self.__hbox = gtk.HBox()
-        self.__hbox.pack_start(self.__regexp_button, expand=False)
-        self.__hbox.pack_start(self.__entry, expand=True)
-        self.__hbox.pack_start(button, expand=False)
-        self.__hbox.show_all()
-        self.__hbox.set_visible(False)
+        self.__filter_box = gtk.HBox()
+        self.__filter_box.pack_start(self.__regexp_button, expand=False)
+        self.__filter_box.pack_start(self.__entry, expand=True)
+        self.__filter_box.pack_start(button, expand=False)
+        self.__filter_box.show_all()
+        self.__filter_box.set_visible(False)
 
         self.__treeview = BlaTreeView(view_id=blaconst.VIEW_PLAYLISTS)
         self.__treeview.connect_object(
@@ -1239,7 +1239,7 @@ class BlaPlaylist(gtk.VBox):
 
         self.clear()
 
-        self.pack_start(self.__hbox, expand=False)
+        self.pack_start(self.__filter_box, expand=False)
         self.pack_start(sw, expand=True)
         sw.show_all()
 
@@ -1952,10 +1952,10 @@ class BlaPlaylist(gtk.VBox):
         self.__entry.grab_focus()
         self.__cid = self.__entry.connect(
             "changed", self.__filter_parameters_changed)
-        self.__hbox.set_visible(True)
+        self.__filter_box.set_visible(True)
 
     def disable_search(self):
-        self.__hbox.set_visible(False)
+        self.__filter_box.set_visible(False)
         try:
             if self.__entry.handler_is_connected(self.__cid):
                 self.__entry.disconnect(self.__cid)
