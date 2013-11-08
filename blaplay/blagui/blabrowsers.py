@@ -322,12 +322,13 @@ class BlaTreeView(blaguiutils.BlaTreeViewBase):
         menu.popup(None, None, None, event.button, event.time)
 
 class BlaQuery(object):
-    def __init__(self, tokens):
+    def __init__(self, filter_string):
         # TODO: if bool(tokens) is False, don't instantiate this at all
-        if tokens:
+        if filter_string:
+            filter_string = filter_string.decode("utf-8")
             flags = re.UNICODE | re.IGNORECASE
-            self.__res = [re.compile(t.decode("utf-8"), flags)
-                          for t in map(re.escape, tokens)]
+            self.__res = [re.compile(t, flags)
+                          for t in map(re.escape, filter_string.split())]
             self.query = self.__query
         else:
             self.query = lambda *x: True
@@ -351,7 +352,6 @@ class BlaQuery(object):
 class BlaLibraryBrowser(gtk.VBox):
     __cid = -1
     __fid = -1
-    __filter_parameters = []
     __expanded_rows = []
     __model = None
 
@@ -561,11 +561,13 @@ class BlaLibraryBrowser(gtk.VBox):
         table.attach(cb, 0, 1, 1, 2)
         hbox.pack_start(table, expand=False)
 
-        entry = gtk.Entry()
-        entry.set_icon_from_stock(gtk.ENTRY_ICON_SECONDARY, gtk.STOCK_CLEAR)
-        entry.connect("icon_release", lambda *x: x[0].delete_text(0, -1))
-        entry.connect("changed", self.__update_filter_parameters)
-        entry.connect_object(
+        self.__entry = gtk.Entry()
+        self.__entry.set_icon_from_stock(gtk.ENTRY_ICON_SECONDARY,
+                                         gtk.STOCK_CLEAR)
+        self.__entry.connect(
+            "icon_release", lambda *x: x[0].delete_text(0, -1))
+        self.__entry.connect("changed", self.__filter_parameters_changed)
+        self.__entry.connect_object(
             "activate", BlaLibraryBrowser.__update_treeview, self)
 
         button = gtk.Button()
@@ -579,7 +581,7 @@ class BlaLibraryBrowser(gtk.VBox):
         table = gtk.Table(rows=2, columns=1, homogeneous=False)
         table.attach(alignment, 0, 1, 0, 1, xpadding=2, ypadding=2)
         hbox2 = gtk.HBox()
-        hbox2.pack_start(entry, expand=True)
+        hbox2.pack_start(self.__entry, expand=True)
         hbox2.pack_start(button, expand=False)
         table.attach(hbox2, 0, 1, 1, 2)
         hbox.pack_start(table)
@@ -604,13 +606,13 @@ class BlaLibraryBrowser(gtk.VBox):
         gobject.source_remove(self.__cid)
         self.__cid = gobject.idle_add(create_model)
 
-    def __update_filter_parameters(self, entry):
-        self.__filter_parameters = entry.get_text().strip().split()
+    def __filter_parameters_changed(self, entry):
+        filter_string = self.__entry.get_text()
         if (blacfg.getboolean("playlist", "search.after.timeout") or
-            not self.__filter_parameters):
+            not filter_string):
             gobject.source_remove(self.__fid)
             def activate():
-                entry.activate()
+                self.__entry.activate()
                 return False
             self.__fid = gobject.timeout_add(500, activate)
 
@@ -678,7 +680,7 @@ class BlaLibraryBrowser(gtk.VBox):
         filt = sort.get_model() # The model is actually a filter.
         model = filt.get_model()
         iterator = model.get_iter_first()
-        query = BlaQuery(self.__filter_parameters).query
+        query = BlaQuery(self.__entry.get_text().strip()).query
         check_children(model, iterator, query)
 
         self.__treeview.freeze_notify()
@@ -731,13 +733,8 @@ class BlaFileBrowser(gtk.VBox):
 
     __fid = -1
     __uid = -1
-    __filter_parameters = []
 
     class History(object):
-        """
-        History class which stores paths to previously visited directories.
-        """
-
         def __init__(self):
             super(BlaFileBrowser.History, self).__init__()
             self.__model = gtk.ListStore(gobject.TYPE_PYOBJECT)
@@ -908,12 +905,16 @@ class BlaFileBrowser(gtk.VBox):
         hbox = gtk.HBox()
         hbox.pack_start(gtk.Label("Filter:"), expand=False, padding=2)
 
-        entry = gtk.Entry()
-        entry.set_icon_from_stock(gtk.ENTRY_ICON_SECONDARY, gtk.STOCK_CLEAR)
-        entry.connect("icon_release", lambda *x: x[0].delete_text(0, -1))
-        entry.connect("changed", self.__filter_parameters_changed)
-        entry.connect("activate", lambda *x: self.__filt.refilter())
-        hbox.pack_start(entry, expand=True)
+        self.__filter_entry = gtk.Entry()
+        self.__filter_entry.set_icon_from_stock(gtk.ENTRY_ICON_SECONDARY,
+                                                gtk.STOCK_CLEAR)
+        self.__filter_entry.connect(
+            "icon_release", lambda *x: x[0].delete_text(0, -1))
+        self.__filter_entry.connect(
+            "changed", self.__filter_parameters_changed)
+        self.__filter_entry.connect(
+            "activate", lambda *x: self.__filt.refilter())
+        hbox.pack_start(self.__filter_entry, expand=True)
 
         button = gtk.Button()
         button.add(
@@ -944,24 +945,28 @@ class BlaFileBrowser(gtk.VBox):
         # FIXME: depending on the number of items in the model this approach is
         #        slow. maybe filter "offline" as we do for playlists and
         #        populate a new model with the result
-        if self.__filter_parameters:
+        try:
+            # FIXME: now this is slow as hell as this gets called for every
+            #        iterator. it's just temporary though until we refactored
+            #        the library browser's treeview code
+            tokens = self.__filter_entry.get_text().strip().split()
+        except AttributeError:
+            return True
+        if tokens:
             try:
                 label = model[iterator][2].lower()
             except AttributeError:
                 return True
-            for p in self.__filter_parameters:
-                if p not in label:
+            for t in tokens:
+                if t not in label:
                     return False
         return True
 
     def __filter_parameters_changed(self, entry):
-        self.__filter_parameters = entry.get_text().strip().split()
+        filter_string = self.__filter_entry.get_text()
         if (blacfg.getboolean("general", "search.after.timeout") or
-            not self.__filter_parameters):
-            try:
-                gobject.source_remove(self.__fid)
-            except AttributeError:
-                pass
+            not filter_string):
+            gobject.source_remove(self.__fid)
             def activate():
                 self.__filt.refilter()
                 return False

@@ -414,10 +414,11 @@ class BlaQuery(object):
                 self.__column_to_tag_ids(column_id))
 
         flags = re.UNICODE | re.IGNORECASE
+        filter_string = filter_string.decode("utf-8")
         if regexp:
             self.__res = [re.compile(r"%s" % filter_string, flags)]
         else:
-            self.__res = [re.compile(t.decode("utf-8"), flags)
+            self.__res = [re.compile(t, flags)
                           for t in map(re.escape, filter_string.split())]
 
     def __column_to_tag_ids(self, column_id):
@@ -1404,7 +1405,7 @@ class BlaPlaylist(gtk.VBox):
         self.__treeview.thaw_child_notify()
         self.__treeview.thaw_notify()
 
-    def __filter_parameters_changed(self, item):
+    def __filter_parameters_changed(self, entry):
         if blacfg.getboolean("general", "search.after.timeout"):
             try:
                 gobject.source_remove(self.__fid)
