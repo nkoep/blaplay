@@ -1433,7 +1433,7 @@ class BlaPlaylist(gtk.VBox):
             else:
                 self.__items = filter(query, self.__all_items)
         else:
-            self.__mode ^= MODE_FILTERED
+            self.__mode &= ~MODE_FILTERED
             if self.__mode & MODE_SORTED:
                 self.__sorted = list(self.__all_sorted)
             else:
@@ -1961,10 +1961,11 @@ class BlaPlaylist(gtk.VBox):
                 self.__entry.disconnect(self.__cid)
         except AttributeError:
             pass
-        text = self.__entry.get_text()
         self.__entry.delete_text(0, -1)
-        if text:
-            self.__entry.activate()
+        # If the playlist was filtered, unfilter it. This happens implicitly
+        # as we made sure the search entry is empty.
+        if self.__mode & MODE_FILTERED:
+            self.__filter()
 
     def sort(self, column_id, sort_order, scroll=False):
         for column in self.__treeview.get_columns():
@@ -1978,7 +1979,7 @@ class BlaPlaylist(gtk.VBox):
         items = (self.__items if self.__mode & MODE_FILTERED else
                  self.__all_items)
         if sort_order is None:
-            self.__mode ^= MODE_SORTED
+            self.__mode &= ~MODE_SORTED
             sort_indicator = False
         else:
             self.__mode |= MODE_SORTED
