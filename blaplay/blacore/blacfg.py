@@ -25,7 +25,7 @@ from blaplay import blautil
 class BlaCfg(RawConfigParser, gobject.GObject):
     __metaclass__ = blautil.BlaSingletonMeta
     __gsignals__ = {
-        "changed": blautil.signal(0)
+        "changed": blautil.signal(2)
     }
 
     __tid = -1
@@ -49,7 +49,6 @@ class BlaCfg(RawConfigParser, gobject.GObject):
                 "tray.tooltip": "yes",
                 "browsers": "yes",
                 "playlist.tabs": "yes",
-                "draw.tree.lines": "yes",
                 "statusbar": "yes",
                 "side.pane": "yes",
                 "filesystem.directory": "",
@@ -88,6 +87,7 @@ class BlaCfg(RawConfigParser, gobject.GObject):
                 "doubleclick.action": blaconst.ACTION_SEND_TO_CURRENT,
                 "middleclick.action": blaconst.ACTION_ADD_TO_CURRENT,
                 "return.action": blaconst.ACTION_SEND_TO_NEW,
+                "draw.tree.lines": "yes",
                 "custom.browser": "yes",
                 "update.on.startup": "yes"
             },
@@ -107,15 +107,6 @@ class BlaCfg(RawConfigParser, gobject.GObject):
                 "scrobble": "yes",
                 "now.playing": "yes",
                 "ignore.pattern": ""
-            },
-            "colors": {
-                "overwrite": "no",
-                "background": "#313131",
-                "highlight": "#A51F1C",
-                "alternate.rows": "#2E2E2E",
-                "selected.rows": "#525252",
-                "text": "#FAFAFA",
-                "active.text": "#FAFAFA"
             }
         }
 
@@ -187,7 +178,7 @@ class BlaCfg(RawConfigParser, gobject.GObject):
         if not self.has_section(section):
             self.add_section(section)
         super(BlaCfg, self).set(section, key, value)
-        self.emit("changed")
+        self.emit("changed", section, key)
     set = set_ # TODO: remove this eventually for PEP8 compliance
 
     def setboolean(self, section, key, value):

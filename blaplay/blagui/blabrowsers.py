@@ -77,17 +77,11 @@ class BlaCellRenderer(blaguiutils.BlaCellRendererBase):
 
     def on_render(self, window, widget, background_area, cell_area,
                   expose_area, flags):
-        if blacfg.getboolean("colors", "overwrite"):
-            text_color = self._text_color
-            active_text_color = self._active_text_color
-            selected_row_color = self._selected_row_color
-            background_color = self._background_color
-        else:
-            style = widget.get_style()
-            text_color = str(style.text[gtk.STATE_NORMAL])
-            active_text_color = str(style.text[gtk.STATE_SELECTED])
-            selected_row_color = str(style.base[gtk.STATE_SELECTED])
-            background_color = str(style.base[gtk.STATE_NORMAL])
+        style = widget.get_style()
+        text_color = str(style.text[gtk.STATE_NORMAL])
+        active_text_color = str(style.text[gtk.STATE_SELECTED])
+        selected_row_color = str(style.base[gtk.STATE_SELECTED])
+        background_color = str(style.base[gtk.STATE_NORMAL])
 
         # Render background
         cr = window.cairo_create()
@@ -589,7 +583,15 @@ class BlaLibraryBrowser(gtk.VBox):
         self.pack_start(sw, expand=True)
         self.pack_start(hbox, expand=False)
 
-        self.update_colors()
+        self.update_treeview_style()
+        self.update_tree_lines()
+        def config_changed(cfg, section, key):
+            if section == "library":
+                if key == "custom.browser":
+                    self.update_treeview_style()
+                elif key == "draw.tree.lines":
+                    self.update_tree_lines()
+        blacfg.connect("changed", config_changed)
 
         def queue_model_update(*args):
             self.__queue_model_update(blacfg.getint("library", "organize.by"))
@@ -698,13 +700,12 @@ class BlaLibraryBrowser(gtk.VBox):
         blacfg.set("library", "organize.by", view)
         self.__queue_model_update(view)
 
-    def update_colors(self):
+    def update_treeview_style(self):
         column = self.__treeview.get_column(0)
         column.clear()
 
         if blacfg.getboolean("library", "custom.browser"):
             renderer = BlaCellRenderer()
-            renderer.update_colors()
         else:
             renderer = gtk.CellRendererText()
 
@@ -722,7 +723,7 @@ class BlaLibraryBrowser(gtk.VBox):
 
     def update_tree_lines(self):
         self.__treeview.set_enable_tree_lines(
-            blacfg.getboolean("general", "draw.tree.lines"))
+            blacfg.getboolean("library", "draw.tree.lines"))
 
 class BlaFileBrowser(gtk.VBox):
     __layout = [
@@ -1097,11 +1098,10 @@ class BlaBrowsers(gtk.VBox):
         notebook.show_all()
         self.show()
 
-        self.update_tree_lines()
         self.set_visible(blacfg.getboolean("general", "browsers"))
 
         page_num = blacfg.getint("general", "browser.view")
-        if page_num not in [0, 1]:
+        if page_num != 0 and page_num != 1:
             page_num = 0
         notebook.set_current_page(page_num)
         notebook.connect(
@@ -1111,12 +1111,4 @@ class BlaBrowsers(gtk.VBox):
     def set_visible(self, state):
         super(BlaBrowsers, self).set_visible(state)
         blacfg.setboolean("general", "browsers", state)
-
-    @classmethod
-    def update_tree_lines(cls):
-        cls.__library_browser.update_tree_lines()
-
-    @classmethod
-    def update_colors(cls):
-        cls.__library_browser.update_colors()
 

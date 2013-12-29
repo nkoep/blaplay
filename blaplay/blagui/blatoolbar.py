@@ -223,6 +223,20 @@ class BlaToolbar(gtk.HBox):
         # the button box
         ctrlbar = gtk.Table(rows=1, columns=5, homogeneous=True)
         ctrlbar.set_name("ctrlbar")
+        gtk.rc_parse_string(
+            """
+            style "blaplay-toolbar"
+            {
+                xthickness = 0
+                ythickness = 0
+
+                GtkButton::focus-padding = 2
+            }
+
+            widget "*.GtkHBox.ctrlbar.GtkButton" style :
+                highest "blaplay-toolbar"
+            """
+        )
 
         img = gtk.Image()
         play_pause = gtk.Button()

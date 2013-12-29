@@ -100,84 +100,8 @@ def create_control_popup_menu():
 
     return menu
 
-def update_colors():
-    # When the user chooses to overwrite the theme colors we set the name of
-    # the affected widgets to blaconst.APPNAME in order for them to respect the
-    # style defined below.
-    name = blaconst.APPNAME if blacfg.getboolean("colors", "overwrite") else ""
-    for treeview in BlaTreeViewBase.instances:
-        treeview.set_name(name)
-
-    # Invert the background color to get a clearly visible color for the drop
-    # indicator drawn during DND operations.
-    color = gtk.gdk.color_parse(blacfg.getstring("colors", "background"))
-    color = (65535-c for c in [color.red, color.green, color.blue])
-    color = gtk.gdk.Color(*color).to_string()
-
-    gtk.rc_parse_string(
-        """
-        style "blaplay-toolbar"
-        {
-            xthickness = 0
-            ythickness = 0
-
-            GtkButton::focus-padding = 2
-        }
-
-        widget "*.GtkHBox.ctrlbar.GtkButton" style : highest "blaplay-toolbar"
-
-        style "%s"
-        {
-            text[NORMAL] = "%s"
-            text[ACTIVE] = "%s"
-            text[PRELIGHT] = "%s"
-            text[SELECTED] = "%s"
-            text[INSENSITIVE] = "%s"
-
-            base[NORMAL] = "%s"
-            base[ACTIVE] = "%s"
-            base[PRELIGHT] = "%s"
-            base[SELECTED] = "%s"
-            base[INSENSITIVE] = "%s"
-
-            GtkTreeView::even-row-color = "%s"
-            GtkTreeView::odd-row-color = "%s"
-        }
-
-        widget "*.GtkVBox.*.%s" style : highest "%s"
-        """ % (
-            blaconst.APPNAME,
-
-            # Text colors
-            blacfg.getstring("colors", "text"),
-            blacfg.getstring("colors", "active.text"),
-            blacfg.getstring("colors", "text"),
-            blacfg.getstring("colors", "active.text"),
-            blacfg.getstring("colors", "text"),
-
-            # Base colors
-            blacfg.getstring("colors", "background"),
-            blacfg.getstring("colors", "selected.rows"),
-            blacfg.getstring("colors", "background"),
-            blacfg.getstring("colors", "selected.rows"),
-            blacfg.getstring("colors", "background"),
-
-            # Even-odd-row colors
-            blacfg.getstring("colors", "background"),
-            blacfg.getstring("colors", "alternate.rows"),
-
-            blaconst.APPNAME, blaconst.APPNAME
-        )
-    )
-
-    from blabrowsers import BlaBrowsers
-    from blaview import BlaView
-
-    BlaBrowsers.update_colors()
-    BlaView.update_colors()
-
 def is_accel(event, accel):
-    # Convenience function from quodlibet to check for accelerator matches.
+    # Convenience function from Quod Libet to check for accelerator matches.
     if event.type != gtk.gdk.KEY_PRESS:
         return False
 

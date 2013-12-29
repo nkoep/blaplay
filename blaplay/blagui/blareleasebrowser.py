@@ -72,19 +72,13 @@ class BlaCellRendererPixbuf(blaguiutils.BlaCellRendererBase):
             layout.set_width((expose_area.width + expose_area.x) * pango.SCALE)
             layout.set_ellipsize(pango.ELLIPSIZE_END)
 
-            if blacfg.getboolean("colors", "overwrite"):
-                if (flags == (gtk.CELL_RENDERER_SELECTED |
-                        gtk.CELL_RENDERER_PRELIT) or
-                        flags == gtk.CELL_RENDERER_SELECTED):
-                    color = gtk.gdk.color_parse(self._active_text_color)
-                else: color = gtk.gdk.color_parse(self._text_color)
+            style = widget.get_style()
+            if (flags == (gtk.CELL_RENDERER_SELECTED |
+                          gtk.CELL_RENDERER_PRELIT) or
+                flags == gtk.CELL_RENDERER_SELECTED):
+                color = style.text[gtk.STATE_SELECTED]
             else:
-                style = widget.get_style()
-                if (flags == (gtk.CELL_RENDERER_SELECTED |
-                        gtk.CELL_RENDERER_PRELIT) or
-                        flags == gtk.CELL_RENDERER_SELECTED):
-                    color = style.text[gtk.STATE_SELECTED]
-                else: color = style.text[gtk.STATE_NORMAL]
+                color = style.text[gtk.STATE_NORMAL]
             cr.set_source_color(color)
 
             pc_context = pangocairo.CairoContext(cr)

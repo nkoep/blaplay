@@ -52,8 +52,6 @@ class BlaSidePane(gtk.VBox):
         def __init__(self):
             super(BlaSidePane.BlaCoverDisplay, self).__init__()
             self.set_shadow_type(gtk.SHADOW_IN)
-            self.connect_object(
-                "realize", BlaSidePane.BlaCoverDisplay.update_colors, self)
 
             # Set up the drawing area.
             self.__is_video_canvas = False
@@ -192,7 +190,7 @@ class BlaSidePane(gtk.VBox):
                 return False
 
             cr = self.child.window.cairo_create()
-            cr.set_source_color(self.__bg_color)
+            cr.set_source_color(self.get_style().bg[gtk.STATE_NORMAL])
             x, y, width, height = self.get_allocation()
 
             # Fill background.
@@ -234,14 +232,6 @@ class BlaSidePane(gtk.VBox):
         def fetch_cover(self):
             BlaSidePane.fetcher.fetch_cover(
                 BlaSidePane.track, self.__update_timestamp())
-
-        def update_colors(self):
-            if blacfg.getboolean("colors", "overwrite"):
-                self.__bg_color = gtk.gdk.Color(
-                    blacfg.getstring("colors", "background"))
-            else:
-                self.__bg_color = self.get_style().bg[gtk.STATE_NORMAL]
-            self.child.queue_draw()
 
         def use_as_video_canvas(self, yes):
             if yes:
@@ -359,8 +349,6 @@ class BlaSidePane(gtk.VBox):
         self.pack_start(notebook, expand=True)
         self.pack_start(hbox, expand=False)
 
-        self.update_colors()
-
         # Hook up the metadata callbacks.
         BlaSidePane.fetcher = blametadata.BlaFetcher()
         self.fetcher.connect_object(
@@ -462,30 +450,6 @@ class BlaSidePane(gtk.VBox):
         if view == path:
             return True
         self.__treeview.set_cursor((view,))
-
-    def update_colors(self):
-        textviews = [(self.__tv, self.__tag), (self.__tv2, self.__tag2)]
-        for tv, tag in textviews:
-            if blacfg.getboolean("colors", "overwrite"):
-                color = gtk.gdk.Color(
-                    blacfg.getstring("colors", "background"))
-                tv.modify_base(gtk.STATE_NORMAL, color)
-
-                color = gtk.gdk.Color(
-                    blacfg.getstring("colors", "selected.rows"))
-                tv.modify_base(gtk.STATE_ACTIVE, color)
-                tv.modify_base(gtk.STATE_SELECTED, color)
-
-                color = gtk.gdk.Color(
-                    blacfg.getstring("colors", "active.text"))
-                tv.modify_text(gtk.STATE_SELECTED, color)
-                tv.modify_text(gtk.STATE_ACTIVE, color)
-                tag.set_property("foreground_gdk", color)
-            else:
-                tv.modify_style(self.__style)
-                tag.set_property("foreground_gdk",
-                    self.__style.fg[gtk.STATE_NORMAL])
-        self.cover_display.update_colors()
 
     def update_count(self, widget, view, count):
         model = self.__treeview.get_model()
@@ -635,10 +599,6 @@ class BlaView(gtk.HPaned):
         # accordingly
         blagui.update_menu(view)
         cls.__side_pane.update_view(view)
-
-    @classmethod
-    def update_colors(cls):
-        cls.__side_pane.update_colors()
 
     @classmethod
     def clear(cls, *args):

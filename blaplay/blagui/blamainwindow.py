@@ -253,7 +253,6 @@ class BlaMainWindow(BlaBaseWindow):
 
         self.child.pack_start(uimanager.get_widget("/Menu"), expand=False)
         self.child.pack_start(vbox)
-        blagui.update_colors()
         self.child.show()
 
         # We must keep a reference to this object.

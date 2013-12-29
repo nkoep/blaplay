@@ -85,15 +85,6 @@ class BlaMessageDialog(gtk.MessageDialog):
 class BlaCellRendererBase(gtk.GenericCellRenderer):
     def __init__(self):
         super(BlaCellRendererBase, self).__init__()
-        self.update_colors()
-
-    def update_colors(self):
-        self._text_color = blacfg.getstring("colors", "text")
-        self._active_text_color = blacfg.getstring(
-            "colors", "active.text")
-        self._selected_row_color = blacfg.getstring(
-            "colors", "selected.rows")
-        self._background_color = blacfg.getstring("colors", "background")
 
     def do_set_property(self, prop, value):
         setattr(self, prop.name, value)
@@ -106,8 +97,6 @@ class BlaTreeViewBase(gtk.TreeView):
         "popup": blautil.signal(1)
     }
 
-    instances = []
-
     def __init__(self, *args, **kwargs):
         self.__multicol = kwargs.pop("multicol", False)
         self.__renderer = kwargs.pop("renderer", None)
@@ -118,13 +107,7 @@ class BlaTreeViewBase(gtk.TreeView):
             "set_button_event_handlers", True)
 
         super(BlaTreeViewBase, self).__init__(*args, **kwargs)
-        self.instances.append(self)
 
-        if blacfg.getboolean("colors", "overwrite") and self.__multicol:
-            name = blaconst.STYLE_NAME
-        else:
-            name = ""
-        self.set_name(name)
         self.set_enable_search(False)
         self.get_selection().set_mode(gtk.SELECTION_MULTIPLE)
 
@@ -194,6 +177,11 @@ class BlaTreeViewBase(gtk.TreeView):
 
         return False
 
+    # DND with multiple selection in gtk is a real pain. The problem boils down
+    # to the fact that the default handler for "button_press_event" immediately
+    # unselects the current selection. This makes it annoyingly difficult to
+    # distinguish between a regular button click which should just select a row
+    # in the treeview and the initiation of a DND operation.
     def __button_press_event(self, event):
         # Never block on double or triple click events.
         if (event.type == gtk.gdk._2BUTTON_PRESS or

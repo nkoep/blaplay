@@ -234,7 +234,7 @@ class BlaPreferences(BlaUniqueWindow):
 
             draw_tree_lines = gtk.CheckButton("Draw tree lines in browsers")
             draw_tree_lines.set_active(
-                blacfg.getboolean("general", "draw.tree.lines"))
+                blacfg.getboolean("library", "draw.tree.lines"))
             draw_tree_lines.connect("toggled", self.__tree_lines_changed)
 
             custom_library_browser = gtk.CheckButton(
@@ -305,13 +305,11 @@ class BlaPreferences(BlaUniqueWindow):
 
         def __tree_lines_changed(self, checkbutton):
             blacfg.setboolean(
-                "general", "draw.tree.lines", checkbutton.get_active())
-            BlaBrowsers.update_tree_lines()
+                "library", "draw.tree.lines", checkbutton.get_active())
 
         def __custom_library_browser_changed(self, checkbutton):
             blacfg.setboolean(
                 "library", "custom.browser", checkbutton.get_active())
-            blagui.update_colors()
 
     class PlayerSettings(Page):
         def __init__(self):
@@ -629,8 +627,8 @@ class BlaPreferences(BlaUniqueWindow):
 
         def __save(self, *args):
             blacfg.set("lastfm", "user", self.__user_entry.get_text())
-            blacfg.set("lastfm", "ignore.pattern",
-                       self.__ignore_entry.get_text())
+            blacfg.set(
+                "lastfm", "ignore.pattern", self.__ignore_entry.get_text())
 
         def __scrobble_changed(self, checkbutton):
             blacfg.setboolean("lastfm", "scrobble", checkbutton.get_active())
