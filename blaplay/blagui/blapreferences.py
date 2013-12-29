@@ -46,47 +46,6 @@ class BlaPreferences(BlaUniqueWindow):
         def __init__(self):
             super(BlaPreferences.GeneralSettings, self).__init__("General")
 
-            # Colors
-            color_frame = gtk.Frame("Colors")
-            color_box = gtk.VBox(spacing=10)
-            color_box.set_border_width(10)
-
-            state = blacfg.getboolean("colors", "overwrite")
-            overwrite_colors = gtk.CheckButton("Overwrite GTK theme colors")
-            overwrite_colors.set_active(state)
-
-            color_table = gtk.Table(rows=2, columns=6, homogeneous=False)
-            color_table.set_col_spacings(10)
-            color_table.set_row_spacings(3)
-            color_table.set_sensitive(state)
-
-            overwrite_colors.connect("toggled", self.__overwrite_colors,
-                                     color_table)
-
-            options = [
-                ("Background", "background"),
-                ("Alternate\nrows", "alternate.rows"),
-                ("Selected\ncolumn", "selected.rows"),
-                ("Text", "text"),
-                ("Active text", "active.text"),
-                ("Highlight", "highlight")
-            ]
-
-            idx = 0
-            for label, key in options:
-                l = gtk.Label("%s:" % label)
-                l.set_justify(gtk.JUSTIFY_CENTER)
-                b = gtk.ColorButton(
-                    gtk.gdk.Color(blacfg.getstring("colors", key)))
-                b.connect("color_set", self.__color_changed, key)
-                color_table.attach(l, idx, idx+1, 0, 1, xoptions=gtk.EXPAND)
-                color_table.attach(b, idx, idx+1, 1, 2, xoptions=gtk.EXPAND)
-                idx += 1
-
-            color_box.pack_start(overwrite_colors)
-            color_box.pack_start(color_table, expand=True)
-            color_frame.add(color_box)
-
             # Tray
             tray_frame = gtk.Frame("Tray")
             tray_table = gtk.Table(rows=2, columns=2, homogeneous=False)
@@ -132,19 +91,8 @@ class BlaPreferences(BlaUniqueWindow):
             cb.connect("toggled", self.__search_after_timeout)
             misc_table.attach(cb, 0, 2, 1, 2)
 
-            self.pack_start(color_frame, expand=False)
             self.pack_start(tray_frame, expand=False)
             self.pack_start(misc_frame, expand=False)
-
-        def __overwrite_colors(self, checkbutton, table):
-            state = checkbutton.get_active()
-            blacfg.setboolean("colors", "overwrite", state)
-            table.set_sensitive(state)
-            blagui.update_colors()
-
-        def __color_changed(self, colorbutton, key):
-            blacfg.set("colors", key, colorbutton.get_color().to_string())
-            blagui.update_colors()
 
         def __tray_changed(self, checkbutton, key, update_visibility):
             state = checkbutton.get_active()
