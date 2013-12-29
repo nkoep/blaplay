@@ -26,7 +26,6 @@ from blaplay.blacore import blaconst, blacfg
 from blaplay import blautil, blagui
 from blaplay.formats._identifiers import *
 from blawindows import BlaBaseWindow
-from blakeys import BlaKeys
 from blatoolbar import BlaToolbar
 from blabrowsers import BlaBrowsers
 from blaplaylist import BlaPlaylistManager
@@ -35,6 +34,7 @@ from blaview import BlaView
 from blastatusbar import BlaStatusbar
 from blapreferences import BlaPreferences
 from blaabout import BlaAbout
+from blatray import BlaTray
 import blaguiutils
 
 
@@ -64,7 +64,7 @@ class BlaMainWindow(BlaBaseWindow):
             elif blagui.is_accel(event, "space"):
                 player.play_pause()
             elif blagui.is_accel(event, "<Ctrl>Q"):
-                self.quit()
+                blaplay.shutdown()
         self.__fullscreen_window.connect_object(
             "key_press_event", key_press_event, self.__fullscreen_window)
         # Realize the fullscreen window. If we don't do this here and reparent
@@ -123,7 +123,7 @@ class BlaMainWindow(BlaBaseWindow):
             ("RemovePlaylist", None, "Remove playlist", "<Ctrl>W", "",
              lambda *x: BlaPlaylistManager.remove_playlist()),
             ("Quit", gtk.STOCK_QUIT, "_Quit", "<Ctrl>Q", "",
-             lambda *x: blaplay.bla.shutdown()),
+             lambda *x: blaplay.shutdown()),
             ("Clear", None, "_Clear", None, "", BlaView.clear),
             ("LockUnlockPlaylist", None, "Lock/Unlock playlist", None, "",
              BlaPlaylistManager.toggle_lock_playlist),
@@ -255,8 +255,7 @@ class BlaMainWindow(BlaBaseWindow):
         self.child.pack_start(vbox)
         self.child.show()
 
-        # We must keep a reference to this object.
-        self.__keys = BlaKeys()
+        self.__tray = BlaTray()
 
     def update_title(self, *args):
         track = player.get_track()
@@ -265,7 +264,6 @@ class BlaMainWindow(BlaBaseWindow):
         if state == blaconst.STATE_STOPPED or not track:
             title = "%s %s" % (blaconst.APPNAME, blaconst.VERSION)
             tooltip = "Stopped"
-
         else:
             if player.radio:
                 title = track[TITLE] or "%s - %s" % (
@@ -281,9 +279,9 @@ class BlaMainWindow(BlaBaseWindow):
             tooltip = title
 
         self.set_title(title)
-        blagui.tray.set_tooltip(tooltip)
-        if not blacfg.getboolean("general", "tray.tooltip"):
-            blagui.tray.set_has_tooltip(False)
+        self.__tray.set_tooltip(tooltip)
+        if not blacfg.getboolean("general", "tray.show.tooltip"):
+            self.__tray.set_has_tooltip(False)
 
     def set_fullscreen(self, da, parent):
         # TODO: when minimizing to tray during fullscreen, reparent the da so
@@ -305,23 +303,22 @@ class BlaMainWindow(BlaBaseWindow):
     def raise_window(self):
         self.present()
         if not blacfg.getboolean("general", "always.show.tray"):
-            blagui.tray.set_visible(False)
+            self.__tray.set_visible(False)
         BlaVisualization.flush_buffers()
 
     def toggle_hide(self):
         self.__hide_windows(self.get_visible())
 
-    def quit(self, *args):
+    def destroy_(self, *args):
+        self.__tray.set_visible(False)
         self.hide()
         self.__fullscreen_window.hide()
-        self.destroy()
-        return False
 
     def __hide_windows(self, yes):
         blaguiutils.set_visible(not yes)
         if yes:
             self.hide()
-            blagui.tray.set_visible(True)
+            self.__tray.set_visible(True)
         else:
             self.raise_window()
 
@@ -337,7 +334,8 @@ class BlaMainWindow(BlaBaseWindow):
         if blacfg.getboolean("general", "close.to.tray"):
             self.toggle_hide()
             return True
-        return self.quit()
+        blaplay.shutdown()
+        return False
 
     def __toggle_browsers(self, event):
         state = event.get_active()

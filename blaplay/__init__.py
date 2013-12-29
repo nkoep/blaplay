@@ -89,8 +89,6 @@ class Blaplay(gobject.GObject):
                     instance.__class__.__name__)
             instance()
 
-        from blaplay import blagui
-        blagui.tray.set_visible(False)
         from blaplay.blagui import blaguiutils
         # TODO: destroy all additional windows instead of just hiding them.
         #       windows from which dialogs were run (which have their own event
@@ -100,7 +98,7 @@ class Blaplay(gobject.GObject):
 
         # Get rid of the main window.
         try:
-            self.window.quit()
+            self.window.destroy_()
         except AttributeError:
             pass
 
@@ -176,4 +174,7 @@ def finish_startup():
 
     # Finally, start the main loop.
     bla.main()
+
+def shutdown():
+    bla.shutdown()
 

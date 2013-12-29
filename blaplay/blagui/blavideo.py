@@ -85,7 +85,7 @@ class BlaVideoCanvas(gtk.DrawingArea):
             if not player.video:
                 return False
 
-            menu = blagui.create_control_popup_menu()
+            menu = blaguiutils.create_control_popup_menu()
             menu.append(gtk.SeparatorMenuItem())
 
             # Add fullscreen entry.

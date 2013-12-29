@@ -56,6 +56,33 @@ def error_dialog(text, secondary_text="", parent=None):
     diag.run()
     diag.destroy()
 
+def create_control_popup_menu():
+    import blaplay
+    player = blaplay.bla.player
+
+    menu = gtk.Menu()
+
+    if player.get_state() in [blaconst.STATE_PAUSED, blaconst.STATE_STOPPED]:
+        label = "Play"
+        stock = gtk.STOCK_MEDIA_PLAY
+    else:
+        label = "Pause"
+        stock = gtk.STOCK_MEDIA_PAUSE
+    items = [
+        (label, stock, player.play_pause),
+        ("Stop", gtk.STOCK_MEDIA_STOP, player.stop),
+        ("Previous", gtk.STOCK_MEDIA_PREVIOUS, player.previous),
+        ("Next", gtk.STOCK_MEDIA_NEXT, player.next)
+    ]
+    for label, stock, callback in items:
+        m = gtk.ImageMenuItem(stock)
+        m.set_label(label)
+        # Force early binding of `callback' by using default arguments.
+        m.connect("activate", lambda x, c=callback: c())
+        menu.append(m)
+
+    return menu
+
 def set_visible(state):
     from blawindows import BlaWindow
     if state:

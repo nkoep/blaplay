@@ -63,3 +63,5 @@ class BlaKeys(gobject.GObject):
         except KeyError:
             pass
 
+BlaKeys()
+

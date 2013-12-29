@@ -52,18 +52,18 @@ class BlaPreferences(BlaUniqueWindow):
             tray_table.set_border_width(10)
             tray_frame.add(tray_table)
 
+            def tray_changed(checkbutton, key):
+                blacfg.setboolean("general", key, checkbutton.get_active())
             options = [
-                ("Always display tray icon", "always.show.tray", True,
+                ("Always display tray icon", "always.show.tray",
                  [0, 1, 0, 1]),
-                ("Close to tray", "close.to.tray", False, [0, 1, 1, 2]),
-                ("Show tooltip", "tray.tooltip", False, [1, 2, 0, 1])
+                ("Close to tray", "close.to.tray", [0, 1, 1, 2]),
+                ("Show tooltip", "tray.show.tooltip", [1, 2, 0, 1])
             ]
-
-            for label, key, update_visibility, coords in options:
+            for label, key, coords in options:
                 b = gtk.CheckButton(label)
                 b.set_active(blacfg.getboolean("general", key))
-                b.connect("toggled", self.__tray_changed, key,
-                          update_visibility)
+                b.connect("toggled", tray_changed, key)
                 tray_table.attach(b, *coords)
 
             # Miscellaneous
@@ -93,14 +93,6 @@ class BlaPreferences(BlaUniqueWindow):
 
             self.pack_start(tray_frame, expand=False)
             self.pack_start(misc_frame, expand=False)
-
-        def __tray_changed(self, checkbutton, key, update_visibility):
-            state = checkbutton.get_active()
-            if update_visibility:
-                blagui.tray.set_visible(state)
-            blacfg.setboolean("general", key, state)
-            if key == "tray.tooltip":
-                blagui.tray.set_has_tooltip(state)
 
         def __follow_playback(self, checkbutton):
             blacfg.setboolean("general", "cursor.follows.playback",

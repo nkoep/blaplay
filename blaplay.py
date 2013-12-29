@@ -33,7 +33,7 @@ def init_signals():
     def main_quit(*args):
         def idle_quit():
             import blaplay
-            blaplay.bla.shutdown()
+            blaplay.shutdown()
         gobject.idle_add(idle_quit, priority=gobject.PRIORITY_HIGH)
         return False
 

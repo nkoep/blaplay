@@ -302,7 +302,7 @@ class BlaMpris(dbus.service.Object):
     @dbus.service.method(dbus_interface=INTERFACE_BASE)
     def Quit(self):
         import blaplay
-        blaplay.bla.shutdown()
+        blaplay.shutdown()
 
     # Properties (these are handled via Get/GetAll/Set)
     def __fullscreen(self, value=None):

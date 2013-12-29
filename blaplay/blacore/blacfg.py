@@ -46,7 +46,7 @@ class BlaCfg(RawConfigParser, gobject.GObject):
                 "pane.pos.right": "",
                 "always.show.tray": "yes",
                 "close.to.tray": "yes",
-                "tray.tooltip": "yes",
+                "tray.show.tooltip": "yes",
                 "browsers": "yes",
                 "playlist.tabs": "yes",
                 "statusbar": "yes",

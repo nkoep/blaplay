@@ -19,8 +19,7 @@ import pygtk
 pygtk.require("2.0")
 import gtk
 
-from blaplay.blacore import blaconst, blacfg, blaplayer
-from blaplay.blautil import blafm
+from blaplay.blacore import blaconst
 from blaguiutils import BlaTreeViewBase
 
 # DND constants
@@ -33,19 +32,16 @@ DND_TARGETS = {
 
 uimanager = None
 accelgroup = None
-tray = None
 
 
 def init():
     from blamainwindow import BlaMainWindow
-    global tray
 
     gtk.icon_theme_get_default().append_search_path(blaconst.ICONS_PATH)
     theme = gtk.icon_theme_get_default()
     gtk.window_set_default_icon_name(blaconst.APPNAME)
 
     window = BlaMainWindow()
-    tray = BlaTray(window)
     window.update_title()
 
     return window
@@ -73,33 +69,6 @@ def update_menu(view):
     for entry in blaconst.MENU_EDIT:
         uimanager.get_widget(entry).set_visible(state)
 
-def create_control_popup_menu():
-    import blaplay
-    player = blaplay.bla.player
-
-    menu = gtk.Menu()
-
-    if player.get_state() in [blaconst.STATE_PAUSED, blaconst.STATE_STOPPED]:
-        label = "Play"
-        stock = gtk.STOCK_MEDIA_PLAY
-    else:
-        label = "Pause"
-        stock = gtk.STOCK_MEDIA_PAUSE
-    items = [
-        (label, stock, player.play_pause),
-        ("Stop", gtk.STOCK_MEDIA_STOP, player.stop),
-        ("Previous", gtk.STOCK_MEDIA_PREVIOUS, player.previous),
-        ("Next", gtk.STOCK_MEDIA_NEXT, player.next)
-    ]
-    for label, stock, callback in items:
-        m = gtk.ImageMenuItem(stock)
-        m.set_label(label)
-        # Force early binding of `callback' by using default arguments.
-        m.connect("activate", lambda x, c=callback: c())
-        menu.append(m)
-
-    return menu
-
 def is_accel(event, accel):
     # Convenience function from Quod Libet to check for accelerator matches.
     if event.type != gtk.gdk.KEY_PRESS:
@@ -123,44 +92,4 @@ def is_accel(event, accel):
 
     # Remove everything except default modifiers and compare.
     return (accel_keyval, accel_mod) == (keyval, event.state & default_mod)
-
-
-# TODO: move this to its own file
-class BlaTray(gtk.StatusIcon):
-    def __init__(self, window):
-        # TODO: add support for scroll-events
-
-        super(BlaTray, self).__init__()
-        self.set_from_icon_name(blaconst.APPNAME)
-        self.set_visible(
-            blacfg.getboolean("general", "always.show.tray"))
-        self.set_tooltip_text("Stopped")
-        self.set_has_tooltip(
-            blacfg.getboolean("general", "tray.tooltip"))
-        def activate(status_icon):
-            window.toggle_hide()
-        self.connect("activate", activate)
-        self.connect("popup_menu", self.__tray_menu)
-
-    def __tray_menu(self, icon, button, activation_time):
-        import blaplay
-
-        menu = create_control_popup_menu()
-        menu.append(gtk.SeparatorMenuItem())
-
-        # Add last.fm submenu.
-        submenu = blafm.create_popup_menu()
-        if submenu:
-            m = gtk.MenuItem("last.fm")
-            m.set_submenu(submenu)
-            menu.append(m)
-            menu.append(gtk.SeparatorMenuItem())
-
-        # Add quit option.
-        m = gtk.MenuItem("Quit")
-        m.connect("activate", lambda *x: blaplay.bla.window.quit())
-        menu.append(m)
-
-        menu.show_all()
-        menu.popup(None, None, None, button, activation_time)
 
