@@ -113,15 +113,9 @@ def init_logging(args):
         logging.addLevelName(level, "\033[1;%sm%s\033[1;m" %
                              (color, logging.getLevelName(level)))
 
-    # FIXME: use this maybe??
-    def critical(msg):
-        logging.critical(msg)
-        raise SystemExit
-
     __builtins__.__dict__["print_d"] = logging.debug
     __builtins__.__dict__["print_i"] = logging.info
     __builtins__.__dict__["print_w"] = logging.warning
-    __builtins__.__dict__["print_c"] = critical
 
 def process_args(args):
     from blaplay.blautil import bladbus
