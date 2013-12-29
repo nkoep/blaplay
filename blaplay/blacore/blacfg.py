@@ -91,6 +91,16 @@ class BlaCfg(RawConfigParser, gobject.GObject):
                 "custom.browser": "yes",
                 "update.on.startup": "yes"
             },
+            "keybindings": {
+                "playpause": "",
+                "pause": "",
+                "stop": "",
+                "previous": "",
+                "next": "",
+                "volup": "",
+                "voldown": "",
+                "mute": ""
+            },
             "lastfm": {
                 "user": "",
                 "sessionkey": "",

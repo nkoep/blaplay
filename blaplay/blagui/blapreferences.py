@@ -32,13 +32,19 @@ import blaguiutils
 
 class BlaPreferences(BlaUniqueWindow):
     class Page(gtk.VBox):
-        def __init__(self):
+        def __init__(self, name):
             super(BlaPreferences.Page, self).__init__(spacing=10)
+
+            self.__name = name
             self.set_border_width(10)
+
+        @property
+        def name(self):
+            return self.__name
 
     class GeneralSettings(Page):
         def __init__(self):
-            super(BlaPreferences.GeneralSettings, self).__init__()
+            super(BlaPreferences.GeneralSettings, self).__init__("General")
 
             # Colors
             color_frame = gtk.Frame("Colors")
@@ -162,7 +168,8 @@ class BlaPreferences(BlaUniqueWindow):
 
     class LibraryBrowsersSettings(Page):
         def __init__(self):
-            super(BlaPreferences.LibraryBrowsersSettings, self).__init__()
+            super(BlaPreferences.LibraryBrowsersSettings, self).__init__(
+                "Library/Browsers")
 
             restrict_string = blacfg.getstring("library", "restrict.to")
             exclude_string = blacfg.getstring("library", "exclude")
@@ -360,7 +367,7 @@ class BlaPreferences(BlaUniqueWindow):
 
     class PlayerSettings(Page):
         def __init__(self):
-            super(BlaPreferences.PlayerSettings, self).__init__()
+            super(BlaPreferences.PlayerSettings, self).__init__("Player")
 
             logarithmic_volume_scale = gtk.CheckButton(
                 "Use logarithmic volume scale")
@@ -568,9 +575,71 @@ class BlaPreferences(BlaUniqueWindow):
                 combobox.remove_text(profile_index)
                 blacfg.delete_option("equalizer.profiles", profile_name)
 
+    class Keybindings(Page):
+        def __init__(self):
+            super(BlaPreferences.Keybindings, self).__init__(
+                "Global keybindings")
+
+            from blakeys import BlaKeys
+            blakeys = BlaKeys()
+
+            actions = [
+                ("Play/Pause", "playpause"),
+                ("Pause", "pause"),
+                ("Stop", "stop"),
+                ("Previous track", "previous"),
+                ("Next track", "next"),
+                ("Volume up", "volup"),
+                ("Volume down", "voldown"),
+                ("Mute", "mute")
+            ]
+            bindings = gtk.ListStore(gobject.TYPE_STRING, gobject.TYPE_STRING)
+            for label, action in actions:
+                accel = blacfg.getstring("keybindings", action)
+                bindings.append([label, accel])
+
+            treeview = gtk.TreeView()
+            treeview.set_property("rules_hint", True)
+            treeview.insert_column_with_attributes(
+                -1, "Action", gtk.CellRendererText(), text=0)
+
+            def edited(renderer, path, key, mod, *args):
+                action = actions[int(path)][-1]
+                accel = gtk.accelerator_name(key, mod)
+                blakeys.bind(action, accel)
+                bindings.set_value(bindings.get_iter(path), 1, accel)
+                blacfg.set("keybindings", action, accel)
+
+            def cleared(renderer, path):
+                bindings.set_value(bindings.get_iter(path), 1, None)
+                action = actions[int(path)][-1]
+                blakeys.unbind(blacfg.getstring("keybindings", action))
+                blacfg.set("keybindings", action, "")
+
+            renderer = gtk.CellRendererAccel()
+            renderer.set_property("editable", True)
+            renderer.connect("accel_edited", edited)
+            renderer.connect("accel_cleared", cleared)
+            treeview.insert_column_with_attributes(
+                -1, "Binding", renderer, text=1)
+            treeview.set_model(bindings)
+
+            sw = BlaScrolledWindow()
+            sw.set_shadow_type(gtk.SHADOW_IN)
+            sw.add(treeview)
+
+            self.pack_start(sw, expand=True)
+            if not blakeys.can_bind():
+                label = gtk.Label()
+                label.set_markup(
+                    "<b>Note</b>: The <i>keybinder</i> module is not "
+                    "available on the system.\nAs a result, the settings on "
+                    "this page will have no effect.")
+                self.pack_start(label, expand=False, padding=20)
+
     class LastfmSettings(Page):
         def __init__(self):
-            super(BlaPreferences.LastfmSettings, self).__init__()
+            super(BlaPreferences.LastfmSettings, self).__init__("last.fm")
 
             self.connect("destroy", self.__save)
 
@@ -629,14 +698,15 @@ class BlaPreferences(BlaUniqueWindow):
         self.set_title("%s Preferences" % blaconst.APPNAME)
 
         notebook = gtk.Notebook()
-        pages = [
-            (self.GeneralSettings, "General"),
-            (self.LibraryBrowsersSettings, "Library/Browsers"),
-            (self.PlayerSettings, "Player"),
-            (self.LastfmSettings, "last.fm")
-        ]
-        for page, label in pages:
-            notebook.append_page(page(), gtk.Label(label))
+        for page in [self.GeneralSettings, self.LibraryBrowsersSettings,
+                     self.PlayerSettings, self.Keybindings,
+                     self.LastfmSettings]:
+            try:
+                page = page()
+            except Exception as exc:
+                print_d(exc)
+                continue
+            notebook.append_page(page, gtk.Label(page.name))
         self.vbox.pack_start(notebook)
         self.show_all()
 
