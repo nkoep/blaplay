@@ -128,6 +128,9 @@ def finish_startup():
     from blaplay import blagui
     bla.window = blagui.init()
 
+    from blaplay.blagui import blakeys
+    blakeys.BlaKeys()
+
     # Set up the D-Bus interface.
     try:
         from blaplay.blautil import bladbus
