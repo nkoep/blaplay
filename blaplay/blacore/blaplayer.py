@@ -18,29 +18,10 @@ import os
 from math import log10
 
 import gobject
-try:
-    import pygst
-    try:
-        pygst.require("0.10")
-    except pygst.RequiredVersionError:
-        raise ImportError
-    import gst
-except ImportError:
-    class gst(object):
-        class ElementNotFoundError(Exception):
-            pass
-
-        @classmethod
-        def element_factory_find(cls, element):
-            return None
-
-        @classmethod
-        def element_factory_make(cls, element):
-            raise gst.ElementNotFoundError
 
 import blaplay
 library = blaplay.bla.library
-from blaplay.blacore import blaconst, blacfg
+from blaplay.blacore import blaconst, blacfg, blagst as gst
 from blaplay import blautil
 from blaplay.formats._identifiers import TITLE
 
@@ -49,7 +30,7 @@ gstreamer_is_working = None
 
 
 def init():
-    def test_gstreamer_setup():
+    def test_gstreamer():
         try:
             gst.Bin()
         except AttributeError:
@@ -64,7 +45,7 @@ def init():
     print_i("Initializing the playback device")
 
     global gstreamer_is_working
-    gstreamer_is_working = test_gstreamer_setup()
+    gstreamer_is_working = test_gstreamer()
 
     # Make sure mad is used for decoding mp3s if both the mad and fluendo
     # decoder are available on the system as mad should be faster.
@@ -72,8 +53,7 @@ def init():
     if fluendo and mad:
         fluendo.set_rank(min(fluendo.get_rank(), max(mad.get_rank() - 1, 0)))
 
-    player = BlaPlayer()
-    return player
+    return BlaPlayer()
 
 
 class BlaPlayer(gobject.GObject):
@@ -84,7 +64,7 @@ class BlaPlayer(gobject.GObject):
         "track_changed": blautil.signal(0),
         "track_stopped": blautil.signal(0),
         "new_buffer": blautil.signal(1),
-        "seek": blautil.signal(0)
+        "seeked": blautil.signal(1)
     }
 
     __bin = None
@@ -93,6 +73,7 @@ class BlaPlayer(gobject.GObject):
     __uri = None
     __station = None
     __state = blaconst.STATE_STOPPED
+    __window_id = 0
 
     def __init__(self):
         super(BlaPlayer, self).__init__()
@@ -107,15 +88,15 @@ class BlaPlayer(gobject.GObject):
                 "and gst-plugins-good are installed.")
             return False
 
-        bin_ = gst.Bin()
+        audio_sink = gst.Bin()
 
         filt = gst.element_factory_make("capsfilter")
         filt.set_property(
-            "caps", gst.caps_from_string("audio/x-raw-float, "
-                                         "rate=(int)44100, "
-                                         "channels=(int)2, "
-                                         "width=(int)32, "
-                                         "depth=(int)32, "
+            "caps", gst.caps_from_string("audio/x-raw-float,"
+                                         "rate=(int)44100,"
+                                         "channels=(int)2,"
+                                         "width=(int)32,"
+                                         "depth=(int)32,"
                                          "endianness=(int)1234"))
         self.__equalizer = gst.element_factory_make("equalizer-10bands")
         tee = gst.element_factory_make("tee")
@@ -135,30 +116,32 @@ class BlaPlayer(gobject.GObject):
         self.__volume = gst.element_factory_make("volume")
         elements = [filt, self.__equalizer, tee, queue, appsink,
                     self.__volume, sink]
-        map(bin_.add, elements)
+        map(audio_sink.add, elements)
 
         pad = elements[0].get_static_pad("sink")
-        bin_.add_pad(gst.GhostPad("sink", pad))
+        audio_sink.add_pad(gst.GhostPad("sink", pad))
 
         gst.element_link_many(filt, self.__equalizer, tee)
         gst.element_link_many(tee, self.__volume, sink)
         gst.element_link_many(tee, queue, appsink)
 
+        video_sink = gst.element_factory_make("xvimagesink")
+        video_sink.set_property("force_aspect_ratio", True)
+
         self.__bin = gst.element_factory_make("playbin2")
-        self.__bin.set_property("audio_sink", bin_)
+        self.__bin.set_property("audio_sink", audio_sink)
         self.__bin.set_property("buffer_duration", 500 * gst.MSECOND)
-        self.__bin.set_property("video_sink", None)
-        GST_PLAY_FLAG_VIDEO = 1 << 0
-        GST_PLAY_FLAG_TEXT = 1 << 2
-        flags = self.__bin.get_property("flags")
-        flags &= ~(GST_PLAY_FLAG_VIDEO | GST_PLAY_FLAG_TEXT)
-        self.__bin.set_property("flags", flags)
+        self.__bin.set_property("video_sink", video_sink)
+
         self.__bin.connect("about_to_finish", self.__about_to_finish)
         self.__bin.set_state(gst.STATE_READY)
 
         bus = self.__bin.get_bus()
         bus.add_signal_watch()
-        self.__busid = bus.connect("message", self.__message)
+        bus.enable_sync_message_emission()
+        self.__message_id = bus.connect("message", self.__message)
+        self.__sync_message_id = bus.connect(
+            "sync-message::element", self.__sync_message)
 
         if blacfg.getboolean("player", "muted"):
             volume = 0
@@ -207,7 +190,17 @@ class BlaPlayer(gobject.GObject):
             self.stop()
             err, debug = message.parse_error()
             from blaplay.blagui import blaguiutils
-            blaguiutils.error_dialog("Error", "%s" % err)
+            blaguiutils.error_dialog("Error", str(err))
+
+    def __sync_message(self, bus, message):
+        if message.structure.get_name() == "prepare-xwindow-id":
+            try:
+                xid = self.__sync_handler()
+            except AttributeError:
+                print_w("No sync handler set for video playback")
+            else:
+                self.set_xwindow_id(xid)
+            return False
 
     def __parse_tags(self, tags):
         MAPPING = {
@@ -226,7 +219,17 @@ class BlaPlayer(gobject.GObject):
                 pass
             if key in ["organization", "location", "title"]:
                 self.__station[MAPPING[key]] = value
+        # FIXME: does it make sense to emit state_changed here?
         gobject.idle_add(self.emit, "state_changed")
+
+    def set_sync_handler(self, handler):
+        self.__sync_handler = handler
+
+    def set_xwindow_id(self, window_id):
+        try:
+            self.__bin.get_property("video_sink").set_xwindow_id(window_id)
+        except AttributeError:
+            pass
 
     def set_equalizer_value(self, band, value):
         if blacfg.getboolean("player", "use.equalizer"):
@@ -275,15 +278,15 @@ class BlaPlayer(gobject.GObject):
 
     def seek(self, pos):
         self.__bin.seek_simple(gst.FORMAT_TIME, gst.SEEK_FLAG_FLUSH, pos)
-        self.emit("seek")
+        self.emit("seeked", pos)
 
     def get_position(self):
-        if self.radio:
-            return 0
-        try:
-            return self.__bin.query_position(gst.FORMAT_TIME, None)[0]
-        except gst.QueryError:
-            return 0
+        if not self.radio:
+            try:
+                return self.__bin.query_position(gst.FORMAT_TIME, None)[0]
+            except (AttributeError, gst.QueryError):
+                pass
+        return 0
 
     def get_track(self):
         try:
@@ -295,7 +298,18 @@ class BlaPlayer(gobject.GObject):
     def get_state(self):
         return self.__state
 
+    def get_state_string(self):
+        if self.__state == blaconst.STATE_PLAYING:
+            return "Playing"
+        elif self.__state == blaconst.STATE_PAUSED:
+            return "Paused"
+        return "Stopped"
+
+    # TODO: remove the playlist argument
     def play_track(self, playlist, uri):
+        # FIXME: it's weird to set the uri here and play the track afterwards.
+        #        maybe compose these two methods differently
+
         if uri:
             self.__uri = uri
             self.play()
@@ -339,25 +353,6 @@ class BlaPlayer(gobject.GObject):
         self.emit("track_changed")
         self.emit("state_changed")
 
-    def play_station(self, station):
-        if not station:
-            return self.stop()
-        if (self.__state == blaconst.STATE_STOPPED and
-            not self.__init_pipeline()):
-            return
-        self.__station = station
-        self.__uri = None
-        self.__bin.set_state(gst.STATE_NULL)
-        self.__bin.set_property("uri", "%s" % self.__station.location)
-        self.__bin.set_state(gst.STATE_PAUSED)
-        self.__state = blaconst.STATE_PAUSED
-        self.emit("track_changed")
-        self.emit("state_changed")
-
-    @property
-    def radio(self):
-        return bool(self.__station)
-
     def pause(self):
         if self.__state == blaconst.STATE_PAUSED:
             self.__bin.set_state(gst.STATE_PLAYING)
@@ -367,11 +362,32 @@ class BlaPlayer(gobject.GObject):
             self.__state = blaconst.STATE_PAUSED
         self.emit("state_changed")
 
+    def play_pause(self):
+        if self.__state == blaconst.STATE_STOPPED:
+            self.play()
+        else:
+            self.pause()
+
+    def play_station(self, station):
+        if not station:
+            return self.stop()
+        if (self.__state == blaconst.STATE_STOPPED and
+            not self.__init_pipeline()):
+            return
+        self.__station = station
+        self.__uri = None
+        self.__bin.set_state(gst.STATE_NULL)
+        self.__bin.set_property("uri", self.__station.location)
+        self.__bin.set_state(gst.STATE_PAUSED)
+        self.__state = blaconst.STATE_PAUSED
+        self.emit("track_changed")
+        self.emit("state_changed")
+
     def stop(self):
         if self.__bin:
             self.__bin.set_state(gst.STATE_NULL)
             bus = self.__bin.get_bus()
-            bus.disconnect(self.__busid)
+            bus.disconnect(self.__message_id)
             bus.remove_signal_watch()
 
         self.__bin = None
@@ -410,9 +426,15 @@ class BlaPlayer(gobject.GObject):
             args = ("get_track", blaconst.TRACK_RANDOM, True)
         self.emit(*args)
 
-    def play_pause(self):
-        if self.__state == blaconst.STATE_STOPPED:
-            self.play()
-        else:
-            self.pause()
+    @property
+    def radio(self):
+        return bool(self.__station)
+
+    @property
+    def video(self):
+        try:
+            return self.__bin.get_property("n_video") > 0
+        except AttributeError:
+            pass
+        return False
 

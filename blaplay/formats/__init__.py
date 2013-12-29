@@ -34,14 +34,17 @@ def get_track(path):
     return track
 
 def _is_py_file(s):
+    # TODO: move this to blautil since we also use it for visualizations
     return not (s.endswith("pyc") or s.startswith("_"))
 
 def _check_module_integrity(module, name):
     try:
         format_ = getattr(module, name)
         extensions = format_.extensions
+        # TODO: use the iter() built-in to check iterability
         if not hasattr(extensions, "__iter__"):
             raise AttributeError
+        # TODO: check if these are callable
         for attr in ["_read_tags", "_save"]:
             if not hasattr(format_, attr):
                 raise AttributeError
@@ -55,6 +58,10 @@ def _check_module_integrity(module, name):
 # with an underscore. We filter module sources by this. Everything that passes
 # is treated like a format. Format classes have the same name as the module
 # name, but with capitalized first letter.
+# FIXME: some distributions might not install the py-files. to avoid being
+#        overly specific when it comes to extensions just filter out every file
+#        which starts with an underscore, put all passed names into a set() and
+#        iterate over this instead
 for module in filter(_is_py_file, os.listdir(os.path.dirname(__file__))):
     basename = blautil.toss_extension(module)
     name = basename.capitalize()
@@ -69,6 +76,8 @@ for module in filter(_is_py_file, os.listdir(os.path.dirname(__file__))):
         format_ = _check_module_integrity(module, name)
         if format_:
             for ext in format_.extensions:
+                # FIXME: with the addition of video support we overwrite
+                #        certain extension handlers here, e.g. mp4
                 formats[ext] = format_
 
 del _is_py_file

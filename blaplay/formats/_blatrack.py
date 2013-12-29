@@ -70,6 +70,12 @@ class BlaTrack(dict):
         except IndexError:
             return item
 
+    def _read_tags(self):
+        pass
+
+    def _save(self):
+        return True
+
     def _parse_info(self, info):
         self[SAMPLING_RATE] = info.sample_rate
 
@@ -125,13 +131,24 @@ class BlaTrack(dict):
         # a numerical identifier as defined in formats._identifiers.
         return list(set(self.keys()).difference(xrange(N_IDENTIFIERS)))
 
+    # TODO: cache properties which don't change over time
+
     def get_cover_basepath(self):
         if "" in [self[ARTIST], self[ALBUM]]:
-            return ""
+            return None
         base = "%s-%s" % (
             self[ARTIST].replace(" ", "_"), self[ALBUM].replace(" ", "_"))
         base = base.replace("/", "_")
         return os.path.join(blaconst.COVERS, base)
+
+    def get_cover_path(self):
+        basepath = self.get_cover_basepath()
+        if basepath is not None:
+            for ext in ["jpg", "png"]:
+                cover = "%s.%s" % (basepath, ext)
+                if os.path.isfile(cover):
+                    return cover
+        return None
 
     def get_lyrics_key(self):
         if "" in [self[ARTIST], self[TITLE]]:

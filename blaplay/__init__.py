@@ -21,39 +21,98 @@ import gobject
 import gtk
 
 from blaplay.blacore import blaconst
+from blaplay import blautil
 
 cli_queue = None
 
 
-class Blaplay(object):
+class Blaplay(gobject.GObject):
+    __slots__ = ("library", "player", "window")
+    __gsignals__ = {
+        "startup_complete": blautil.signal(0)
+    }
+
     __cleanup = []
 
     def __init__(self):
+        super(Blaplay, self).__init__()
         self.library = self.player = self.window = None
 
+    def __setattr__(self, attr, value):
+        # The attributes for this class are frozen. That is, we only allow the
+        # assignment to attributes named in __slots__. However, we additionally
+        # make sure no one reassigns to one of the allowed fields here.
+        if hasattr(self, attr) and getattr(self, attr) is not None:
+            raise ValueError("Attribute '%s' already has a value" % attr)
+        return super(Blaplay, self).__setattr__(attr, value)
+
     def main(self):
+        def map_event(window, event):
+            self.emit("startup_complete")
+            self.window.disconnect(cid)
+        cid = self.window.connect("map_event", map_event)
         gobject.idle_add(self.window.show)
+        print_d("Entering the main loop")
         gtk.main()
 
     def register_for_cleanup(self, instance):
+        # Class instances which need to shut down gracefully and preferably
+        # before the user interface has been destroyed can register themselves
+        # via this method. Classes that do so need to implement the __call__
+        # method as their cleanup routine.
         self.__cleanup.append(instance)
 
     def shutdown(self):
-        # Class instances which need to shut down gracefully and preferably
-        # before the user interface has been destroyed can register themselves
-        # via the `register_for_cleanup' method. Classes that do so need to
-        # implement the __call__ method as their cleanup routine.
+        print_d("Shutting down %s..." % blaconst.APPNAME)
+
+        # Stop playback. It is important to do this before destroying the main
+        # window as we otherwise might end up with an invalid xid we told
+        # gstreamer to use for video rendering.
+        try:
+            self.player.stop()
+        except AttributeError:
+            pass
+
+        # FIXME: this is our gateway routine for shutting down blaplay, i.e.
+        #        shutdown always starts here. just calling the kill_threads
+        #        classmethod isn't enough to actually stop the threads. we also
+        #        need to join them. otherwise interpreter shutdown might be
+        #        initiated after leaving this function with threads still running.
+        #        occasionally, these wake up to find their containing module's
+        #        globals() dict wiped clean and start spitting out exceptions +
+        #        segfaults.
+        from blaplay import blautil
+        blautil.BlaThread.kill_threads()
+
         for instance in self.__cleanup:
             print_d("Calling shutdown routine for %s" %
                     instance.__class__.__name__)
             instance()
+
+        from blaplay.blagui import blaguiutils
+        # TODO: destroy all additional windows instead of just hiding them.
+        #       windows from which dialogs were run (which have their own event
+        #       loops) will cause segfaults otherwise. would it be enough to
+        #       parent every other window to self.window?
+        blaguiutils.set_visible(False)
+
+        # Get rid of the main window.
+        try:
+            self.window.destroy_()
+        except AttributeError:
+            pass
+
+        from blaplay.blacore import blacfg
+        blacfg.save()
+
+        print_d("Stopping the main loop")
+        gtk.main_quit()
 
 bla = Blaplay()
 
 
 def finish_startup():
     from blaplay.blacore import blacfg, bladb
-    from blaplay import blautil
 
     # Initialize the config.
     blacfg.init()
@@ -68,7 +127,6 @@ def finish_startup():
     # Initialize the GUI.
     from blaplay import blagui
     bla.window = blagui.init()
-    bla.window.connect("destroy", shutdown)
 
     # Set up the D-Bus interface.
     try:
@@ -93,6 +151,14 @@ def finish_startup():
 
     bladbus.setup_bus()
 
+    # Initialize MPRIS2 module.
+    try:
+        from blaplay.blautil import blampris
+    except ImportError:
+        pass
+    else:
+        blampris.init()
+
     # Initialize last.fm services.
     from blaplay.blautil import blafm
     blafm.init()
@@ -106,33 +172,13 @@ def finish_startup():
     import ctypes.util
 
     gobject.set_prgname(blaconst.APPNAME)
-    try:
-        soname = ctypes.util.find_library("c")
-        # 15 == PR_SET_NAME
-        ctypes.CDLL(soname).prctl(15, blaconst.APPNAME, 0, 0, 0)
-    except AttributeError:
-        pass
-
-    # FIXME: rather just save it when it actually changed
-    # Schedule periodic saving of the config.
-    gobject.timeout_add(blaconst.CFG_TIMEOUT * 60 * 1000, blacfg.save, False)
+    soname = ctypes.util.find_library("c")
+    # 15 == PR_SET_NAME
+    ctypes.CDLL(soname).prctl(15, blaconst.APPNAME, 0, 0, 0)
 
     # Finally, start the main loop.
     bla.main()
 
-def shutdown(window):
-    print_d("Shutting down...")
-
-    bla.player.stop()
-
-    from blaplay import blautil
-    blautil.BlaThread.kill_threads()
-
+def shutdown():
     bla.shutdown()
-
-    from blaplay.blacore import blacfg
-    blacfg.save()
-
-    print_d("Stopping the main loop")
-    gtk.main_quit()
 

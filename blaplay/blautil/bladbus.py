@@ -17,7 +17,6 @@
 import sys
 import os
 
-import dbus
 import dbus.service
 import dbus.mainloop.glib
 dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
@@ -34,7 +33,9 @@ def setup_bus():
     BlaDBus(object_path=OBJECT_PATH, bus_name=bus_name)
 
 def query_bus(query, arg=None):
-    # FIXME: do this properly once we comply to MPRIS 2.2
+    # FIXME: - do this properly once we comply to MPRIS 2.2
+    #        - since we started using the gst module in the formats package
+    #          recently importing this here also imports gst
     from blaplay.formats._identifiers import ARTIST, TITLE, ALBUM, DATE, GENRE
 
     # Get a proxy to the bus object of the running blaplay instance.
@@ -99,6 +100,7 @@ class BlaDBus(dbus.service.Object):
     def get_tag(self, identifier):
         from blaplay.formats._identifiers import ARTIST, TITLE
 
+        # FIXME: check if track is None
         track = self.__player.get_track()
         ret = track[identifier]
         if not ret:
@@ -118,11 +120,9 @@ class BlaDBus(dbus.service.Object):
     def get_cover(self):
         track = self.__player.get_track()
         if track:
-            cover = track.get_cover_basepath()
-            if os.path.isfile("%s.jpg" % cover):
-                return ("%s.jpg" % cover)
-            elif os.path.isfile("%s.png" % cover):
-                return ("%s.png" % cover)
+            cover = track.get_cover_path()
+            if cover is not None:
+                return cover
         return ""
 
     @dbus.service.method(

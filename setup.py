@@ -38,7 +38,7 @@ class clean(d_clean):
 
         for mod in self.distribution.ext_modules:
             paths = ["%s.c" % blautil.toss_extension(src)
-                     for src in mod.sources if "mmkeys" not in src]
+                     for src in mod.sources]
             paths.append(
                 os.path.join(base, "%s.so" % mod.name.replace(".", "/")))
             for f in paths:
@@ -178,8 +178,8 @@ class build_shortcuts(Command):
         basepath = os.path.join(self.build_base, "share", "applications")
         self.mkpath(basepath)
         for shortcut in self.shortcuts:
-            self.copy_file(shortcut, os.path.join(basepath,
-                                                  os.path.basename(shortcut)))
+            self.copy_file(shortcut,
+                           os.path.join(basepath, os.path.basename(shortcut)))
 
 class update_icon_cache(Command):
     def initialize_options(self):
@@ -265,28 +265,6 @@ if __name__ == "__main__":
                   extra_compile_args=extra_compile_args)
         for f in visualizations]
 
-    # mmkeys module
-    defs = exec_("pkg-config --variable=defsdir pygtk-2.0".split())
-    defs = " ".join(map(str.strip, defs))
-    name = "mmkeys_"
-    mmkeyspy = exec_(
-        ("""pygobject-codegen-2.0 --prefix %s
-         --register %s/gdk-types.defs
-         --register %s/gtk-types.defs
-         --override mmkeys.override
-         mmkeys.defs""" % (name, defs, defs)).split(),
-        split=False, cwd="mmkeys")
-
-    with open("mmkeys/mmkeyspy.c", "w") as f:
-        f.write(mmkeyspy)
-    ext_modules.append(
-        Extension("blaplay.blagui.%s" % name, ["mmkeys/%s" % f
-                  for f in ("mmkeyspy.c", "mmkeys.c", "mmkeysmodule.c")],
-                  extra_compile_args=exec_(
-                  "pkg-config --cflags gtk+-2.0 pygtk-2.0".split()),
-                  extra_link_args=exec_(
-                  "pkg-config --libs gtk+-2.0 pygtk-2.0".split())))
-
     # Icons
     base = "blaplay/images"
     images_comps = []
@@ -306,7 +284,7 @@ if __name__ == "__main__":
         "packages": ["blaplay"] + ["blaplay.%s" % module for module in
                                    ["blacore", "blagui", "blautil", "formats",
                                     "visualizations"]],
-        # package_data is used for files directly used by blaplay which
+        # Package_data is used for files directly used by blaplay which
         # aren't modules such as images.
         "package_data": {
             "": ["ChangeLog", "TODO"],

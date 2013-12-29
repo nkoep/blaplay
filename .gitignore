@@ -1,5 +1,7 @@
 *~
+*.swp
 *.pyc
+*.pyo
 visualizations/*.c
 *.so
 *.html
@@ -7,3 +9,4 @@ visualizations/*.c
 build
 dist
 MANIFEST
+

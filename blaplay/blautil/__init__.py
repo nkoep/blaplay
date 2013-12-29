@@ -32,47 +32,69 @@ import ctypes
 import time
 
 import gobject
+import gio
 import gtk
 
-KEY, PREV, NEXT = xrange(3)
 
+def clamp(min_, max_, value):
+    if min_ > max_:
+        raise ValueError("Lower bound must be smaller or equal to upper bound")
+    return max(min_, min(max_, value))
 
 def signal(n_args):
-    return (gobject.SIGNAL_RUN_LAST, gobject.TYPE_NONE, (object,) * n_args)
+    return (gobject.SIGNAL_RUN_LAST | gobject.SIGNAL_ACTION,
+            gobject.TYPE_NONE, (object,) * n_args)
 
-def thread(f):
-    @functools.wraps(f)
+def thread(func):
+    @functools.wraps(func)
     def wrapper(*args, **kwargs):
-        t = BlaThread(target=f, args=args, kwargs=kwargs)
+        t = BlaThread(target=func, args=args, kwargs=kwargs)
         t.daemon = True
         t.start()
         return t
     return wrapper
 
-def thread_nondaemonic(f):
-    @functools.wraps(f)
+def thread_nondaemonic(func):
+    @functools.wraps(func)
     def wrapper(*args, **kwargs):
-        t = Thread(target=f, args=args, kwargs=kwargs)
+        t = Thread(target=func, args=args, kwargs=kwargs)
         t.start()
         return t
     return wrapper
 
-# TODO: add optional argument to adjust the priority
-def idle(f):
-    @functools.wraps(f)
+def idle(func=None, **kwargs):
+    # There is one case we cannot avoid which is `@idle(some_callable)' as this
+    # looks like the regular use case
+    #   @idle
+    #   def some_func...
+    # to us. Every other misuse should be handled properly though.
+
+    if len(kwargs) > 1:
+        raise ValueError("Only one keyword argument allowed")
+    elif kwargs and "priority" not in kwargs:
+        raise ValueError("Invalid keyword argument '%s'" % kwargs.keys()[0])
+
+    if func is None:
+        if not kwargs:
+            raise ValueError("Keyword argument 'priority' expected")
+        def wrapper(func):
+            return idle(func, **kwargs)
+        return wrapper
+
+    @functools.wraps(func)
     def wrapper(*args):
-        gobject.idle_add(f, *args)
+        priority = kwargs.get("priority", gobject.PRIORITY_DEFAULT_IDLE)
+        gobject.idle_add(func, *args, priority=priority)
     return wrapper
 
-# There's nothing complicated about this decorator at all...
 def lock(lock_):
-    def func(f):
-        @functools.wraps(f)
+    def wrapper_(func):
+        @functools.wraps(func)
         def wrapper(*args, **kwargs):
             with lock_:
-                f(*args, **kwargs)
+                func(*args, **kwargs)
         return wrapper
-    return func
+    return wrapper_
 
 def toss_extension(filepath):
     return os.path.splitext(filepath)[0]
@@ -80,10 +102,28 @@ def toss_extension(filepath):
 def get_extension(filepath):
     return filepath.split(".")[-1]
 
-def resolve_uri(uri):
-    uri = urlparse.urlparse(uri).path
-    uri = os.path.abspath(urllib.url2pathname(uri))
-    return uri
+def resolve_uris(uris):
+    # The argument might be a tuple or a list. Either way turn it into a new
+    # list so we don't mutate the iterable `uris' references when first calling
+    # this function.
+    uris = list(uris)
+    for idx, uri in enumerate(uris):
+        uri = urlparse.urlparse(uri).path
+        uri = os.path.abspath(urllib.url2pathname(uri))
+        uris[idx] = uri
+    return uris
+
+def filepaths2uris(paths):
+    quote = urllib.quote
+    urljoin = urlparse.urljoin
+    return [urljoin("file:", quote(filepath)) for filepath in paths]
+
+def get_mimetype(path):
+    file_ = gio.File(path)
+    try:
+        return file_.query_info("standard::content-type").get_content_type()
+    except gio.Error:
+        return ""
 
 def md5(string):
     m = hashlib.md5()
@@ -266,42 +306,37 @@ class BlaThread(Thread):
         BlaThread.__threads = filter(BlaThread.is_alive, BlaThread.__threads)
         BlaThread.__threads.append(self)
 
-    def start(self):
-        self.__run_ = self.run
-        self.run = self.__run
-        Thread.start(self)
+    def run(self):
+        sys.settrace(self.__globaltrace)
+        Thread.run(self)
 
     def kill(self):
         self.__killed = True
 
     @classmethod
     def kill_threads(cls):
-        map(cls.kill, cls.__threads)
-
-    def __run(self):
-        sys.settrace(self.__globaltrace)
-        self.__run_()
-        self.run = self.__run_
+       map(cls.kill, cls.__threads)
 
     def __globaltrace(self, frame, event, arg):
         if event == "call":
             return self.__localtrace
+        else:
+            print_w("GLOBAL TRACE: " + event)
         return None
 
     def __localtrace(self, frame, event, arg):
-        try:
-            if self.__killed and event == "line":
-                BlaThread.__threads.remove(self)
-                raise SystemExit
-            return self.__localtrace
-        except AttributeError:
+        if self.__killed and event == "line":
+            BlaThread.__threads.remove(self)
             raise SystemExit
+        return self.__localtrace
 
 class BlaOrderedSet(collections.MutableSet):
     """
     set-like class which maintains the order in which elements were added.
-    Implementation from: http://code.activestate.com/recipes/576694
+    Modified version of http://code.activestate.com/recipes/576694
     """
+
+    __KEY, __PREV, __NEXT = xrange(3)
 
     def __init__(self, iterable=None):
         self.end = end = []
@@ -319,28 +354,29 @@ class BlaOrderedSet(collections.MutableSet):
     def add(self, key):
         if key not in self.map:
             end = self.end
-            curr = end[PREV]
-            curr[NEXT] = end[PREV] = self.map[key] = [key, curr, end]
+            curr = end[self.__PREV]
+            curr[self.__NEXT] = end[self.__PREV] = self.map[key] = [
+                key, curr, end]
 
     def discard(self, key):
         if key in self.map:
             key, prev, next = self.map.pop(key)
-            prev[NEXT] = next
-            next[PREV] = prev
+            prev[self.__NEXT] = next
+            next[self.__PREV] = prev
 
     def __iter__(self):
         end = self.end
-        curr = end[NEXT]
+        curr = end[self.__NEXT]
         while curr is not end:
-            yield curr[KEY]
-            curr = curr[NEXT]
+            yield curr[self.__KEY]
+            curr = curr[self.__NEXT]
 
     def __reversed__(self):
         end = self.end
-        curr = end[PREV]
+        curr = end[self.__PREV]
         while curr is not end:
-            yield curr[KEY]
-            curr = curr[PREV]
+            yield curr[self.__KEY]
+            curr = curr[self.__PREV]
 
     def pop(self, last=True):
         if not self:
@@ -361,4 +397,36 @@ class BlaOrderedSet(collections.MutableSet):
 
     def __del__(self):
         self.clear()
+
+# Note that assignment to an existing key is still possible by deleting the
+# relevant entry first. It's still a decent precautionary measure to avoid
+# accidental overrides of existing keys.
+class BlaFrozenDict(dict):
+    def setdefault(self, keys, default=None):
+        raise NotImplementedError("Method not supported")
+
+    def __setitem__(self, key, value):
+        if key in self:
+            raise ValueError("Entry for key '%s' already exists" % key)
+        super(BlaFrozenDict, self).__setitem__(key, value)
+
+class BlaSingletonMeta(gobject.GObjectMeta):
+    __instances = {}
+
+    def __call__(cls, *args, **kwargs):
+        try:
+            instance = cls.__instances[cls]
+        except KeyError:
+            instance = cls.__instances[cls] = super(
+                BlaSingletonMeta, cls).__call__(*args, **kwargs)
+            def destroy(instance):
+                try:
+                    del cls.__instances[instance.__class__]
+                except KeyError:
+                    pass
+            try:
+                instance.connect("destroy", destroy)
+            except TypeError:
+                pass
+        return instance
 

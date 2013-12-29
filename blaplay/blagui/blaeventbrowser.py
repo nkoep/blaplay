@@ -30,12 +30,14 @@ import blaplay
 from blaplay.blacore import blacfg, blaconst
 from blaplay import blautil
 from blaplay.blautil import blafm
-from blaplay.blagui import blaguiutils
+from blaview import BlaViewMeta
+from blawindows import BlaScrolledWindow
 from blareleasebrowser import IMAGE_SIZE, BlaCellRendererPixbuf
+import blaguiutils
 
 class BlaEvent(object):
     __EMPTY_PIXBUF = gtk.gdk.Pixbuf(gtk.gdk.COLORSPACE_RGB, True, 8,
-                IMAGE_SIZE, IMAGE_SIZE)
+                                    IMAGE_SIZE, IMAGE_SIZE)
     __EMPTY_PIXBUF.fill(0)
 
     def __init__(self, raw):
@@ -45,11 +47,15 @@ class BlaEvent(object):
         self.cancelled = bool(int(raw["cancelled"]))
         self.artists = [raw["artists"]["headliner"]]
         artists = raw["artists"]["artist"]
-        if not hasattr(artists, "__iter__"): artists = [artists]
-        [self.artists.append(artist) for artist in artists
-                if artist not in self.artists]
-        try: self.artists.remove(self.event_name)
-        except ValueError: pass
+        if not hasattr(artists, "__iter__"):
+            artists = [artists]
+        for artist in artists:
+            if artist not in self.artists:
+                self.artists.append(artist)
+        try:
+            self.artists.remove(self.event_name)
+        except ValueError:
+            pass
         self.date = blautil.format_date(parse_rfc_time(raw["startDate"]))
         self.image = BlaEvent.__EMPTY_PIXBUF
         venue = raw["venue"]
@@ -59,28 +65,31 @@ class BlaEvent(object):
 
     def get_image(self, restore=False):
         image_base = os.path.join(
-                blaconst.EVENTS, ("%s" % self.event_name).replace(" ", "_"))
+            blaconst.EVENTS, self.event_name.replace(" ", "_"))
         pixbuf = path = None
         for ext in ["jpg", "png"]:
+            path = "%s.%s" % (image_base, ext)
             try:
-                path = "%s.%s" % (image_base, ext)
                 pixbuf = gtk.gdk.pixbuf_new_from_file(path)
-                break
-            except gobject.GError: pass
+            except gobject.GError:
+                continue
+            break
         else:
             if not restore:
                 url = blafm.get_image_url(self.__raw["image"])
                 try:
                     image, message = urllib.urlretrieve(url)
                     path = "%s.%s" % (
-                            image_base, blautil.get_extension(image))
+                        image_base, blautil.get_extension(image))
                     shutil.move(image, path)
                     pixbuf = gtk.gdk.pixbuf_new_from_file(path)
-                except (IOError, gobject.GError): pass
+                except (IOError, gobject.GError):
+                    pass
 
         # resize until the smaller dimension reaches IMAGE_SIZE, then crop
         # IMAGE_SIZE x IMAGE_SIZE pixels from the center of the image in
         # case of a landscape image and from the top in case of a portrait
+        # FIXME: too much code in the try-block
         try:
             width, height = pixbuf.get_width(), pixbuf.get_height()
             # portrait
@@ -95,23 +104,20 @@ class BlaEvent(object):
                 x = int((width - IMAGE_SIZE) / 2)
                 y = 0
             pixbuf = pixbuf.scale_simple(
-                    width, height, gtk.gdk.INTERP_HYPER).subpixbuf(
-                    x, y, IMAGE_SIZE, IMAGE_SIZE
-            )
+                width, height, gtk.gdk.INTERP_HYPER).subpixbuf(
+                    x, y, IMAGE_SIZE, IMAGE_SIZE)
 
-        except (AttributeError, gobject.GError): pass
+        except (AttributeError, gobject.GError):
+            pass
         self.image = pixbuf or BlaEvent.__EMPTY_PIXBUF
         return path
 
-class BlaEventBrowser(blaguiutils.BlaScrolledWindow):
-    __gsignals__ = {
-        "count_changed": blautil.signal(2)
-    }
+class BlaEventBrowser(BlaScrolledWindow):
+    __metaclass__ = BlaViewMeta("Events")
+
     __count_recommended = 0
     __count_all = 0
     __lock = blautil.BlaLock(strict=True)
-
-    name = property(lambda self: "Events")
 
     def __init__(self):
         super(BlaEventBrowser, self).__init__()
@@ -149,7 +155,8 @@ class BlaEventBrowser(blaguiutils.BlaScrolledWindow):
         location = gtk.Label()
         country = blacfg.getstring("general", "events.country")
         city = blacfg.getstring("general", "events.city")
-        if not city: location.set_markup("<i>Unspecified</i>")
+        if not city:
+            location.set_markup("<i>Unspecified</i>")
         else:
             location.set_text(
                     ", ".join([city, country] if country else [city]))
@@ -269,8 +276,7 @@ class BlaEventBrowser(blaguiutils.BlaScrolledWindow):
         self.__treeview.connect("row_activated", self.__row_activated)
         self.__treeview.connect(
                 "button_press_event", self.__button_press_event)
-        self.__models = [
-                gtk.ListStore(gobject.TYPE_PYOBJECT) for x in xrange(2)]
+        self.__models = map(gtk.ListStore, [gobject.TYPE_PYOBJECT] * 2)
         self.__treeview.set_model(self.__models[active])
         vbox.pack_start(self.__treeview, expand=True, padding=10)
 
@@ -289,12 +295,7 @@ class BlaEventBrowser(blaguiutils.BlaScrolledWindow):
         blautil.serialize_to_file(events, blaconst.EVENTS_PATH)
 
     def __change_location(self, button, location):
-        diag = gtk.Dialog(title="Change location",
-                buttons=(gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL,
-                gtk.STOCK_OK, gtk.RESPONSE_OK),
-                flags=gtk.DIALOG_DESTROY_WITH_PARENT|gtk.DIALOG_MODAL
-        )
-        diag.set_resizable(False)
+        diag = blaguiutils.BlaDialog(title="Change location")
 
         # country list
         country = blacfg.getstring("general", "events.country")
@@ -349,6 +350,7 @@ class BlaEventBrowser(blaguiutils.BlaScrolledWindow):
             country = blacfg.getstring("general", "events.country")
             city = blacfg.getstring("general", "events.city")
 
+            # TODO: these don't always seem to timeout properly
             events = (
                 blafm.get_events(limit=limit, recommended=True),
                 blafm.get_events(limit=limit, recommended=False,
@@ -433,7 +435,7 @@ class BlaEventBrowser(blaguiutils.BlaScrolledWindow):
 
         return False
 
-    def restore(self):
+    def init(self):
         events = blautil.deserialize_from_file(blaconst.EVENTS_PATH)
         if events:
             model = gtk.ListStore(gobject.TYPE_PYOBJECT)

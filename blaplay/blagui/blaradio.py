@@ -26,9 +26,11 @@ import blaplay
 player = blaplay.bla.player
 from blaplay.blacore import blacfg, blaconst
 from blaplay import blautil, blagui
+from blaview import BlaViewMeta
+from blawindows import BlaScrolledWindow
 from blaplay.formats._blatrack import BlaTrack
 from blaplay.formats._identifiers import LENGTH, TITLE
-from blaplay.blagui import blaguiutils
+import blaguiutils
 
 
 def parse_uri(uri):
@@ -85,12 +87,9 @@ class BlaRadioStation(BlaTrack):
     location = property(lambda self: self["location"])
 
 class BlaRadio(gtk.VBox):
-    __gsignals__ = {
-        "count_changed": blautil.signal(2)
-    }
-    __current = None
+    __metaclass__ = BlaViewMeta("Internet Radio")
 
-    name = property(lambda self: "Internet Radio")
+    __current = None
 
     def __init__(self):
         super(BlaRadio, self).__init__(spacing=3)
@@ -163,7 +162,7 @@ class BlaRadio(gtk.VBox):
             c.set_cell_data_func(r, cell_data_func, identifier)
             self.__treeview.append_column(c)
 
-        sw = blaguiutils.BlaScrolledWindow()
+        sw = BlaScrolledWindow()
         sw.set_shadow_type(gtk.SHADOW_IN)
         sw.add(self.__treeview)
 
@@ -171,13 +170,13 @@ class BlaRadio(gtk.VBox):
         self.pack_start(sw, expand=True)
 
         self.__treeview.enable_model_drag_dest([
-                ("radio", 0, 0),
-                ("text/uri-list", 0, 1),
-                ("text/plain", 0, 2),
-                ("TEXT", 0, 3),
-                ("STRING", 0, 4),
-                ("COMPOUND_TEXT", 0, 5),
-                ("UTF8_STRING", 0, 6)
+                ("radio", gtk.TARGET_OTHER_APP, 0),
+                ("text/uri-list", gtk.TARGET_OTHER_APP, 1),
+                ("text/plain", gtk.TARGET_OTHER_APP, 2),
+                ("TEXT", gtk.TARGET_OTHER_APP, 3),
+                ("STRING", gtk.TARGET_OTHER_APP, 4),
+                ("COMPOUND_TEXT", gtk.TARGET_OTHER_APP, 5),
+                ("UTF8_STRING", gtk.TARGET_OTHER_APP, 6)
                 ],
                 gtk.gdk.ACTION_COPY
         )
@@ -237,9 +236,7 @@ class BlaRadio(gtk.VBox):
 
         # DND from an external location
         else:
-            uris = selection_data.data.strip("\n\r\x00")
-            resolve_uri = blautil.resolve_uri
-            uris = map(resolve_uri, uris.replace("\r", "").split("\n"))
+            uris = blautil.resolve_uris(selection_data.get_uris())
             map(self.__add_station, uris)
 
     def __update_rows(self):
@@ -352,7 +349,7 @@ class BlaRadio(gtk.VBox):
         if blagui.is_accel(event, "Delete"): self.__remove_stations()
         return False
 
-    def restore(self):
+    def init(self):
         try:
             self.__current, stations = blautil.deserialize_from_file(
                   blaconst.STATIONS_PATH)

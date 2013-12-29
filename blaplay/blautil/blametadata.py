@@ -63,14 +63,15 @@ class BlaMetadata(object):
             return None
 
 class BlaFetcher(gobject.GObject):
+    # TODO: add a payload class in which we wrap the timestamp, etc.
     __gsignals__ = {
-        "cover": blautil.signal(2),
-        "lyrics": blautil.signal(1),
-        "biography": blautil.signal(2)
+        "cover": blautil.signal(3),
+        "lyrics": blautil.signal(2),
+        "biography": blautil.signal(3)
     }
 
-    __track = None
     __tid = -1
+    __thread_lyrics = __thread_biography = __thread_cover = None
 
     class JSONParser(object):
         def feed(self, feed, **kwargs):
@@ -197,22 +198,26 @@ class BlaFetcher(gobject.GObject):
         return feed
 
     @blautil.thread
-    def __fetch_lyrics(self):
-        track = self.__track
+    def __fetch_lyrics(self, track, timestamp):
+        def emit(lyrics):
+            self.emit("lyrics", timestamp, lyrics)
+
         lyrics = None
 
         if not track or not track.get_lyrics_key():
-            self.emit("lyrics", lyrics)
+            emit(lyrics)
             return
 
         lyrics_key = track.get_lyrics_key()
 
-        # Try locally stored lyrics first
+        # Try locally stored lyrics first.
         lyrics = metadata.get("lyrics", lyrics_key)
         if lyrics and False: # FIXME: remove this after testing
-            self.emit("lyrics", lyrics)
+            emit(lyrics)
             return
 
+        # TODO: wrap lyrics providers in their own class
+        #       http://www.plyrics.com/lyrics/balanceandcomposure/reflection.html
         resources = [
             # TODO: - add option for passing dict of replacements to the __download_feed method
             #       - don't escape ß for wikia
@@ -266,59 +271,60 @@ class BlaFetcher(gobject.GObject):
                 print_d("Failed to store lyrics")
             metadata.add("lyrics", lyrics_key, lyrics)
 
-        self.emit("lyrics", lyrics)
+        emit(lyrics)
 
     @blautil.thread
-    def __fetch_cover(self, force_download=False):
+    def __fetch_cover(self, track, timestamp, force_download):
+        def emit(cover):
+            gobject.source_remove(self.__tid)
+            self.emit("cover", timestamp, cover, force_download)
+            return False
+
         gobject.source_remove(self.__tid)
-        track = self.__track
         cover = None
 
         image_base = track.get_cover_basepath()
+        if image_base is None:
+            return
+
         if not force_download:
             if os.path.isfile("%s.jpg" % image_base):
                 cover = "%s.jpg" % image_base
             elif os.path.isfile("%s.png" % image_base):
                 cover = "%s.png" % image_base
 
-        if cover:
-            self.emit("cover", cover, force_download)
-        else:
-            def f():
-                self.emit("cover", blaconst.COVER, force_download)
-                return False
-            self.__tid = gobject.timeout_add(2000, f)
-            cover = blafm.get_cover(track, image_base)
-            if not cover and not force_download:
-                base = os.path.dirname(track.uri)
-                images = [f for f in os.listdir(base)
-                          if blautil.get_extension(f) in ["jpg", "png"]]
-                for image in images:
-                    name = image.lower()
-                    # TODO: re anyone?
-                    if ("front" in name or "cover" in name or
-                        name.startswith("folder") or
-                        (name.startswith("albumart") and
-                         name.endswith("large"))):
-                        path = os.path.join(base, image)
-                        name = os.path.basename(image_base)
-                        images = [f for f in os.listdir(blaconst.COVERS)
-                                  if f.startswith(name)]
-                        images = [os.path.join(blaconst.COVERS, f)
-                                  for f in images]
-                        map(os.unlink, images)
-                        cover = "%s.%s" % (
-                            image_base, blautil.get_extension(path))
-                        shutil.copy(path, cover)
-                        break
+        if cover is not None:
+            return emit(cover)
 
-            if cover:
-                gobject.source_remove(self.__tid)
-                self.emit("cover", cover, force_download)
+        self.__tid = gobject.timeout_add(2000, emit, blaconst.COVER)
+        cover = blafm.get_cover(track, image_base)
+        # Don't try to get a cover from disk if we were specifically asked to
+        # download it.
+        if cover is None and not force_download:
+            base = os.path.dirname(track.uri)
+            images = [f for f in os.listdir(base)
+                      if blautil.get_extension(f).lower() in ["jpg", "png"]]
+            r = re.compile(
+                r"front|cover|^folder|^albumart.*large", re.UNICODE)
+            for image in images:
+                name = image.lower()
+                if r.search(name):
+                    path = os.path.join(base, image)
+                    name = os.path.basename(image_base)
+                    images = [f for f in os.listdir(blaconst.COVERS)
+                              if f.startswith(name)]
+                    images = [os.path.join(blaconst.COVERS, f)
+                              for f in images]
+                    map(os.unlink, images)
+                    cover = "%s.%s" % (
+                        image_base, blautil.get_extension(path))
+                    shutil.copy(path, cover)
+                    break
+        if cover is not None:
+            emit(cover)
 
     @blautil.thread
-    def __fetch_biography(self):
-        track = self.__track
+    def __fetch_biography(self, track, timestamp):
         image, biography = None, None
         if track[ARTIST]:
             # Look for a cached artist image first.
@@ -339,49 +345,52 @@ class BlaFetcher(gobject.GObject):
                 if biography:
                     metadata.add("bio", track[ARTIST], biography)
 
-        self.emit("biography", image, biography)
+        self.emit("biography", timestamp, image, biography)
 
-    def start(self, track, cover_only=False):
-        self.__track = track
+    def fetch_cover(self, track, timestamp, force_download=False):
+        # This convenience method makes sure we keep a reference to the thread
+        # that retrieves the cover so we're able to kill it once the method is
+        # called again. Covers ought to be able to be fetched independently of
+        # the lyrics and biography so we wrap the thread creation here.
+        try:
+            self.__thread_cover.kill()
+        except AttributeError:
+            pass
+        self.__thread_cover = self.__fetch_cover(
+            track, timestamp, force_download)
 
-        if cover_only:
+    def fetch_lyrics_and_bio(self, track, timestamp):
+        for thread in [self.__thread_lyrics, self.__thread_biography,
+                       self.__thread_cover]:
             try:
-                if not self.__thread_cover.is_alive():
-                    self.__thread_cover = self.__fetch_cover(
-                        force_download=True)
+                thread.kill()
             except AttributeError:
                 pass
-        else:
-            try:
-                map(blautil.BlaThread.kill, [self.__thread_lyrics,
-                        self.__thread_cover, self.__thread_biography])
-            except AttributeError:
-                pass
 
-            self.__thread_lyrics = self.__fetch_lyrics()
-            self.__thread_cover = self.__fetch_cover()
-            self.__thread_biography = self.__fetch_biography()
+        self.__thread_lyrics = self.__fetch_lyrics(track, timestamp)
+        self.__thread_biography = self.__fetch_biography(track, timestamp)
 
-    def set_cover(self, path=""):
+    def set_cover(self, timestamp, path=None):
         track = self.__track
 
-        # Stop any thread which still might be busy with retrieving a cover.
+        # Stop any thread which still might be trying to retrieve a cover.
         self.__thread_cover.kill()
 
-        # Remove any old images -- user-set or downloaded.
+        # Remove any old images -- both user-set and downloaded.
         if path != blaconst.COVER:
             image_base = track.get_cover_basepath()
-            name = os.path.basename(image_base)
-            images = [
-                os.path.join(blaconst.COVERS, f)
-                for f in os.listdir(blaconst.COVERS) if f.startswith(name)]
-            map(os.unlink, images)
+            if image_base is not None:
+                name = os.path.basename(image_base)
+                images = [
+                    os.path.join(blaconst.COVERS, f)
+                    for f in os.listdir(blaconst.COVERS) if f.startswith(name)]
+                map(os.unlink, images)
 
-        if path:
+        if path is not None:
             cover = "%s.%s" % (image_base, blautil.get_extension(path))
             shutil.copy(path, cover)
         else:
             cover = blaconst.COVER
 
-        self.emit("cover", cover, False)
+        self.emit("cover", timestamp, cover, False)
 

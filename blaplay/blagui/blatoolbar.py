@@ -39,6 +39,7 @@ class PositionSlider(gtk.HScale):
     def __init__(self):
         super(PositionSlider, self).__init__()
         self.set_draw_value(False)
+        self.set_sensitive(False)
 
         self.connect("key_press_event", lambda *x: True)
         self.connect("button_press_event", self.__seek_start)
@@ -222,6 +223,20 @@ class BlaToolbar(gtk.HBox):
         # the button box
         ctrlbar = gtk.Table(rows=1, columns=5, homogeneous=True)
         ctrlbar.set_name("ctrlbar")
+        gtk.rc_parse_string(
+            """
+            style "blaplay-toolbar"
+            {
+                xthickness = 0
+                ythickness = 0
+
+                GtkButton::focus-padding = 2
+            }
+
+            widget "*.GtkHBox.ctrlbar.GtkButton" style :
+                highest "blaplay-toolbar"
+            """
+        )
 
         img = gtk.Image()
         play_pause = gtk.Button()
@@ -273,7 +288,7 @@ class BlaToolbar(gtk.HBox):
         self.pack_start(volume, expand=False)
 
         player.connect("state_changed", self.__update_state, img, play_pause)
-        player.emit("state_changed")
+        self.__update_state(player, img, play_pause)
 
         self.show_all()
 

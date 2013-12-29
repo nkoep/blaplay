@@ -31,7 +31,9 @@ import blaplay
 from blaplay.blacore import blacfg, blaconst
 from blaplay import blautil
 from blaplay.blautil import blafm
-from blaplay.blagui import blaguiutils
+from blaview import BlaViewMeta
+from blawindows import BlaScrolledWindow
+import blaguiutils
 
 IMAGE_SIZE = 65
 
@@ -70,19 +72,13 @@ class BlaCellRendererPixbuf(blaguiutils.BlaCellRendererBase):
             layout.set_width((expose_area.width + expose_area.x) * pango.SCALE)
             layout.set_ellipsize(pango.ELLIPSIZE_END)
 
-            if blacfg.getboolean("colors", "overwrite"):
-                if (flags == (gtk.CELL_RENDERER_SELECTED |
-                        gtk.CELL_RENDERER_PRELIT) or
-                        flags == gtk.CELL_RENDERER_SELECTED):
-                    color = gtk.gdk.color_parse(self._active_text_color)
-                else: color = gtk.gdk.color_parse(self._text_color)
+            style = widget.get_style()
+            if (flags == (gtk.CELL_RENDERER_SELECTED |
+                          gtk.CELL_RENDERER_PRELIT) or
+                flags == gtk.CELL_RENDERER_SELECTED):
+                color = style.text[gtk.STATE_SELECTED]
             else:
-                style = widget.get_style()
-                if (flags == (gtk.CELL_RENDERER_SELECTED |
-                        gtk.CELL_RENDERER_PRELIT) or
-                        flags == gtk.CELL_RENDERER_SELECTED):
-                    color = style.text[gtk.STATE_SELECTED]
-                else: color = style.text[gtk.STATE_NORMAL]
+                color = style.text[gtk.STATE_NORMAL]
             cr.set_source_color(color)
 
             pc_context = pangocairo.CairoContext(cr)
@@ -160,15 +156,12 @@ class BlaRelease(object):
         self.cover = pixbuf or BlaRelease.__EMPTY_PIXBUF
         return path
 
-class BlaReleaseBrowser(blaguiutils.BlaScrolledWindow):
-    __gsignals__ = {
-        "count_changed": blautil.signal(2)
-    }
+class BlaReleaseBrowser(BlaScrolledWindow):
+    __metaclass__ = BlaViewMeta("New Releases")
+
     __count_library = 0
     __count_recommended = 0
     __lock = blautil.BlaLock(strict=True)
-
-    name = property(lambda self: "New Releases")
 
     def __init__(self):
         super(BlaReleaseBrowser, self).__init__()
@@ -252,8 +245,7 @@ class BlaReleaseBrowser(blaguiutils.BlaScrolledWindow):
         self.__treeview.connect("row_activated", self.__row_activated)
         self.__treeview.connect(
                 "button_press_event", self.__button_press_event)
-        self.__models = [gtk.ListStore(gobject.TYPE_PYOBJECT)
-                for x in xrange(2)]
+        self.__models = map(gtk.ListStore, [gobject.TYPE_PYOBJECT] * 2)
         self.__treeview.set_model(self.__models[active])
         vbox.pack_start(self.__treeview, expand=True, padding=10)
 
@@ -279,6 +271,7 @@ class BlaReleaseBrowser(blaguiutils.BlaScrolledWindow):
 
         with self.__lock:
             images = set()
+            # TODO: these don't always seem to timeout properly
             releases = (blafm.get_new_releases(),
                     blafm.get_new_releases(recommended=True))
             active = blacfg.getint("general", "releases.filter")
@@ -363,8 +356,9 @@ class BlaReleaseBrowser(blaguiutils.BlaScrolledWindow):
         user = blacfg.getstring("lastfm", "user")
         if user:
             artist_history_url = os.path.basename(release.artist_url)
-            artist_history_url = ("http://www.last.fm/user/%s/library/music/%s"
-                    % (user, artist_history_url))
+            artist_history_url = (
+                "http://www.last.fm/user/%s/library/music/%s" %
+                (user, artist_history_url))
             items.append(("View artist history",
                     lambda *x: blautil.open_url(artist_history_url)))
 
@@ -384,7 +378,7 @@ class BlaReleaseBrowser(blaguiutils.BlaScrolledWindow):
         timedelta = datetime.timedelta(days=(week-1)*7+1)
         return date + timedelta, date + timedelta + datetime.timedelta(days=6)
 
-    def restore(self):
+    def init(self):
         releases = blautil.deserialize_from_file(blaconst.RELEASES_PATH)
         if releases:
             model = gtk.ListStore(gobject.TYPE_PYOBJECT)

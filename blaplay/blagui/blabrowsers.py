@@ -17,7 +17,6 @@
 import os
 import cPickle as pickle
 import time
-import urllib
 import re
 
 import gobject
@@ -31,11 +30,12 @@ import blaplay
 library = blaplay.bla.library
 from blaplay.blacore import blaconst, blacfg
 from blaplay import blautil, blagui
+from blaplay.formats._identifiers import *
+from blawindows import BlaScrolledWindow
 from blaplaylist import BlaPlaylistManager, BlaQueue
 from blavisualization import BlaVisualization
 from blatagedit import BlaTagedit
-from blaplay.blagui import blaguiutils
-from blaplay.formats._identifiers import *
+import blaguiutils
 
 
 class BlaCellRenderer(blaguiutils.BlaCellRendererBase):
@@ -48,11 +48,11 @@ class BlaCellRenderer(blaguiutils.BlaCellRendererBase):
 
     def get_layout(self, *args):
         if len(args) == 1:
-            tv, text = args[0], ""
+            treeview, text = args[0], ""
         else:
-            tv, text = args
+            treeview, text = args
 
-        context = tv.get_pango_context()
+        context = treeview.get_pango_context()
         layout = pango.Layout(context)
         fdesc = gtk.widget_get_default_style().font_desc
         layout.set_font_description(fdesc)
@@ -77,17 +77,11 @@ class BlaCellRenderer(blaguiutils.BlaCellRendererBase):
 
     def on_render(self, window, widget, background_area, cell_area,
                   expose_area, flags):
-        if blacfg.getboolean("colors", "overwrite"):
-            text_color = self._text_color
-            active_text_color = self._active_text_color
-            selected_row_color = self._selected_row_color
-            background_color = self._background_color
-        else:
-            style = widget.get_style()
-            text_color = str(style.text[gtk.STATE_NORMAL])
-            active_text_color = str(style.text[gtk.STATE_SELECTED])
-            selected_row_color = str(style.base[gtk.STATE_SELECTED])
-            background_color = str(style.base[gtk.STATE_NORMAL])
+        style = widget.get_style()
+        text_color = str(style.text[gtk.STATE_NORMAL])
+        active_text_color = str(style.text[gtk.STATE_SELECTED])
+        selected_row_color = str(style.base[gtk.STATE_SELECTED])
+        background_color = str(style.base[gtk.STATE_NORMAL])
 
         # Render background
         cr = window.cairo_create()
@@ -103,8 +97,8 @@ class BlaCellRenderer(blaguiutils.BlaCellRendererBase):
         layout.set_font_description(widget.get_style().font_desc)
         width, height = layout.get_pixel_size()
 
-        if (flags == (gtk.CELL_RENDERER_SELECTED|gtk.CELL_RENDERER_PRELIT) or
-            flags == gtk.CELL_RENDERER_SELECTED):
+        use_highlight_color = flags & gtk.CELL_RENDERER_SELECTED
+        if use_highlight_color:
             color = gtk.gdk.color_parse(selected_row_color)
         else:
             color = gtk.gdk.color_parse(background_color)
@@ -117,8 +111,7 @@ class BlaCellRenderer(blaguiutils.BlaCellRendererBase):
         pc_context.fill()
 
         # Set font, font color and the text to render
-        if (flags == (gtk.CELL_RENDERER_SELECTED|gtk.CELL_RENDERER_PRELIT) or
-            flags == gtk.CELL_RENDERER_SELECTED):
+        if use_highlight_color:
             color = gtk.gdk.color_parse(active_text_color)
         else:
             color = gtk.gdk.color_parse(text_color)
@@ -129,7 +122,7 @@ class BlaCellRenderer(blaguiutils.BlaCellRendererBase):
 class BlaTreeView(blaguiutils.BlaTreeViewBase):
     def __init__(self, parent, multicol, browser_id):
         super(BlaTreeView, self).__init__(
-                multicol=multicol, renderer=0, text_column=1)
+            multicol=multicol, renderer=0, text_column=1)
 
         self.__parent = parent
         self.__browser_id = browser_id
@@ -230,7 +223,7 @@ class BlaTreeView(blaguiutils.BlaTreeViewBase):
         path = self.get_path_at_pos(*map(int, [event.x, event.y]))[0]
 
         # Handle LMB events
-        if event.button == 1 and action == 3:
+        if event.button == 1 and action == blaconst.ACTION_EXPAND_COLLAPSE:
             if self.row_expanded(path):
                 self.collapse_row(path)
             else:
@@ -273,7 +266,7 @@ class BlaTreeView(blaguiutils.BlaTreeViewBase):
             resolve = False
 
         name = model[path][2]
-        # TODO: defer calling get_tracks() when it's actually needed, i.e.
+        # TODO: defer calling get_tracks() until it's actually needed, i.e.
         #       when an "activate" callback is invoked
         tracks = self.get_tracks()
         directory = list(set(map(dirname, tracks)))
@@ -323,12 +316,13 @@ class BlaTreeView(blaguiutils.BlaTreeViewBase):
         menu.popup(None, None, None, event.button, event.time)
 
 class BlaQuery(object):
-    def __init__(self, tokens):
+    def __init__(self, filter_string):
         # TODO: if bool(tokens) is False, don't instantiate this at all
-        if tokens:
+        if filter_string:
+            filter_string = filter_string.decode("utf-8")
             flags = re.UNICODE | re.IGNORECASE
-            self.__res = [re.compile(t.decode("utf-8"), flags)
-                          for t in map(re.escape, tokens)]
+            self.__res = [re.compile(t, flags)
+                          for t in map(re.escape, filter_string.split())]
             self.query = self.__query
         else:
             self.query = lambda *x: True
@@ -350,10 +344,178 @@ class BlaQuery(object):
         return True
 
 class BlaLibraryBrowser(gtk.VBox):
+    __cid = -1
     __fid = -1
-    __filter_parameters = []
     __expanded_rows = []
     __model = None
+
+    class BlaLibraryModel(object):
+        # FIXME: for a library of ~9000 tracks creating an instance of the
+        #        model increases the interpreter's memory use by roughly 4 MB
+        #        every time. would this be better with a "lazy" model, i.e.
+        #        synthesizing nodes on row expansion? this could suffer from
+        #        performance issues. one way to fix it might be pushing the
+        #        tree creation to cpython using cython
+
+        __layout = [
+            gobject.TYPE_STRING,    # uri
+            gobject.TYPE_STRING,    # label (with child count if present)
+            gobject.TYPE_STRING,    # label
+            gobject.TYPE_BOOLEAN    # visibility value for filtering
+        ]
+
+        def __new__(cls, view):
+            # TODO: add a proper search tree implementation with sorted leaf
+            #       nodes so we don't have to wrap the resulting model in a
+            #       gtk.TreeModelSort() instance. also get rid of the
+            #       gtk.TreeModelFilter() instance. in most cases it's probably
+            #       faster to populate a new model after filtering the library
+            #       offline. for this, pass in a BlaQuery instance to the
+            #       constructor which we can use to filter the library.
+            #       finally, since we can then simply return a gtk.TreeModel()
+            #       instance, rename __new__ to __init__ and derive this class
+            #       from gtk.TreeModel directly. even though it seems to be
+            #       possible to derive and instantiate gtk.TreeModelFilter
+            #       instances by now, we don't need to anymore if we don't use
+            #       gtk's filtering capabilities (cf. playlists).
+
+            def get_iterator(model, iterators, comps):
+                d = iterators
+                iterator = None
+                for comp in comps:
+                    try:
+                        iterator, d = d[comp]
+                    except KeyError:
+                        d[comp] = [
+                            model.append(iterator, ["", comp, comp, True]), {}]
+                        iterator, d = d[comp]
+                return iterator
+
+            model = gtk.TreeStore(*cls.__layout)
+
+            if view == blaconst.ORGANIZE_BY_DIRECTORY:
+                cb = cls.__organize_by_directory
+            elif view == blaconst.ORGANIZE_BY_ARTIST:
+                cb = cls.__organize_by_artist
+            elif view == blaconst.ORGANIZE_BY_ARTIST_ALBUM:
+                cb = cls.__organize_by_artist_album
+            elif view == blaconst.ORGANIZE_BY_ALBUM:
+                cb = cls.__organize_by_album
+            elif view in [blaconst.ORGANIZE_BY_GENRE,
+                          blaconst.ORGANIZE_BY_YEAR]:
+                def cb(uri, comps):
+                    return cls.__organize_by_genre_year(uri, comps, view=view)
+            else:
+                raise NotImplementedError("Invalid library view")
+
+            iterators = {}
+            old_iterator, old_comps = None, None
+            append = model.append
+
+            for uri in filter(cls.__get_filter(), library):
+                track = library[uri]
+                comps, leaf = cb(uri, track)
+
+                if old_comps is not None and comps == old_comps:
+                    iterator = old_iterator
+                else:
+                    iterator = get_iterator(model, iterators, comps)
+
+                append(iterator, [uri, leaf, leaf, True])
+
+                old_iterator = iterator
+                old_comps = comps
+
+            filt = model.filter_new()
+            filt.set_visible_column(3)
+            sort = gtk.TreeModelSort(filt)
+            sort.set_sort_column_id(2, gtk.SORT_ASCENDING)
+            return sort
+
+        @classmethod
+        def __get_filter(cls):
+            # This returns a filter function which URIs have to pass in order
+            # for them to be considered in the library browser.
+            def get_regexp(string):
+                tokens = [t.replace(".", "\.").replace("*", ".*")
+                          for t in map(str.strip, string.split(","))]
+                return re.compile(r"(%s)" % "|".join(tokens))
+
+            restrict_re = get_regexp(
+                blacfg.getstring("library", "restrict.to").strip())
+            exclude_string = blacfg.getstring("library", "exclude").strip()
+            if exclude_string:
+                exclude_re = get_regexp(exclude_string)
+                def filt(s):
+                    return restrict_re.match(s) and not exclude_re.match(s)
+            else:
+                filt = restrict_re.match
+            return filt
+
+        @classmethod
+        def __get_track_label(cls, track):
+            # FIXME: - get rid of the int() calls
+            #        - set the disc number prefix AFTER setting the track
+            #          number to make sure we don't get a label with a proper
+            #          disc number and a missing track number
+
+            # ValueError is raised if the int() call fails.
+            try:
+                label = "%d." % int(track[DISC].split("/")[0])
+            except ValueError:
+                label = ""
+            try:
+                label += "%02d. " % int(track[TRACK].split("/")[0])
+            except ValueError:
+                pass
+            artist = (track[ALBUM_ARTIST] or track[PERFORMER] or
+                      track[ARTIST] or track[COMPOSER])
+            if track[ARTIST] and artist != track[ARTIST]:
+                label += "%s - " % track[ARTIST]
+            return "%s%s" % (label, track[TITLE] or track.basename)
+
+        @classmethod
+        def __organize_by_directory(cls, uri, track):
+            if not track[MONITORED_DIRECTORY]:
+                raise ValueError("Trying to include track in the library "
+                                 "browser that has no monitored directory")
+            directory = os.path.dirname(
+                track.uri)[len(track[MONITORED_DIRECTORY])+1:]
+            comps = directory.split("/")
+            if comps == [""]:
+                comps = ["bla"]
+            else:
+                comps.insert(0, "bla")
+            return comps, os.path.basename(track.uri)
+
+        @classmethod
+        def __organize_by_artist(cls, uri, track):
+            return ([track[ARTIST] or "?", track[ALBUM] or "?"],
+                    cls.__get_track_label(track))
+
+        @classmethod
+        def __organize_by_artist_album(cls, uri, track):
+            artist = (track[ALBUM_ARTIST] or track[PERFORMER] or
+                      track[ARTIST] or "?")
+            return (["%s - %s" % (artist, track[ALBUM] or "?")],
+                    cls.__get_track_label(track))
+
+        @classmethod
+        def __organize_by_album(cls, uri, track):
+            return [track[ALBUM] or "?"], cls.__get_track_label(track)
+
+        @classmethod
+        def __organize_by_genre_year(cls, uri, track, view):
+            if view == blaconst.ORGANIZE_BY_GENRE:
+                key = GENRE
+            else:
+                key = DATE
+            organizer = track[key].capitalize() or "?"
+            if key == DATE:
+                organizer = organizer.split("-")[0]
+            label = "%s - %s" % (
+                track[ALBUM_ARTIST] or track[ARTIST], track[ALBUM] or "?")
+            return [organizer, label], cls.__get_track_label(track)
 
     def __init__(self, parent):
         super(BlaLibraryBrowser, self).__init__()
@@ -369,12 +531,12 @@ class BlaLibraryBrowser(gtk.VBox):
 
         self.__treeview.enable_model_drag_source(
             gtk.gdk.BUTTON1_MASK,
-            [("tracks/library", gtk.TARGET_SAME_APP, 0)],
+            [blagui.DND_TARGETS[blagui.DND_LIBRARY]],
             gtk.gdk.ACTION_COPY)
         self.__treeview.connect_object(
             "drag_data_get", BlaLibraryBrowser.__drag_data_get, self)
 
-        sw = blaguiutils.BlaScrolledWindow()
+        sw = BlaScrolledWindow()
         sw.add(self.__treeview)
 
         hbox = gtk.HBox()
@@ -393,23 +555,27 @@ class BlaLibraryBrowser(gtk.VBox):
         table.attach(cb, 0, 1, 1, 2)
         hbox.pack_start(table, expand=False)
 
-        entry = gtk.Entry()
-        entry.set_icon_from_stock(gtk.ENTRY_ICON_SECONDARY, gtk.STOCK_CLEAR)
-        entry.connect("icon_release", lambda *x: x[0].delete_text(0, -1))
-        entry.connect("changed", self.__update_filter_parameters)
-        entry.connect("activate", self.__update_treeview)
+        self.__entry = gtk.Entry()
+        self.__entry.set_icon_from_stock(gtk.ENTRY_ICON_SECONDARY,
+                                         gtk.STOCK_CLEAR)
+        self.__entry.connect(
+            "icon_release", lambda *x: x[0].delete_text(0, -1))
+        self.__entry.connect("changed", self.__filter_parameters_changed)
+        self.__entry.connect_object(
+            "activate", BlaLibraryBrowser.__update_treeview, self)
 
         button = gtk.Button()
         button.add(
             gtk.image_new_from_stock(gtk.STOCK_FIND, gtk.ICON_SIZE_BUTTON))
-        button.connect("clicked", self.__update_treeview)
+        button.connect_object(
+            "clicked", BlaLibraryBrowser.__update_treeview, self)
 
         alignment = gtk.Alignment()
         alignment.add(gtk.Label("Filter:"))
         table = gtk.Table(rows=2, columns=1, homogeneous=False)
         table.attach(alignment, 0, 1, 0, 1, xpadding=2, ypadding=2)
         hbox2 = gtk.HBox()
-        hbox2.pack_start(entry, expand=True)
+        hbox2.pack_start(self.__entry, expand=True)
         hbox2.pack_start(button, expand=False)
         table.attach(hbox2, 0, 1, 1, 2)
         hbox.pack_start(table)
@@ -417,27 +583,45 @@ class BlaLibraryBrowser(gtk.VBox):
         self.pack_start(sw, expand=True)
         self.pack_start(hbox, expand=False)
 
-        self.update_colors()
+        self.update_treeview_style()
+        self.update_tree_lines()
+        def config_changed(cfg, section, key):
+            if section == "library":
+                if key == "custom.browser":
+                    self.update_treeview_style()
+                elif key == "draw.tree.lines":
+                    self.update_tree_lines()
+        blacfg.connect("changed", config_changed)
 
-        library.connect(
-            "update_library_browser", self.__update_library_contents)
-        library.request_model(blacfg.getint("library", "organize.by"))
+        def queue_model_update(*args):
+            self.__queue_model_update(blacfg.getint("library", "organize.by"))
+        library.connect("library_changed", queue_model_update)
+        queue_model_update()
 
-    def __update_filter_parameters(self, entry):
-        self.__filter_parameters = entry.get_text().strip().split()
+    def __queue_model_update(self, view):
+        def create_model():
+            print_d("Updating library browser")
+            model = BlaLibraryBrowser.BlaLibraryModel(view)
+            self.__expanded_rows = []
+            self.__update_treeview(model)
+            return False
+        gobject.source_remove(self.__cid)
+        self.__cid = gobject.idle_add(create_model)
+
+    def __filter_parameters_changed(self, entry):
+        filter_string = self.__entry.get_text()
         if (blacfg.getboolean("playlist", "search.after.timeout") or
-            not self.__filter_parameters):
-            try:
-                gobject.source_remove(self.__fid)
-            except AttributeError:
-                pass
+            not filter_string):
+            gobject.source_remove(self.__fid)
             def activate():
-                entry.activate()
+                self.__entry.activate()
                 return False
             self.__fid = gobject.timeout_add(500, activate)
 
     def __drag_data_get(self, drag_context, selection_data, info, timestamp):
         data = self.__treeview.get_tracks()
+        # TODO: we could use set_uris() here as well which would allow DND
+        #       from the library to external applications like file managers
         data = pickle.dumps(data, protocol=pickle.HIGHEST_PROTOCOL)
         selection_data.set("", 8, data)
 
@@ -457,13 +641,7 @@ class BlaLibraryBrowser(gtk.VBox):
         if not path in self.__expanded_rows:
             self.__expanded_rows.append(path)
 
-    def __update_library_contents(self, library, model):
-        print_d("Updating library browser")
-        self.__expanded_rows = []
-        self.__model = model
-        self.__update_treeview()
-
-    def __update_treeview(self, *args):
+    def __update_treeview(self, model=None):
         def check_children(model, iterator, query):
             iter_has_child = model.iter_has_child
             iter_children = model.iter_children
@@ -484,8 +662,9 @@ class BlaLibraryBrowser(gtk.VBox):
                     else:
                         count_sub += 1
                         model[iterator][3] = True
-                        # FIXME: can't we just evaluate the child count in a
-                        #        cell_data_func?
+                        # TODO: do this with a cell data function once we
+                        #       sorted out the mess that is BlaBaseTreeView in
+                        #       blaguiutils
                         model[iterator][1] = "%s (%d)" % (
                             model[iterator][2], count)
                 else:
@@ -496,16 +675,19 @@ class BlaLibraryBrowser(gtk.VBox):
                 iterator = iter_next(iterator)
             return count_local + count_sub
 
-        filt = self.__model.get_model()
+        if model is None:
+            sort = self.__treeview.get_model()
+        else:
+            sort = model
+        filt = sort.get_model() # The model is actually a filter.
         model = filt.get_model()
         iterator = model.get_iter_first()
-        query = BlaQuery(self.__filter_parameters).query
+        query = BlaQuery(self.__entry.get_text().strip()).query
         check_children(model, iterator, query)
 
         self.__treeview.freeze_notify()
         self.__treeview.freeze_child_notify()
-        self.__treeview.set_model(None)
-        self.__treeview.set_model(self.__model)
+        self.__treeview.set_model(sort)
         organize_by = blacfg.getint("library", "organize.by")
         if (organize_by == blaconst.ORGANIZE_BY_DIRECTORY and
             model.get_iter_first()):
@@ -516,24 +698,32 @@ class BlaLibraryBrowser(gtk.VBox):
     def __organize_by_changed(self, combobox):
         view = combobox.get_active()
         blacfg.set("library", "organize.by", view)
-        library.request_model(view)
+        self.__queue_model_update(view)
 
-    def update_colors(self):
+    def update_treeview_style(self):
         column = self.__treeview.get_column(0)
         column.clear()
 
         if blacfg.getboolean("library", "custom.browser"):
             renderer = BlaCellRenderer()
-            renderer.update_colors()
         else:
             renderer = gtk.CellRendererText()
 
         column.pack_start(renderer, expand=True)
         column.add_attribute(renderer, "text", 1)
+        # TODO: this is how we'd ideally do things
+        # def cdf(column, cell, model, iterator):
+        #     n_children = model.iter_n_children(iterator)
+        #     if n_children > 0:
+        #         text = "%s (%d)" % (model[iterator][2], n_children)
+        #     else:
+        #         text = model[iterator][2]
+        #     renderer.set_property("text", text)
+        # column.set_cell_data_func(renderer, cdf)
 
     def update_tree_lines(self):
         self.__treeview.set_enable_tree_lines(
-            blacfg.getboolean("general", "draw.tree.lines"))
+            blacfg.getboolean("library", "draw.tree.lines"))
 
 class BlaFileBrowser(gtk.VBox):
     __layout = [
@@ -544,13 +734,8 @@ class BlaFileBrowser(gtk.VBox):
 
     __fid = -1
     __uid = -1
-    __filter_parameters = []
 
     class History(object):
-        """
-        History class which stores paths to previously visited directories.
-        """
-
         def __init__(self):
             super(BlaFileBrowser.History, self).__init__()
             self.__model = gtk.ListStore(gobject.TYPE_PYOBJECT)
@@ -599,58 +784,71 @@ class BlaFileBrowser(gtk.VBox):
         # The toolbar
         table = gtk.Table(rows=1, columns=6, homogeneous=False)
 
-        back = gtk.Button()
-        back.add(
-            gtk.image_new_from_stock(gtk.STOCK_GO_BACK, gtk.ICON_SIZE_BUTTON))
-        back.set_relief(gtk.RELIEF_NONE)
-        back.connect(
-            "clicked", lambda *x: self.__update_from_history(backwards=True))
-        table.attach(back, 0, 1, 0, 1, xoptions=not gtk.EXPAND)
+        buttons = [
+            (gtk.STOCK_GO_BACK,
+             lambda *x: self.__update_from_history(backwards=True)),
+            (gtk.STOCK_GO_UP,
+             lambda *x: self.__update_directory(
+                os.path.dirname(self.__directory))),
+            (gtk.STOCK_GO_FORWARD,
+             lambda *x: self.__update_from_history(backwards=False)),
+            (gtk.STOCK_HOME,
+             lambda *x: self.__update_directory(os.path.expanduser("~")))
+        ]
 
-        up = gtk.Button()
-        up.add(
-            gtk.image_new_from_stock(gtk.STOCK_GO_UP, gtk.ICON_SIZE_BUTTON))
-        up.set_relief(gtk.RELIEF_NONE)
-        up.connect(
-            "clicked",
-            lambda *x: self.__update_model(os.path.dirname(self.__directory)))
-        table.attach(up, 1, 2, 0, 1, xoptions=not gtk.EXPAND)
+        def add_button(icon, callback, idx):
+            button = gtk.Button()
+            button.add(gtk.image_new_from_stock(icon, gtk.ICON_SIZE_BUTTON))
+            button.set_relief(gtk.RELIEF_NONE)
+            button.connect("clicked", callback)
+            table.attach(button, idx, idx+1, 0, 1, xoptions=not gtk.EXPAND)
 
-        forward = gtk.Button()
-        forward.add(
-            gtk.image_new_from_stock(gtk.STOCK_GO_FORWARD,
-                                     gtk.ICON_SIZE_BUTTON))
-        forward.set_relief(gtk.RELIEF_NONE)
-        forward.connect(
-            "clicked", lambda *x: self.__update_from_history(backwards=False))
-        table.attach(forward, 2, 3, 0, 1, xoptions=not gtk.EXPAND)
+        idx = 0
+        for icon, callback in buttons:
+            add_button(icon, callback, idx)
+            idx += 1
 
+        # Add the entry field separately.
         self.__entry = gtk.Entry()
         self.__entry.connect(
             "activate",
-            lambda *x: self.__update_model(self.__entry.get_text()))
-        table.attach(self.__entry, 3, 4, 0, 1)
+            lambda *x: self.__update_directory(self.__entry.get_text()))
+        def key_press_event_entry(entry, event):
+            if (blagui.is_accel(event, "Escape") or
+                blagui.is_accel(event, "<Ctrl>L")):
+                self.__entry.select_region(-1, -1)
+                self.__treeview.grab_focus()
+                return True
+            elif (blagui.is_accel(event, "Up") or
+                  blagui.is_accel(event, "Down")):
+                return True
+            return False
+        self.__entry.connect("key_press_event", key_press_event_entry)
+        table.attach(self.__entry, idx, idx+1, 0, 1)
+        idx += 1
 
-        refresh = gtk.Button()
-        refresh.add(
-            gtk.image_new_from_stock(gtk.STOCK_REFRESH, gtk.ICON_SIZE_BUTTON))
-        refresh.set_relief(gtk.RELIEF_NONE)
-        refresh.connect(
-            "clicked", lambda *x: self.__update_model(refresh=True))
-        table.attach(refresh, 4, 5, 0, 1, xoptions=not gtk.EXPAND)
+        add_button(gtk.STOCK_REFRESH,
+                   lambda *x: self.__update_directory(refresh=True), idx)
+
         vbox.pack_start(table, expand=False, fill=False)
 
         # The treeview
         self.__treeview = BlaTreeView(parent=parent, multicol=True,
-                browser_id=blaconst.BROWSER_FILESYSTEM)
+                                      browser_id=blaconst.BROWSER_FILESYSTEM)
         self.__treeview.set_enable_search(True)
         self.__treeview.set_search_column(2)
         self.__treeview.enable_model_drag_source(
             gtk.gdk.BUTTON1_MASK,
-            [("tracks/filesystem", gtk.TARGET_SAME_APP, 1)],
+            [blagui.DND_TARGETS[blagui.DND_URIS]],
             gtk.gdk.ACTION_COPY)
         self.__treeview.connect_object(
             "drag_data_get", BlaFileBrowser.__drag_data_get, self)
+        def key_press_event(treeview, event):
+            if blagui.is_accel(event, "<Ctrl>L"):
+                self.__entry.grab_focus()
+                return True
+            return False
+        self.__treeview.connect("key_press_event", key_press_event)
         model = gtk.ListStore(*self.__layout)
         self.__filt = model.filter_new()
         self.__filt.set_visible_func(self.__visible_func)
@@ -677,7 +875,8 @@ class BlaFileBrowser(gtk.VBox):
 
         self.__treeview.append_column(c)
 
-        # FIXME: what would be a more useful column? maybe remove it completely
+        # TODO: turn this into nemo's size column (for files, display the size,
+        #       for directories the number of items)
         # Last modified column
         c = gtk.TreeViewColumn()
         c.set_sizing(gtk.TREE_VIEW_COLUMN_FIXED)
@@ -696,10 +895,10 @@ class BlaFileBrowser(gtk.VBox):
 
         self.__treeview.append_column(c)
         self.__treeview.connect("row_activated", self.__open)
-        self.__update_model(self.__directory)
+        self.__update_directory(self.__directory)
         self.__treeview.columns_autosize()
 
-        sw = blaguiutils.BlaScrolledWindow()
+        sw = BlaScrolledWindow()
         sw.add(self.__treeview)
         vbox.pack_start(sw, expand=True)
 
@@ -707,12 +906,16 @@ class BlaFileBrowser(gtk.VBox):
         hbox = gtk.HBox()
         hbox.pack_start(gtk.Label("Filter:"), expand=False, padding=2)
 
-        entry = gtk.Entry()
-        entry.set_icon_from_stock(gtk.ENTRY_ICON_SECONDARY, gtk.STOCK_CLEAR)
-        entry.connect("icon_release", lambda *x: x[0].delete_text(0, -1))
-        entry.connect("changed", self.__filter_parameters_changed)
-        entry.connect("activate", lambda *x: self.__filt.refilter())
-        hbox.pack_start(entry, expand=True)
+        self.__filter_entry = gtk.Entry()
+        self.__filter_entry.set_icon_from_stock(gtk.ENTRY_ICON_SECONDARY,
+                                                gtk.STOCK_CLEAR)
+        self.__filter_entry.connect(
+            "icon_release", lambda *x: x[0].delete_text(0, -1))
+        self.__filter_entry.connect(
+            "changed", self.__filter_parameters_changed)
+        self.__filter_entry.connect(
+            "activate", lambda *x: self.__filt.refilter())
+        hbox.pack_start(self.__filter_entry, expand=True)
 
         button = gtk.Button()
         button.add(
@@ -743,50 +946,56 @@ class BlaFileBrowser(gtk.VBox):
         # FIXME: depending on the number of items in the model this approach is
         #        slow. maybe filter "offline" as we do for playlists and
         #        populate a new model with the result
-        if self.__filter_parameters:
+        try:
+            # FIXME: now this is slow as hell as this gets called for every
+            #        iterator. it's just temporary though until we refactored
+            #        the library browser's treeview code
+            tokens = self.__filter_entry.get_text().strip().split()
+        except AttributeError:
+            return True
+        if tokens:
             try:
                 label = model[iterator][2].lower()
             except AttributeError:
                 return True
-            for p in self.__filter_parameters:
-                if p not in label:
+            for t in tokens:
+                if t not in label:
                     return False
         return True
 
     def __filter_parameters_changed(self, entry):
-        self.__filter_parameters = entry.get_text().strip().split()
+        filter_string = self.__filter_entry.get_text()
         if (blacfg.getboolean("general", "search.after.timeout") or
-            not self.__filter_parameters):
-            try:
-                gobject.source_remove(self.__fid)
-            except AttributeError:
-                pass
+            not filter_string):
+            gobject.source_remove(self.__fid)
             def activate():
                 self.__filt.refilter()
                 return False
             self.__fid = gobject.timeout_add(500, activate)
 
-    def __update_model(self, directory=None, refresh=False,
-                       add_to_history=True):
+    def __update_directory(self, directory=None, refresh=False,
+                           add_to_history=True):
         if not refresh:
-            if directory and not directory.startswith("/"):
+            if directory is None:
+                print_w("Directory must not be None")
+                return False
+            directory = os.path.expanduser(directory)
+            # Got a relative path?
+            if not os.path.isabs(directory):
                 directory = os.path.join(self.__directory, directory)
-            if directory and not os.path.exists(directory):
+            if not os.path.exists(directory):
                 blaguiutils.error_dialog(
                     "Could not find \"%s\"." % directory,
                     "Please check the spelling and try again.")
                 return False
-
-            if not directory or not os.path.exists(directory):
-                self.__directory = os.path.expanduser("~")
-            else:
-                self.__directory = os.path.abspath(directory)
-
+            self.__directory = directory
             self.__entry.set_text(self.__directory)
             blacfg.set("general", "filesystem.directory", self.__directory)
             if add_to_history:
                 self.__history.add(self.__directory)
 
+        # FIXME: don't use gtk's model filter capabilities
+        # TODO: keep the selection after updating the model
         model = self.__filt.get_model()
         self.__treeview.freeze_child_notify()
         model.clear()
@@ -802,6 +1011,10 @@ class BlaFileBrowser(gtk.VBox):
                 if f.startswith("."):
                     continue
                 path = os.path.join(self.__directory, f)
+                # TODO: use this instead (profile the overhead first though):
+                #         f = gio.File(path)
+                #         info = f.query_info("standard::content-type")
+                #         mimetype = info.get_content_type()
                 mimetype = gio.content_type_guess(path)
                 try:
                     pb = self.__pixbufs[mimetype]
@@ -822,6 +1035,7 @@ class BlaFileBrowser(gtk.VBox):
         except AttributeError:
             pass
 
+        # FIXME: this seems to cease working after handling an event
         self.__monitor = gio.File(self.__directory).monitor_directory(
             flags=gio.FILE_MONITOR_NONE)
         self.__monitor.connect("changed", self.__process_event)
@@ -832,8 +1046,8 @@ class BlaFileBrowser(gtk.VBox):
     def __process_event(self, monitor, filepath, other_filepath, type_):
         gobject.source_remove(self.__uid)
         self.__uid = gobject.timeout_add(
-            2000,
-            lambda *x: self.__update_model(refresh=True, add_to_history=False))
+            2000, lambda *x: self.__update_directory(refresh=True,
+                                                     add_to_history=False))
 
     def __update_from_history(self, backwards):
         if backwards:
@@ -842,13 +1056,13 @@ class BlaFileBrowser(gtk.VBox):
             path = self.__history.get(next=True)
 
         if path:
-            self.__update_model(directory=path, add_to_history=False)
+            self.__update_directory(directory=path, add_to_history=False)
 
     def __open(self, treeview, path, column):
         model = treeview.get_model()
         entry = model[path][0]
         if os.path.isdir(entry):
-            model = self.__update_model(entry)
+            model = self.__update_directory(entry)
             return True
         return False
 
@@ -862,9 +1076,8 @@ class BlaFileBrowser(gtk.VBox):
 
     def __drag_data_get(self, drag_context, selection_data, info, timestamp):
         model, paths = self.__treeview.get_selection().get_selected_rows()
-        quote = urllib.quote
-        data = ["file://%s" % quote(model[path][0]) for path in paths]
-        selection_data.set("tracks", 8, "\n".join(data))
+        uris = blautil.filepaths2uris([model[path][0] for path in paths])
+        selection_data.set_uris(uris)
 
 class BlaBrowsers(gtk.VBox):
     def __init__(self):
@@ -885,26 +1098,17 @@ class BlaBrowsers(gtk.VBox):
         notebook.show_all()
         self.show()
 
-        self.update_tree_lines()
-        self.set_visibility(blacfg.getboolean("general", "browsers"))
+        self.set_visible(blacfg.getboolean("general", "browsers"))
 
         page_num = blacfg.getint("general", "browser.view")
-        if page_num not in [0, 1]:
+        if page_num != 0 and page_num != 1:
             page_num = 0
         notebook.set_current_page(page_num)
         notebook.connect(
             "switch_page",
             lambda *x: blacfg.set("general", "browser.view", x[-1]))
 
-    def set_visibility(self, state):
-        self.set_visible(state)
+    def set_visible(self, state):
+        super(BlaBrowsers, self).set_visible(state)
         blacfg.setboolean("general", "browsers", state)
-
-    @classmethod
-    def update_tree_lines(cls):
-        cls.__library_browser.update_tree_lines()
-
-    @classmethod
-    def update_colors(cls):
-        cls.__library_browser.update_colors()
 

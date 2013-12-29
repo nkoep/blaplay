@@ -33,19 +33,16 @@ def init_signals():
     def main_quit(*args):
         def idle_quit():
             import blaplay
-            try:
-                blaplay.bla.window.destroy()
-            except AttributeError:
-                pass
+            blaplay.shutdown()
         gobject.idle_add(idle_quit, priority=gobject.PRIORITY_HIGH)
         return False
 
-    # Writing to a file descriptor that's monitored by gobject is buffered,
+    # Writing to a file descriptor which is monitored by gobject is buffered,
     # i.e. we can write to it here and the event gets handled as soon as a main
     # loop is started. We use this to defer shutdown requests during startup.
     r, w = os.pipe()
     gobject.io_add_watch(r, gobject.IO_IN, main_quit)
-    for sig in (signal.SIGTERM, signal.SIGINT, signal.SIGHUP):
+    for sig in [signal.SIGTERM, signal.SIGINT, signal.SIGHUP]:
         signal.signal(sig, lambda *x: os.write(w, "bla")) # What else?
 
 def parse_args():
@@ -75,7 +72,7 @@ def parse_args():
         "information and exit\n   %%a: artist\n   %%t: "
         "title\n   %%b: album\n   %%y: year"
         "\n   %%g: genre\n   %%c: cover", action="append")
-    parser.add_argument("-d", "--debug", action="store_true",
+    parser.add_argument("-d", "--debug", action="count",
                         help="print debug messages")
     parser.add_argument("-q", "--quiet", action="store_true",
                         help="only print fatal messages")
@@ -89,17 +86,24 @@ def parse_args():
     return vars(parser.parse_args())
 
 def init_logging(args):
-    import __builtin__
     import logging
 
     format_ = "*** %%(levelname)s%s: %%(message)s"
-    if args["debug"]:
-        format_ %= " (%(filename)s:%(lineno)d)"
+
+    debug = args["debug"]
+    if debug:
+        if debug == 1:
+            format_ %= " (%(filename)s:%(lineno)d)"
+        elif debug == 2:
+            format_ %= " (%(asctime)s, %(filename)s:%(lineno)d)"
+        else:
+            raise SystemExit("Maximum debug level is 2")
         level = logging.DEBUG
     else:
         format_ %= ""
         level = logging.INFO
-    logging.basicConfig(format=format_, level=level)
+    logging.basicConfig(format=format_, level=level,
+            datefmt="%a %b %d %H:%M:%S %Y")
 
     colors = [
         (logging.INFO, "32"), (logging.DEBUG, "34"),
@@ -109,15 +113,9 @@ def init_logging(args):
         logging.addLevelName(level, "\033[1;%sm%s\033[1;m" %
                              (color, logging.getLevelName(level)))
 
-    # FIXME: use this maybe??
-    def critical(msg):
-        logging.critical(msg)
-        raise SystemExit
-
-    __builtin__.__dict__["print_d"] = logging.debug
-    __builtin__.__dict__["print_i"] = logging.info
-    __builtin__.__dict__["print_w"] = logging.warning
-    __builtin__.__dict__["print_c"] = critical
+    __builtins__.__dict__["print_d"] = logging.debug
+    __builtins__.__dict__["print_i"] = logging.info
+    __builtins__.__dict__["print_w"] = logging.warning
 
 def process_args(args):
     from blaplay.blautil import bladbus
@@ -138,7 +136,7 @@ def process_args(args):
             action = "replace"
 
         def normpath(uri):
-            os.path.normpath(os.path.abspath(uri))
+            return os.path.normpath(os.path.abspath(uri))
         # TODO: make cli_queue a FIFO we write to here. then connect a handler
         #       which monitors the FIFO in the main thread and adds tracks as
         #       they arrive
