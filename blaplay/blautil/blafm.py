@@ -37,11 +37,6 @@ from blaplay.blacore import blacfg, blaconst
 from blaplay import blautil
 from blaplay.formats._identifiers import *
 
-TIMEOUT = 10
-LEGAL_NOTICE = str(
-    "User-contributed text is available under the Creative Commons By-SA "
-    "License and may also be available under the GNU FDL.")
-
 scrobbler = None
 
 
@@ -56,41 +51,52 @@ def quote_url(url):
 
 def create_popup_menu(track=None):
     user = blacfg.getstring("lastfm", "user")
-    if track is None:
-        track = player.get_track()
-    if not track and not user:
+    if not user:
         return None
 
     menu = gtk.Menu()
-    if user:
-        m = gtk.MenuItem("View your profile")
-        m.connect("activate",
-                  lambda *x: blautil.open_url("http://last.fm/user/%s" % user))
-        menu.append(m)
 
-        m = gtk.MenuItem("Love song")
-        m.connect("activate", lambda *x: love_unlove_song(track, unlove=False))
-        menu.append(m)
+    # User profile
+    m = gtk.MenuItem("View your profile")
+    m.connect("activate",
+              lambda *x: blautil.open_url("http://last.fm/user/%s" % user))
+    menu.append(m)
 
-        m = gtk.MenuItem("Unlove song")
-        m.connect("activate", lambda *x: love_unlove_song(track, unlove=True))
-        menu.append(m)
+    # Love/Unlove song
+    artist = title = track_label = None
+    if track is None:
+        track = player.get_track()
+    try:
+        artist = track[ARTIST].replace(" ", "+")
+        title =  track[TITLE].replace(" ", "+")
+    except TypeError:
+        return menu
 
-    m = gtk.MenuItem("View song profile")
+    limit = 40
+    track_label = "%s - %s" % (track[ARTIST], track[TITLE])
+    if len(track_label) > limit:
+        track_label = "%s..." % track_label[:limit]
 
-    if track:
-        m.connect(
-            "activate",
-             lambda *x: blautil.open_url("http://last.fm/music/%s/_/%s" % (
-             track[ARTIST].replace(" ", "+"), track[TITLE].replace(" ", "+"))))
-        menu.append(m)
+    m = gtk.MenuItem("Love song \"%s\"" % track_label)
+    m.connect("activate", lambda *x: love_unlove_song(track, unlove=False))
+    menu.append(m)
 
-        m = gtk.MenuItem("View artist profile")
-        m.connect(
-            "activate",
-            lambda *x: blautil.open_url("http://last.fm/music/%s" %
-            track[ARTIST].replace(" ", "+")))
-        menu.append(m)
+    m = gtk.MenuItem("Unlove song \"%s\"" % track_label)
+    m.connect("activate", lambda *x: love_unlove_song(track, unlove=True))
+    menu.append(m)
+
+    m = gtk.MenuItem("View song profile of \"%s\"" % track_label)
+    m.connect(
+        "activate",
+        lambda *x: blautil.open_url("http://last.fm/music/%s/_/%s" %
+                                    (artist, title)))
+    menu.append(m)
+
+    m = gtk.MenuItem("View artist profile of \"%s\"" % track[ARTIST])
+    m.connect(
+        "activate",
+        lambda *x: blautil.open_url("http://last.fm/music/%s" % artist))
+    menu.append(m)
 
     return menu
 
@@ -119,10 +125,11 @@ def post_message(params):
     return error, response
 
 def get_response(url, key):
+    # FIXME: Clean this mess up.
     error, response = 0, None
     try:
         try:
-            f = urllib2.urlopen(url, timeout=TIMEOUT)
+            f = urllib2.urlopen(url, timeout=10)
         except (socket.timeout, urllib2.URLError, IOError):
             pass
         else:
@@ -157,9 +164,8 @@ def get_image_url(images):
 def get_cover(track, image_base):
     path, cover = None, None
     url = "%s&method=album.getinfo&album=%s&artist=%s&autocorrect=1" % (
-            blaconst.LASTFM_BASEURL, track[ALBUM].replace("&", "and"),
-            track[ARTIST].replace("&", "and")
-    )
+        blaconst.LASTFM_BASEURL, track[ALBUM].replace("&", "and"),
+        track[ARTIST].replace("&", "and"))
     url = quote_url(url)
     error, response = get_response(url, "album")
 
@@ -213,8 +219,11 @@ def get_biography(track, image_base):
     except (TypeError, KeyError):
         pass
     else:
+        legal_notice = str(
+            "User-contributed text is available under the Creative Commons "
+            "By-SA License and may also be available under the GNU FDL.")
         biography = blautil.remove_html_tags(
-            biography.replace(LEGAL_NOTICE, "").strip())
+            biography.replace(legal_notice, "").strip())
 
     if error or response is None:
         print_d("Failed to retrieve artist biography: %s (error %d)" % (
@@ -277,7 +286,7 @@ def get_new_releases(recommended=False):
         return releases
 
     url = "%s&method=user.getNewReleases&user=%s&userecs=%d" % (
-          blaconst.LASTFM_BASEURL, user, int(recommended))
+        blaconst.LASTFM_BASEURL, user, int(recommended))
     url = quote_url(url)
     error, response = get_response(url, "albums")
 
