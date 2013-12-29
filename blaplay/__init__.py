@@ -151,9 +151,13 @@ def finish_startup():
 
     bladbus.setup_bus()
 
-    # Set up MPRIS2 support.
-    from blaplay.blautil import blampris
-    blampris.init()
+    # Initialize MPRIS2 module.
+    try:
+        from blaplay.blautil import blampris
+    except ImportError:
+        pass
+    else:
+        blampris.init()
 
     # Initialize last.fm services.
     from blaplay.blautil import blafm
