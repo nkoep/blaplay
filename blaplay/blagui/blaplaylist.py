@@ -268,13 +268,9 @@ def popup(treeview, event, view_id, target):
             submenu = gtk.Menu()
             current_playlist = BlaPlaylistManager.get_current_playlist()
             for playlist in playlists:
-                try:
-                    if playlist == current_playlist:
-                        raise AttributeError
-                    label = BlaPlaylistManager.get_playlist_name(playlist)
-                except AttributeError:
+                if playlist == current_playlist:
                     continue
-                m = gtk.MenuItem(label)
+                m = gtk.MenuItem(playlist.get_name())
                 m.connect("activate", lambda x, p=playlist:
                           target.add_selection_to_playlist(p, move=True))
                 submenu.append(m)
@@ -287,13 +283,9 @@ def popup(treeview, event, view_id, target):
             submenu = gtk.Menu()
             current_playlist = BlaPlaylistManager.get_current_playlist()
             for playlist in playlists:
-                try:
-                    if playlist == current_playlist:
-                        raise AttributeError
-                    label = BlaPlaylistManager.get_playlist_name(playlist)
-                except AttributeError:
+                if playlist == current_playlist:
                     continue
-                m = gtk.MenuItem(label)
+                m = gtk.MenuItem(playlist.get_name())
                 m.connect("activate", lambda x, p=playlist:
                           target.add_selection_to_playlist(p, move=False))
                 submenu.append(m)
@@ -1160,9 +1152,9 @@ class BlaPlaylist(gtk.VBox):
     def __init__(self, name):
         super(BlaPlaylist, self).__init__()
 
-        self.__name = gtk.HBox()
-        self.__name.pack_start(gtk.Label(name))
-        self.__name.show_all()
+        self.__header_box = gtk.HBox()
+        self.__header_box.pack_start(gtk.Label(name))
+        self.__header_box.show_all()
 
         self.__lock = blautil.BlaLock()
 
@@ -1248,7 +1240,7 @@ class BlaPlaylist(gtk.VBox):
 
     def __getstate__(self):
         state = {
-            "name": self.__name.children()[0].get_text(),
+            "name": self.__header_box.children()[0].get_text(),
             "locked": self.__lock.locked(),
             "all_items": self.__all_items,
             "items": self.__items,
@@ -1507,13 +1499,14 @@ class BlaPlaylist(gtk.VBox):
                 break
         return False
 
-    def get_name(self, as_text=False):
-        if not as_text:
-            return self.__name
-        return self.__name.children()[0].get_text()
+    def get_header_box(self):
+        return self.__header_box
+
+    def get_name(self):
+        return self.__header_box.children()[0].get_text()
 
     def set_name(self, name):
-        self.__name.children()[0].set_text(name)
+        self.__header_box.children()[0].set_text(name)
 
     def modification_allowed(self, check_filter_state=True):
         if self.__lock.locked():
@@ -1920,12 +1913,12 @@ class BlaPlaylist(gtk.VBox):
     def toggle_lock(self):
         if self.__lock.locked():
             self.__lock.release()
-            self.__name.remove(self.__name.children()[-1])
+            self.__header_box.remove(self.__header_box.children()[-1])
         else:
             self.__lock.acquire()
 
             # Create a lock image and resize it so it fits the text size.
-            label = self.__name.children()[0]
+            label = self.__header_box.children()[0]
             height = label.create_pango_layout(
                 label.get_text()).get_pixel_size()[-1]
             pixbuf = self.render_icon(
@@ -1933,8 +1926,8 @@ class BlaPlaylist(gtk.VBox):
             pixbuf = pixbuf.scale_simple(
                 height, height, gtk.gdk.INTERP_BILINEAR)
             image = gtk.image_new_from_pixbuf(pixbuf)
-            self.__name.pack_start(image)
-            self.__name.show_all()
+            self.__header_box.pack_start(image)
+            self.__header_box.show_all()
 
         BlaPlaylistManager.update_playlist_lock_state()
 
@@ -2388,7 +2381,7 @@ class BlaPlaylistManager(gtk.Notebook):
         return name
 
     def __rename_playlist(self, playlist):
-        name = playlist.get_name(as_text=True)
+        name = playlist.get_name()
         new_name = self.__query_name("Rename playlist", name)
         if new_name:
             playlist.set_name(new_name)
@@ -2582,10 +2575,6 @@ class BlaPlaylistManager(gtk.Notebook):
         return self_.get_nth_page(self_.get_current_page())
 
     @classmethod
-    def get_playlist_name(cls, playlist):
-        return cls.__instance.get_tab_label(playlist).get_text()
-
-    @classmethod
     def enable_search(cls):
         if blacfg.getint("general", "view") == blaconst.VIEW_PLAYLISTS:
             cls.get_current_playlist().enable_search()
@@ -2667,7 +2656,7 @@ class BlaPlaylistManager(gtk.Notebook):
 
         if playlists:
             for playlist in playlists:
-                self.append_page(playlist, playlist.get_name())
+                self.append_page(playlist, playlist.get_header_box())
 
             if active_playlist is not None:
                 self.set_current_page(active_playlist)
@@ -2705,7 +2694,7 @@ class BlaPlaylistManager(gtk.Notebook):
             indices = set()
             r = re.compile(r"(^bla \()([0-9]+)\)")
             for playlist in cls.__instance:
-                label = playlist.get_name(as_text=True)
+                label = playlist.get_name()
 
                 if label == "bla":
                     indices.add(0)
@@ -2730,7 +2719,7 @@ class BlaPlaylistManager(gtk.Notebook):
                 list_name += " (%d)" % idx
 
         playlist = BlaPlaylist(list_name)
-        cls.__instance.append_page(playlist, playlist.get_name())
+        cls.__instance.append_page(playlist, playlist.get_header_box())
         cls.__instance.set_tab_reorderable(playlist, True)
 
         if focus:
