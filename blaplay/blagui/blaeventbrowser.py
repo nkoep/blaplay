@@ -67,7 +67,7 @@ class BlaEvent(object):
         image_base = os.path.join(
             blaconst.EVENTS, self.event_name.replace(" ", "_"))
         pixbuf = path = None
-        for ext in ["jpg", "png"]:
+        for ext in ("jpg", "png"):
             path = "%s.%s" % (image_base, ext)
             try:
                 pixbuf = gtk.gdk.pixbuf_new_from_file(path)
@@ -86,18 +86,18 @@ class BlaEvent(object):
                 except (IOError, gobject.GError):
                     pass
 
-        # resize until the smaller dimension reaches IMAGE_SIZE, then crop
+        # Resize until the smaller dimension reaches IMAGE_SIZE, then crop
         # IMAGE_SIZE x IMAGE_SIZE pixels from the center of the image in
-        # case of a landscape image and from the top in case of a portrait
+        # case of a landscape image and from the top in case of a portrait.
         # FIXME: too much code in the try-block
         try:
             width, height = pixbuf.get_width(), pixbuf.get_height()
-            # portrait
+            # Portrait
             if width < height:
                 height = int(height * (IMAGE_SIZE / float(width)))
                 width = IMAGE_SIZE
                 x = y = 0
-            # landscape
+            # Landscape
             else:
                 width = int(width * (IMAGE_SIZE / float(height)))
                 height = IMAGE_SIZE
@@ -126,7 +126,7 @@ class BlaEventBrowser(BlaScrolledWindow):
         vbox = gtk.VBox()
         vbox.set_border_width(10)
 
-        # heading
+        # Heading
         hbox = gtk.HBox()
         items = [
             ("<b><span size=\"xx-large\">Events</span></b>",
@@ -147,7 +147,7 @@ class BlaEventBrowser(BlaScrolledWindow):
         hbox.pack_start(alignment, expand=False)
         vbox.pack_start(hbox, expand=False)
 
-        # location
+        # Location
         hbox_location = gtk.HBox(spacing=5)
 
         label = gtk.Label()
@@ -159,12 +159,12 @@ class BlaEventBrowser(BlaScrolledWindow):
             location.set_markup("<i>Unspecified</i>")
         else:
             location.set_text(
-                    ", ".join([city, country] if country else [city]))
+                ", ".join([city, country] if country else [city]))
 
         button = gtk.Button("Change location")
         button.set_focus_on_click(False)
         button.connect(
-                "clicked", self.__change_location, location)
+            "clicked", self.__change_location, location)
 
         for widget, padding in [(label, 0), (location, 0), (button, 5)]:
             alignment = gtk.Alignment(0.0, 0.5)
@@ -172,7 +172,7 @@ class BlaEventBrowser(BlaScrolledWindow):
             hbox_location.pack_start(alignment, expand=False, padding=padding)
         vbox.pack_start(hbox_location, expand=False)
 
-        # type selector
+        # Type selector
         self.__hbox = gtk.HBox(spacing=5)
         self.__hbox.set_border_width(10)
         items = [
@@ -183,9 +183,10 @@ class BlaEventBrowser(BlaScrolledWindow):
         radiobutton = None
         for label, filt in items:
             radiobutton = gtk.RadioButton(radiobutton, label)
-            if filt == active: radiobutton.set_active(True)
+            if filt == active:
+                radiobutton.set_active(True)
             radiobutton.connect(
-                    "toggled", self.__filter_changed, filt, hbox_location)
+                "toggled", self.__filter_changed, filt, hbox_location)
             self.__hbox.pack_start(radiobutton, expand=False)
 
         button = gtk.Button("Refresh")
@@ -200,58 +201,66 @@ class BlaEventBrowser(BlaScrolledWindow):
         adjustment = gtk.Adjustment(limit, 1.0, 100.0, 1.0, 5.0, 0.0)
         spinbutton = gtk.SpinButton(adjustment)
         spinbutton.set_numeric(True)
-        spinbutton.connect("value_changed", lambda sb: blacfg.set(
-                "general", "events.limit", sb.get_value()))
+        spinbutton.connect(
+            "value_changed",
+            lambda sb: blacfg.set("general", "events.limit", sb.get_value()))
         hbox.pack_start(spinbutton, expand=False)
         vbox.pack_start(hbox, expand=False)
 
-        # events list
+        # Events list
         def cell_data_func_pixbuf(column, renderer, model, iterator):
             event = model[iterator][0]
-            try: renderer.set_property("content", event.image)
-            except AttributeError: renderer.set_property("content", event)
+            try:
+                renderer.set_property("content", event.image)
+            except AttributeError:
+                renderer.set_property("content", event)
 
         def cell_data_func_text(column, renderer, model, iterator):
             event = model[iterator][0]
+            # FIXME: Too much code in the try-block.
             try:
                 limit = 8
                 markup = "<b>%s</b>\n%%s" % event.event_name
                 artists = ", ".join(event.artists[:limit])
-                if len(event.artists) > limit: artists += ", and more"
+                if len(event.artists) > limit:
+                    artists += ", and more"
                 markup %= artists
-            except AttributeError: markup = ""
+            except AttributeError:
+                markup = ""
             renderer.set_property("markup", markup.replace("&", "&amp;"))
 
         def cell_data_func_text2(column, renderer, model, iterator):
             event = model[iterator][0]
             try:
                 markup = "<b>%s</b>\n%s\n%s" % (
-                        event.venue, event.city, event.country)
-            except AttributeError: markup = ""
+                    event.venue, event.city, event.country)
+            except AttributeError:
+                markup = ""
             renderer.set_property("markup", markup.replace("&", "&amp;"))
 
         def cell_data_func_text3(column, renderer, model, iterator):
             event = model[iterator][0]
+            markup = ""
             try:
                 if event.cancelled:
                     markup = "<span size=\"x-large\"><b>Cancelled</b></span>"
-                else: raise AttributeError
-            except AttributeError: markup = ""
+            except AttributeError:
+                pass
             renderer.set_property("markup", markup.replace("&", "&amp;"))
 
         self.__treeview = blaguiutils.BlaTreeViewBase(
-                set_button_event_handlers=False)
+            set_button_event_handlers=False)
         self.__treeview.set_rules_hint(True)
         self.__treeview.get_selection().set_mode(gtk.SELECTION_SINGLE)
         self.__treeview.set_headers_visible(False)
 
-        # image
+        # Image
         r = BlaCellRendererPixbuf()
         column = gtk.TreeViewColumn()
         column.pack_start(r, expand=False)
         column.set_cell_data_func(r, cell_data_func_pixbuf)
 
-        # title and artists
+        # Title and artists
         r = gtk.CellRendererText()
         r.set_alignment(0.0, 0.0)
         r.set_property("wrap_mode", pango.WRAP_WORD)
@@ -259,14 +268,14 @@ class BlaEventBrowser(BlaScrolledWindow):
         column.pack_start(r, expand=False)
         column.set_cell_data_func(r, cell_data_func_text)
 
-        # location
+        # Location
         r = gtk.CellRendererText()
         r.set_alignment(0.0, 0.0)
         r.set_property("ellipsize", pango.ELLIPSIZE_END)
         column.pack_start(r)
         column.set_cell_data_func(r, cell_data_func_text2)
 
-        # status
+        # Event cancelled status
         r = gtk.CellRendererText()
         r.set_property("ellipsize", pango.ELLIPSIZE_END)
         column.pack_start(r)
@@ -275,7 +284,7 @@ class BlaEventBrowser(BlaScrolledWindow):
         self.__treeview.append_column(column)
         self.__treeview.connect("row_activated", self.__row_activated)
         self.__treeview.connect(
-                "button_press_event", self.__button_press_event)
+            "button_press_event", self.__button_press_event)
         self.__models = map(gtk.ListStore, [gobject.TYPE_PYOBJECT] * 2)
         self.__treeview.set_model(self.__models[active])
         vbox.pack_start(self.__treeview, expand=True, padding=10)
@@ -297,7 +306,7 @@ class BlaEventBrowser(BlaScrolledWindow):
     def __change_location(self, button, location):
         diag = blaguiutils.BlaDialog(title="Change location")
 
-        # country list
+        # Country list
         country = blacfg.getstring("general", "events.country")
         entry1 = gtk.Entry()
         entry1.set_text(country)
@@ -312,7 +321,7 @@ class BlaEventBrowser(BlaScrolledWindow):
         items = [("Country", entry1), ("City", entry2)]
         for idx, (label, entry) in enumerate(items):
             entry.connect(
-                    "activate", lambda *x: diag.response(gtk.RESPONSE_OK))
+                "activate", lambda *x: diag.response(gtk.RESPONSE_OK))
             label = gtk.Label("%s:" % label)
             label.set_alignment(xalign=0.0, yalign=0.5)
             table.attach(label, idx, idx+1, 0, 1)
@@ -327,10 +336,11 @@ class BlaEventBrowser(BlaScrolledWindow):
             city = entry2.get_text()
         diag.destroy()
 
-        if not city: location.set_markup("<i>Unspecified</i>")
+        if not city:
+            location.set_markup("<i>Unspecified</i>")
         else:
             location.set_text(
-                    ", ".join([city, country] if country else [city]))
+                ", ".join([city, country] if country else [city]))
         blacfg.set("general", "events.country", country)
         blacfg.set("general", "events.city", city)
 
@@ -350,14 +360,14 @@ class BlaEventBrowser(BlaScrolledWindow):
             country = blacfg.getstring("general", "events.country")
             city = blacfg.getstring("general", "events.city")
 
-            # TODO: these don't always seem to timeout properly
-            events = (
-                blafm.get_events(limit=limit, recommended=True),
-                blafm.get_events(limit=limit, recommended=False,
-                        country=country, city=city)
-            )
-            if events[0]: self.__count_recommended = len(events[0])
-            if events[1]: self.__count_all = len(events[1])
+            # FIXME: These don't always seem to timeout properly.
+            events = (blafm.get_events(limit=limit, recommended=True),
+                      blafm.get_events(limit=limit, recommended=False,
+                                       country=country, city=city))
+            if events[0]:
+                self.__count_recommended = len(events[0])
+            if events[1]:
+                self.__count_all = len(events[1])
             items = [
                 (blaconst.EVENTS_RECOMMENDED, events[0] or []),
                 (blaconst.EVENTS_ALL, events[1] or [])
@@ -370,57 +380,68 @@ class BlaEventBrowser(BlaScrolledWindow):
                     date = event.date
                     if previous_date != date:
                         previous_date = date
-                        model.append(["\n<span "
-                                "size=\"larger\"><b>%s</b></span>\n" % date])
+                        model.append(
+                            ["\n<span size=\"larger\"><b>%s</b></span>\n" %
+                             date])
                     model.append([event])
                     path = event.get_image()
-                    if path: images.add(path)
+                    if path:
+                        images.add(path)
                 self.__models[filt] = model
 
-            # get rid of images for events that don't show up anymore
+            # Get rid of images for events that don't show up anymore.
             for image in set(blautil.discover(blaconst.EVENTS)).difference(
-                    images):
-                try: os.unlink(image)
-                except OSError: pass
+                images):
+                try:
+                    os.unlink(image)
+                except OSError:
+                    pass
 
             gobject.idle_add(set_sensitive, True)
-            # TODO: only set the model when we verified that we successfully
-            #       retrieved event information. this avoids that we delete a
-            #       restored model
+            # TODO: Only set the model when we verified that we successfully
+            #       retrieved event information. This avoids that we delete a
+            #       restored model.
             gobject.idle_add(self.__treeview.set_model, self.__models[active])
 
             if active == blaconst.EVENTS_RECOMMENDED:
                 count = self.__count_recommended
-            else: count = self.__count_all
+            else:
+                count = self.__count_all
             gobject.idle_add(
-                    self.emit, "count_changed", blaconst.VIEW_EVENTS, count)
+                self.emit, "count_changed", blaconst.VIEW_EVENTS, count)
             return True
 
     def __filter_changed(self, radiobutton, filt, hbox):
-        # the signal of the new active radiobutton arrives last so only change
-        # the config when that happens
+        # The signal of the new active radiobutton arrives last so only change
+        # the config when that happens.
         if radiobutton.get_active():
             blacfg.set("general", "events.filter", filt)
             self.__treeview.set_model(self.__models[filt])
-            if filt == blaconst.EVENTS_RECOMMENDED: hbox.set_visible(False)
-            else: hbox.set_visible(True)
+            if filt == blaconst.EVENTS_RECOMMENDED:
+                hbox.set_visible(False)
+            else:
+                hbox.set_visible(True)
             if filt == blaconst.EVENTS_RECOMMENDED:
                 count = self.__count_recommended
-            else: count = self.__count_all
+            else:
+                count = self.__count_all
             self.emit("count_changed", blaconst.VIEW_EVENTS, count)
 
     def __row_activated(self, treeview, path, column):
         blautil.open_url(treeview.get_model()[path][0].event_url)
 
     def __button_press_event(self, treeview, event):
-        try: path = treeview.get_path_at_pos(*map(int, [event.x, event.y]))[0]
-        except TypeError: return False
+        try:
+            path = treeview.get_path_at_pos(*map(int, [event.x, event.y]))[0]
+        except TypeError:
+            return False
 
         model = treeview.get_model()
         event_ = model[path][0]
-        if not isinstance(event_, BlaEvent): return True
-        if event.button in [1, 2]:
-            if event.type in [gtk.gdk._2BUTTON_PRESS, gtk.gdk._3BUTTON_PRESS]:
+        if not isinstance(event_, BlaEvent):
+            return True
+        if event.button in (1, 2):
+            if event.type in (gtk.gdk._2BUTTON_PRESS, gtk.gdk._3BUTTON_PRESS):
                 return True
             return False
 
@@ -439,17 +460,19 @@ class BlaEventBrowser(BlaScrolledWindow):
         events = blautil.deserialize_from_file(blaconst.EVENTS_PATH)
         if events:
             model = gtk.ListStore(gobject.TYPE_PYOBJECT)
-            # pixbufs aren't initialized when they're unpickled so we need to
+            # Pixbufs aren't initialized when they're unpickled so we need to
             # instantiate them while restoring. to speed up restoring we force
-            # the use of possibly cached images by passing True as `restore'
-            # kwarg
+            # the use of possibly cached images by passing `restore=True'.
             for event in events:
-                try: event.get_image(restore=True)
-                except AttributeError: pass
-            [model.append([event]) for event in events]
+                try:
+                    event.get_image(restore=True)
+                except AttributeError:
+                    pass
+            for event in events:
+                model.append([event])
             self.__treeview.set_model(model)
 
-        # check for new events now and every two hours
+        # Check for new events now and every two hours.
         self.__update_models()
         gobject.timeout_add(2 * 3600 * 1000, self.__update_models)
 
