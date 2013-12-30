@@ -31,6 +31,7 @@ import blaplay
 from blaplay.blacore import blacfg, blaconst
 from blaplay import blautil
 from blaplay.blautil import blafm
+from blaplay import blagui
 from blaview import BlaViewMeta
 from blawindows import BlaScrolledWindow
 import blaguiutils
@@ -89,9 +90,9 @@ class BlaCellRendererPixbuf(blaguiutils.BlaCellRendererBase):
             cr.set_line_width(1.0)
             size = layout.get_pixel_size()
             cr.move_to(size[0] + 20,
-                    math.ceil(expose_area.y + size[1] / 2) + 0.5)
+                       math.ceil(expose_area.y + size[1] / 2) + 0.5)
             cr.line_to(expose_area.x+expose_area.width - 10,
-                    math.ceil(expose_area.y + size[1] / 2) + 0.5)
+                       math.ceil(expose_area.y + size[1] / 2) + 0.5)
             cr.stroke()
         else:
             if not content:
@@ -127,7 +128,7 @@ class BlaRelease(object):
         path = ("%s-%s" % (self.artist_name, self.release_name)).replace(
             " ", "_")
         image_base = os.path.join(blaconst.RELEASES, path)
-        for ext in ["jpg", "png"]:
+        for ext in ("jpg", "png"):
             try:
                 path = "%s.%s" % (image_base, ext)
                 pixbuf = gtk.gdk.pixbuf_new_from_file(path)
@@ -141,7 +142,7 @@ class BlaRelease(object):
             if not restore:
                 url = blafm.get_image_url(self.__raw["image"])
                 try:
-                    image, message = urllib.urlretrieve(url)
+                    image, _ = urllib.urlretrieve(url)
                     path = "%s.%s" % (image_base, blautil.get_extension(image))
                     shutil.move(image, path)
                     pixbuf = gtk.gdk.pixbuf_new_from_file(path).scale_simple(
@@ -244,12 +245,17 @@ class BlaReleaseBrowser(BlaScrolledWindow):
         column.set_cell_data_func(r, cell_data_func_text)
         self.__treeview.append_column(column)
         self.__treeview.connect("row_activated", self.__row_activated)
-        self.__treeview.connect(
-            "button_press_event", self.__button_press_event)
+        self.__treeview.connect_object(
+            "key_press_event", BlaReleaseBrowser.__key_press_event, self)
+        self.__treeview.connect_object(
+            "button_press_event", BlaReleaseBrowser.__button_press_event, self)
         self.__models = map(gtk.ListStore, [gobject.TYPE_PYOBJECT] * 2)
         self.__treeview.set_model(self.__models[active])
         vbox.pack_start(self.__treeview, expand=True, padding=10)
 
+        # FIXME: The treeview in the vbox, wrapped in a gtk.ScrolledWindow,
+        #        does not cause the viewport to scroll according to the
+        #        selection in the treeview.
         self.add_with_viewport(vbox)
         self.show_all()
 
@@ -342,13 +348,53 @@ class BlaReleaseBrowser(BlaScrolledWindow):
     def __row_activated(self, treeview, path, column):
         blautil.open_url(treeview.get_model()[path][0].release_url)
 
-    def __button_press_event(self, treeview, event):
+    def __key_press_event(self, event):
+        def get_previous_valid_path(model, path):
+            if model.iter_n_children(None) == 0 or path[0] == 1:
+                return None
+            path = (path[0]-1,)
+            release = model[path][0]
+            if isinstance(release, BlaRelease):
+                return path
+            return (path[0]-1,)
+
+        def get_next_valid_path(model, path):
+            n = model.iter_n_children(None)
+            if path[0] == n-1:
+                return None
+            path = (path[0]+1,)
+            release = model[path][0]
+            if isinstance(release, BlaRelease):
+                return path
+            return (path[0]+1,)
+
+        model, iterator = self.__treeview.get_selection().get_selected()
+        path = model.get_path(iterator)
+
+        path_func = None
+        if blagui.is_accel(event, "Up"):
+            path_func = get_previous_valid_path
+        elif blagui.is_accel(event, "Down"):
+            path_func = get_next_valid_path
+
+        if path_func is not None:
+            path = path_func(model, path)
+            if path is not None:
+                self.__treeview.set_cursor(path)
+            return True
+        return False
+
+    def __button_press_event(self, event):
+        if event.button not in (1, 2, 3):
+            return True
+
         try:
-            path = treeview.get_path_at_pos(*map(int, [event.x, event.y]))[0]
+            path = self.__treeview.get_path_at_pos(
+                *map(int, [event.x, event.y]))[0]
         except TypeError:
             return False
 
-        model = treeview.get_model()
+        model = self.__treeview.get_model()
         release = model[path][0]
         if not isinstance(release, BlaRelease):
             return True
@@ -402,10 +448,11 @@ class BlaReleaseBrowser(BlaScrolledWindow):
                     release.get_cover(restore=True)
                 except AttributeError:
                     pass
-            [model.append([release]) for release in releases]
+            for release in releases:
+                model.append([release])
             self.__treeview.set_model(model)
 
-        # Check for new releases now and every two hours
+        # Check for new releases now and every two hours.
         self.__update_models()
         gobject.timeout_add(2 * 3600 * 1000, self.__update_models)
 

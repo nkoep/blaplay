@@ -30,6 +30,7 @@ import blaplay
 from blaplay.blacore import blacfg, blaconst
 from blaplay import blautil
 from blaplay.blautil import blafm
+from blaplay import blagui
 from blaview import BlaViewMeta
 from blawindows import BlaScrolledWindow
 from blareleasebrowser import IMAGE_SIZE, BlaCellRendererPixbuf
@@ -78,7 +79,7 @@ class BlaEvent(object):
             if not restore:
                 url = blafm.get_image_url(self.__raw["image"])
                 try:
-                    image, message = urllib.urlretrieve(url)
+                    image, _ = urllib.urlretrieve(url)
                     path = "%s.%s" % (
                         image_base, blautil.get_extension(image))
                     shutil.move(image, path)
@@ -283,8 +284,10 @@ class BlaEventBrowser(BlaScrolledWindow):
 
         self.__treeview.append_column(column)
         self.__treeview.connect("row_activated", self.__row_activated)
-        self.__treeview.connect(
-            "button_press_event", self.__button_press_event)
+        self.__treeview.connect_object(
+            "key_press_event", BlaEventBrowser.__key_press_event, self)
+        self.__treeview.connect_object(
+            "button_press_event", BlaEventBrowser.__button_press_event, self)
         self.__models = map(gtk.ListStore, [gobject.TYPE_PYOBJECT] * 2)
         self.__treeview.set_model(self.__models[active])
         vbox.pack_start(self.__treeview, expand=True, padding=10)
@@ -430,13 +433,53 @@ class BlaEventBrowser(BlaScrolledWindow):
     def __row_activated(self, treeview, path, column):
         blautil.open_url(treeview.get_model()[path][0].event_url)
 
-    def __button_press_event(self, treeview, event):
+    def __key_press_event(self, event):
+        def get_previous_valid_path(model, path):
+            if model.iter_n_children(None) == 0 or path[0] == 1:
+                return None
+            path = (path[0]-1,)
+            release = model[path][0]
+            if isinstance(release, BlaEvent):
+                return path
+            return (path[0]-1,)
+
+        def get_next_valid_path(model, path):
+            n = model.iter_n_children(None)
+            if path[0] == n-1:
+                return None
+            path = (path[0]+1,)
+            release = model[path][0]
+            if isinstance(release, BlaEvent):
+                return path
+            return (path[0]+1,)
+
+        model, iterator = self.__treeview.get_selection().get_selected()
+        path = model.get_path(iterator)
+
+        path_func = None
+        if blagui.is_accel(event, "Up"):
+            path_func = get_previous_valid_path
+        elif blagui.is_accel(event, "Down"):
+            path_func = get_next_valid_path
+
+        if path_func is not None:
+            path = path_func(model, path)
+            if path is not None:
+                self.__treeview.set_cursor(path)
+            return True
+        return False
+
+    def __button_press_event(self, event):
+        if event.button not in (1, 2, 3):
+            return True
+
         try:
-            path = treeview.get_path_at_pos(*map(int, [event.x, event.y]))[0]
+            path = self.__treeview.get_path_at_pos(
+                *map(int, [event.x, event.y]))[0]
         except TypeError:
             return False
 
-        model = treeview.get_model()
+        model = self.__treeview.get_model()
         event_ = model[path][0]
         if not isinstance(event_, BlaEvent):
             return True
@@ -445,7 +488,7 @@ class BlaEventBrowser(BlaScrolledWindow):
                 return True
             return False
 
-        model = treeview.get_model()
+        model = self.__treeview.get_model()
         event_url = event_.event_url
         menu = gtk.Menu()
         m = gtk.MenuItem("View event page")
