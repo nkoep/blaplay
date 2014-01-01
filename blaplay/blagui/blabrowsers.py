@@ -1081,7 +1081,7 @@ class BlaFileBrowser(gtk.VBox):
 
 class BlaBrowsers(gtk.VBox):
     def __init__(self):
-        super(BlaBrowsers, self).__init__(spacing=5)
+        super(BlaBrowsers, self).__init__(spacing=blaconst.WIDGET_SPACING)
 
         type(self).__library_browser = BlaLibraryBrowser(self)
         self.__file_browser = BlaFileBrowser(self)

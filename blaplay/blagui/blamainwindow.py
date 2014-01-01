@@ -39,8 +39,6 @@ import blaguiutils
 
 
 class BlaMainWindow(BlaBaseWindow):
-    __BORDER_WIDTH = 3
-
     __is_fullscreen = False
 
     def __init__(self):
@@ -242,16 +240,16 @@ class BlaMainWindow(BlaBaseWindow):
                 pass
             pane.connect("notify", notify_cb, key)
 
-        # Create a vbox for the toolbar, hpane and the statusbar. This allows
-        # for setting a border around those items which excludes the menubar.
-        vbox = gtk.VBox()
-        vbox.set_border_width(self.__BORDER_WIDTH)
-        vbox.pack_start(self.__toolbar, expand=False)
+        # Create a vbox hpane and the statusbar. This allows for setting a
+        # border around those items which excludes the menubar and the toolbar.
+        vbox = gtk.VBox(spacing=blaconst.BORDER_PADDING)
+        vbox.set_border_width(blaconst.BORDER_PADDING)
         vbox.pack_start(hpane)
         vbox.pack_start(self.__statusbar, expand=False)
         vbox.show()
 
         self.child.pack_start(uimanager.get_widget("/Menu"), expand=False)
+        self.child.pack_start(self.__toolbar, expand=False)
         self.child.pack_start(vbox)
         self.child.show()
 

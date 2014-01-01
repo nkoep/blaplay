@@ -17,6 +17,8 @@
 
 import os
 
+import gtk
+
 VERSION = "0.1"
 APPNAME = "blaplay"
 COMMENT = "A bla that plays"
@@ -65,6 +67,9 @@ LASTFM_LOGO = os.path.join(IMAGES_PATH, "lastfm.gif")
 STATE_PLAYING, STATE_PAUSED, STATE_STOPPED = xrange(3)
 TRACK_PLAY, TRACK_NEXT, TRACK_PREVIOUS, TRACK_RANDOM = xrange(4)
 EQUALIZER_BANDS = 10
+
+BORDER_PADDING = 3
+WIDGET_SPACING = gtk.HPaned().style_get_property("handle_size")
 
 # Main menu
 MENU = """

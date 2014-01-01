@@ -238,11 +238,14 @@ class VolumeControl(gtk.HBox):
         self.__scale.set_tooltip_text(tooltip)
         return False
 
-class BlaToolbar(gtk.HBox):
+class BlaToolbar(gtk.Alignment):
     __state = None
 
     def __init__(self):
-        super(BlaToolbar, self).__init__(spacing=10)
+        super(BlaToolbar, self).__init__(xalign=0.0, yalign=0.5, xscale=1.0,
+                                         yscale=1.0)
+        self.set_padding(0, 0, blaconst.BORDER_PADDING,
+                         blaconst.BORDER_PADDING)
 
         # The button box
         ctrlbar = gtk.Table(rows=1, columns=5, homogeneous=True)
@@ -309,9 +312,11 @@ class BlaToolbar(gtk.HBox):
         # Volume control
         volume = VolumeControl()
 
-        self.pack_start(ctrlbar, expand=False)
-        self.pack_start(seekbar, expand=True)
-        self.pack_start(volume, expand=False)
+        hbox = gtk.HBox(spacing=10)
+        hbox.pack_start(ctrlbar, expand=False)
+        hbox.pack_start(seekbar, expand=True)
+        hbox.pack_start(volume, expand=False)
+        self.add(hbox)
 
         player.connect("state_changed", self.__update_state, img, play_pause)
         self.__update_state(player, img, play_pause)

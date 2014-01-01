@@ -76,13 +76,13 @@ class BlaStatusbar(gtk.Table):
         table.attach(gtk.Label("Order:"), 0, 1, 0, 1, xpadding=10)
         table.attach(self.__order, 1, 2, 0, 1)
 
-        count, xalign = 0, 0.0
-        for widget in [hbox, self.__view_info, table]:
+        count = 0
+        for widget, xalign in [(hbox, 0.0), (self.__view_info, 0.5),
+                               (table, 1.0)]:
             alignment = gtk.Alignment(xalign, 0.5, 0.0, 0.5)
             alignment.add(widget)
             self.attach(alignment, count, count+1, 0, 1)
             count += 1
-            xalign += 0.5
 
         player.connect("state_changed", self.__changed)
         library.connect("progress", self.update_progress)

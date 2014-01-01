@@ -252,7 +252,7 @@ class BlaSidePane(gtk.VBox):
             return self.child
 
     def __init__(self, views):
-        super(BlaSidePane, self).__init__(spacing=5)
+        super(BlaSidePane, self).__init__(spacing=blaconst.WIDGET_SPACING)
 
         notebook = gtk.Notebook()
         notebook.set_scrollable(True)
