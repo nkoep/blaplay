@@ -596,56 +596,46 @@ class BlaView(gtk.HPaned):
         cls.__container.add(child)
         child.update_statusbar()
 
-        # not all menu items are available for all views so update them
-        # accordingly
+        # Not all menu items are available for all views so update them
+        # accordingly.
         blagui.update_menu(view)
         cls.__side_pane.update_view(view)
 
     @classmethod
-    def clear(cls, *args):
+    def __mediator(cls, method_name, *args):
         view = blacfg.getint("general", "view")
-        if view in [blaconst.VIEW_PLAYLISTS, blaconst.VIEW_QUEUE]:
-            cls.views[view].clear()
+        if view in (blaconst.VIEW_PLAYLISTS, blaconst.VIEW_QUEUE):
+            getattr(cls.views[view], method_name)(*args)
+
+    @classmethod
+    def clear(cls, *args):
+        cls.__mediator("clear")
 
     @classmethod
     def select(cls, type_):
-        view = blacfg.getint("general", "view")
-        if view in [blaconst.VIEW_PLAYLISTS, blaconst.VIEW_QUEUE]:
-            cls.views[view].select(type_)
+        cls.__mediator("select", type_)
 
     @classmethod
     def cut(cls, *args):
-        view = blacfg.getint("general", "view")
-        if view in [blaconst.VIEW_PLAYLISTS, blaconst.VIEW_QUEUE]:
-            cls.views[view].cut()
+        cls.__mediator("cut")
 
     @classmethod
     def copy(cls, *args):
-        view = blacfg.getint("general", "view")
-        if view in [blaconst.VIEW_PLAYLISTS, blaconst.VIEW_QUEUE]:
-            cls.views[view].copy()
+        cls.__mediator("copy")
 
     @classmethod
     def paste(cls, *args):
-        view = blacfg.getint("general", "view")
-        if view in [blaconst.VIEW_PLAYLISTS, blaconst.VIEW_QUEUE]:
-            cls.views[view].paste()
+        cls.__mediator("paste")
 
     @classmethod
     def remove(cls, *args):
-        view = blacfg.getint("general", "view")
-        if view in [blaconst.VIEW_PLAYLISTS, blaconst.VIEW_QUEUE]:
-            cls.views[view].remove()
+        cls.__mediator("remove")
 
     @classmethod
     def remove_duplicates(cls, *args):
-        view = blacfg.getint("general", "view")
-        if view in [blaconst.VIEW_PLAYLISTS, blaconst.VIEW_QUEUE]:
-            cls.views[view].remove_duplicates()
+        cls.__mediator("remove_duplicates")
 
     @classmethod
     def remove_invalid_tracks(cls, *args):
-        view = blacfg.getint("general", "view")
-        if view in [blaconst.VIEW_PLAYLISTS, blaconst.VIEW_QUEUE]:
-            cls.views[view].remove_invalid_tracks()
+        cls.__mediator("remove_invalid_tracks")
 
