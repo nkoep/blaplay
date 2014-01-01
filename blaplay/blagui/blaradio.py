@@ -35,9 +35,10 @@ import blaguiutils
 
 def parse_uri(uri):
     stations = []
-    if isinstance(uri, unicode): uri = uri.encode("utf-8")
+    if isinstance(uri, unicode):
+        uri = uri.encode("utf-8")
     ext = blautil.get_extension(uri).lower()
-    if ext in ["m3u", "pls", "asx"]:
+    if ext in ("m3u", "pls", "asx"):
         f = urllib.urlopen(uri)
 
         if ext == "m3u":
@@ -52,39 +53,49 @@ def parse_uri(uri):
             if "playlist" in parser.sections():
                 kwargs = dict(parser.items("playlist"))
                 entries = [key for key in kwargs.iterkeys()
-                        if key.startswith("file")]
+                           if key.startswith("file")]
                 stations.extend([BlaRadioStation(uri, kwargs[e])
-                        for e in entries])
+                                 for e in entries])
 
         elif ext == "asx":
-            try: tree = ETree.ElementTree(None, f)
-            except SyntaxError: pass
+            try:
+                tree = ETree.ElementTree(None, f)
+            except SyntaxError:
+                pass
             else:
                 iterator = tree.getiterator()
                 for node in iterator:
                     keys = node.keys()
-                    try: idx = map(str.lower, keys).index("href")
-                    except ValueError: continue
+                    try:
+                        idx = map(str.lower, keys).index("href")
+                    except ValueError:
+                        continue
                     location = node.get(keys[idx]).strip()
                     stations.append(BlaRadioStation(uri, location))
 
         f.close()
 
-    elif uri: stations.append(BlaRadioStation(uri, uri))
+    elif uri:
+        stations.append(BlaRadioStation(uri, uri))
     return stations
 
 class BlaRadioStation(BlaTrack):
     def __init__(self, uri, location):
-        # don't call BlaTrack's __init__ method as it'd try to parse tags from
-        # a file. we just subclass BlaTrack to make sure that all methods and
+        # Don't call BlaTrack's __init__ method as it'd try to parse tags from
+        # a file. We just subclass BlaTrack to make sure that all methods and
         # properties any other track instance has are available for stations as
-        # well
+        # well.
         self["uri"] = uri
         self["location"] = location
         self[LENGTH] = 0
 
-    uri = property(lambda self: self["uri"])
-    location = property(lambda self: self["location"])
+    @property
+    def uri(self):
+        return self["uri"]
+
+    @property
+    def location(self):
+        return self["location"]
 
 class BlaRadio(gtk.VBox):
     __metaclass__ = BlaViewMeta("Internet Radio")
@@ -98,12 +109,12 @@ class BlaRadio(gtk.VBox):
 
         entry = gtk.Entry()
         entry.connect(
-                "activate", lambda *x: self.__add_station(entry.get_text()))
+            "activate", lambda *x: self.__add_station(entry.get_text()))
         hbox.pack_start(entry, expand=True)
 
         button = gtk.Button("Add")
         button.connect(
-                "clicked", lambda *x: self.__add_station(entry.get_text()))
+            "clicked", lambda *x: self.__add_station(entry.get_text()))
         hbox.pack_start(button, expand=False)
 
         button = gtk.Button("Remove")
@@ -111,11 +122,11 @@ class BlaRadio(gtk.VBox):
         hbox.pack_start(button, expand=False)
 
         def open_(*args):
-            diag = gtk.FileChooserDialog("Select files",
-                    action=gtk.FILE_CHOOSER_ACTION_OPEN,
-                    buttons=(gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL,
-                    gtk.STOCK_OPEN, gtk.RESPONSE_OK)
-            )
+            diag = gtk.FileChooserDialog(
+                "Select files",
+                action=gtk.FILE_CHOOSER_ACTION_OPEN,
+                buttons=(gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL,
+                         gtk.STOCK_OPEN, gtk.RESPONSE_OK))
             diag.set_local_only(True)
             response = diag.run()
             filename = diag.get_filename()
@@ -136,15 +147,15 @@ class BlaRadio(gtk.VBox):
         self.__treeview.set_rubber_banding(True)
         self.__treeview.set_property("rules_hint", True)
 
-        # playing column
+        # Playing column
         r = gtk.CellRendererPixbuf()
         self.__treeview.insert_column_with_attributes(
-                -1, "Playing", r, stock_id=0)
+            -1, "Playing", r, stock_id=0)
         r.set_property("stock-size", gtk.ICON_SIZE_BUTTON)
         r.set_property("xalign", 0.5)
         self.__treeview.get_columns()[-1].set_alignment(0.5)
 
-        # remaining columns
+        # The remaining columns
         def cell_data_func(column, renderer, model, iterator, identifier):
             renderer.set_property("text", model[iterator][1][identifier])
 
@@ -169,24 +180,24 @@ class BlaRadio(gtk.VBox):
         self.pack_start(hbox, expand=False)
         self.pack_start(sw, expand=True)
 
-        self.__treeview.enable_model_drag_dest([
-                ("radio", gtk.TARGET_OTHER_APP, 0),
-                ("text/uri-list", gtk.TARGET_OTHER_APP, 1),
-                ("text/plain", gtk.TARGET_OTHER_APP, 2),
-                ("TEXT", gtk.TARGET_OTHER_APP, 3),
-                ("STRING", gtk.TARGET_OTHER_APP, 4),
-                ("COMPOUND_TEXT", gtk.TARGET_OTHER_APP, 5),
-                ("UTF8_STRING", gtk.TARGET_OTHER_APP, 6)
-                ],
-                gtk.gdk.ACTION_COPY
-        )
-        self.__treeview.enable_model_drag_source(gtk.gdk.BUTTON1_MASK,
-                [("radio", gtk.TARGET_SAME_WIDGET, 0)], gtk.gdk.ACTION_MOVE)
+        self.__treeview.enable_model_drag_dest(
+            [("radio", gtk.TARGET_OTHER_APP, 0),
+             ("text/uri-list", gtk.TARGET_OTHER_APP, 1),
+             ("text/plain", gtk.TARGET_OTHER_APP, 2),
+             ("TEXT", gtk.TARGET_OTHER_APP, 3),
+             ("STRING", gtk.TARGET_OTHER_APP, 4),
+             ("COMPOUND_TEXT", gtk.TARGET_OTHER_APP, 5),
+             ("UTF8_STRING", gtk.TARGET_OTHER_APP, 6)],
+            gtk.gdk.ACTION_COPY)
+        self.__treeview.enable_model_drag_source(
+            gtk.gdk.BUTTON1_MASK, [("radio", gtk.TARGET_SAME_WIDGET, 0)],
+            gtk.gdk.ACTION_MOVE)
         self.__treeview.connect("drag_data_get", self.__drag_data_get)
         self.__treeview.connect("drag_data_received", self.__drag_data_recv)
         self.__treeview.connect("popup", self.__popup_menu)
-        self.__treeview.connect("row_activated",
-                lambda treeview, path, column: self.__get_station(path))
+        self.__treeview.connect(
+            "row_activated",
+            lambda treeview, path, column: self.__get_station(path))
         self.__treeview.connect("key_press_event", self.__key_press_event)
 
         player.connect_object("get_station", BlaRadio.__get_station, self)
@@ -203,20 +214,20 @@ class BlaRadio(gtk.VBox):
         self.__paths = treeview.get_selection().get_selected_rows()[-1]
         selection_data.set("radio", 8, "")
 
-    def __drag_data_recv(self, treeview, drag_context, x, y,
-            selection_data, info, time):
+    def __drag_data_recv(self, treeview, drag_context, x, y, selection_data,
+                         info, time):
         treeview.grab_focus()
         drop_info = treeview.get_dest_row_at_pos(x, y)
         model = treeview.get_model()
 
-        # in-playlist DND
+        # In-playlist DND
         if info == 0:
             if drop_info:
                 path, pos = drop_info
                 iterator = model.get_iter(path)
 
                 if (pos == gtk.TREE_VIEW_DROP_BEFORE or
-                            pos == gtk.TREE_VIEW_DROP_INTO_OR_BEFORE):
+                    pos == gtk.TREE_VIEW_DROP_INTO_OR_BEFORE):
                     move_before = model.move_before
                     f = lambda it: move_before(it, iterator)
                 else:
@@ -242,15 +253,16 @@ class BlaRadio(gtk.VBox):
     def __update_rows(self):
         if not player.radio:
             model = self.__treeview.get_model()
-            for row in model: row[0] = None
+            for row in model:
+                row[0] = None
         else:
             station = player.get_track()
             model = self.__treeview.get_model()
             state = player.get_state()
+            # FIXME: Um, how does this evaluate? Simplify!
             stock = (gtk.STOCK_MEDIA_PLAY if state == blaconst.STATE_PLAYING
-                    else gtk.STOCK_MEDIA_PAUSE
-                    if state == blaconst.STATE_PAUSED else None
-            )
+                     else gtk.STOCK_MEDIA_PAUSE
+                     if state == blaconst.STATE_PAUSED else None)
             for row in model:
                 if row[1] == station:
                     row[0] = stock
@@ -261,14 +273,15 @@ class BlaRadio(gtk.VBox):
         uri = uri.strip()
         try:
             stations = parse_uri(uri)
-            if not stations: return
+            if not stations:
+                return
         except IOError:
             blaguiutils.error_dialog(
-                    "Invalid URL", "Failed to open location %s." % uri)
+                "Invalid URL", "Failed to open location %s." % uri)
         else:
             model = self.__treeview.get_model()
             iterators = [model.append([None, station])
-                    for station in stations]
+                         for station in stations]
             self.emit("count_changed", blaconst.VIEW_RADIO, len(model))
             self.__treeview.set_cursor(model.get_path(iterators[0]))
             select_path = self.__treeview.get_selection().select_path
@@ -278,26 +291,31 @@ class BlaRadio(gtk.VBox):
         model, paths = self.__treeview.get_selection().get_selected_rows()
         map(model.remove, map(model.get_iter, paths))
 
-        # check if we removed the current station
-        if not self.__current: return
+        # Check if we removed the current station.
+        if not self.__current:
+            return
         for row in model:
-            if row[1] == self.__current: break
-        else: self.__current = None
+            if row[1] == self.__current:
+                break
+        else:
+            self.__current = None
 
     def __save_stations(self):
         stations = [row[1] for row in self.__treeview.get_model()]
         blautil.serialize_to_file(
-                [self.__current, stations], blaconst.STATIONS_PATH)
+            [self.__current, stations], blaconst.STATIONS_PATH)
 
     def __popup_menu(self, treeview, event):
-        try: path = treeview.get_path_at_pos(*map(int, [event.x, event.y]))
-        except TypeError: return False
+        try:
+            path = treeview.get_path_at_pos(*map(int, [event.x, event.y]))
+        except TypeError:
+            return False
 
         menu = gtk.Menu()
         m = gtk.MenuItem("Remove")
         mod, key = gtk.accelerator_parse("Delete")
         m.add_accelerator(
-                "activate", blagui.accelgroup, mod, key, gtk.ACCEL_VISIBLE)
+            "activate", blagui.accelgroup, mod, key, gtk.ACCEL_VISIBLE)
         m.connect("activate", self.__remove_stations)
         menu.append(m)
         menu.show_all()
@@ -308,16 +326,20 @@ class BlaRadio(gtk.VBox):
             idx_max = len(model)-1
             path = randint(0, idx_max)
             if old is not None and idx_max > 0:
-                while path == old[0]: path = randint(0, idx_max)
+                while path == old[0]:
+                    path = randint(0, idx_max)
             return (path,)
 
         model = self.__treeview.get_model()
-        for row in model: row[0] = None
+        for row in model:
+            row[0] = None
         path = (0,)
 
-        # choice can either be a direction constant as defined in blaconst if
-        # the method is invoked as player callback or a treemodel path if it's
-        # invoked as row_activated callback on the treeview
+        # FIXME:
+        # The `choice' variable can either be a direction constant as defined
+        # in blaconst if the method is invoked as player callback or a
+        # treemodel path if it's invoked as row_activated callback on the
+        # treeview.
         if not isinstance(choice, tuple):
             if len(model) == 0:
                 return player.play_station(None)
@@ -329,33 +351,41 @@ class BlaRadio(gtk.VBox):
                         break
 
             order = blacfg.getint("general", "play.order")
-            if choice == blaconst.TRACK_RANDOM: path = get_random()
-            elif order == blaconst.ORDER_SHUFFLE: path = get_random(path)
+            if choice == blaconst.TRACK_RANDOM:
+                path = get_random()
+            elif order == blaconst.ORDER_SHUFFLE:
+                path = get_random(path)
             else:
                 if choice == blaconst.TRACK_NEXT:
                     iterator = model.iter_next(model.get_iter(path))
-                    if not iterator: return player.play_station(None)
+                    if not iterator:
+                        return player.play_station(None)
                     path = model.get_path(iterator)
                 elif choice == blaconst.TRACK_PREVIOUS:
-                    if path[0] < 1: return player.play_station(None)
+                    if path[0] < 1:
+                        return player.play_station(None)
                     path = (path[0]-1,)
-        else: path = choice
+        else:
+            path = choice
 
         self.__treeview.set_cursor(path)
         self.__current = model[path][1]
         player.play_station(self.__current)
 
     def __key_press_event(self, treeview, event):
-        if blagui.is_accel(event, "Delete"): self.__remove_stations()
+        if blagui.is_accel(event, "Delete"):
+            self.__remove_stations()
         return False
 
     def init(self):
         try:
             self.__current, stations = blautil.deserialize_from_file(
-                  blaconst.STATIONS_PATH)
-        except TypeError: return
+                blaconst.STATIONS_PATH)
+        except TypeError:
+            return
         model = self.__treeview.get_model()
-        [model.append([None, station]) for station in stations]
+        for station in stations:
+            model.append([None, station])
         if self.__current:
             for row in model:
                 if row[1] == self.__current:

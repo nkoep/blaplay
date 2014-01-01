@@ -266,8 +266,8 @@ class BlaTreeView(blaguiutils.BlaTreeViewBase):
             resolve = False
 
         name = model[path][2]
-        # TODO: defer calling get_tracks() until it's actually needed, i.e.
-        #       when an "activate" callback is invoked
+        # TODO: Defer calling get_tracks() until it's actually needed, i.e.
+        #       when an "activate" callback is invoked.
         tracks = self.get_tracks()
         directory = list(set(map(dirname, tracks)))
         if len(directory) == 1 and os.path.isdir(directory[0]):
@@ -620,8 +620,8 @@ class BlaLibraryBrowser(gtk.VBox):
 
     def __drag_data_get(self, drag_context, selection_data, info, timestamp):
         data = self.__treeview.get_tracks()
-        # TODO: we could use set_uris() here as well which would allow DND
-        #       from the library to external applications like file managers
+        # TODO: We could use set_uris() here as well which would allow DND
+        #       from the library to external applications like file managers.
         data = pickle.dumps(data, protocol=pickle.HIGHEST_PROTOCOL)
         selection_data.set("", 8, data)
 

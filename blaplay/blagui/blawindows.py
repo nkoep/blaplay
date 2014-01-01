@@ -37,9 +37,9 @@ class BlaBaseWindow(gtk.Window):
         self.__is_main_window = False
 
     def present(self):
-        # set the proper window state before presenting the window to the user.
-        # this is necessary to avoid that the window appears in its default
-        # state for a brief moment first
+        # Set the proper window state before presenting the window to the user.
+        # This is necessary to avoid that the window appears in its default
+        # state for a brief moment first.
         self.__restore_window_state()
         super(BlaBaseWindow, self).present()
 

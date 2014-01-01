@@ -1152,14 +1152,14 @@ class BlaPlaylist(gtk.VBox):
     def __init__(self, name):
         super(BlaPlaylist, self).__init__()
 
-        self.__header_box = gtk.HBox()
-        self.__header_box.pack_start(gtk.Label(name))
-        self.__header_box.show_all()
+        self.__history = BlaPlaylist.History(self)
+        self.__mode = MODE_NORMAL
 
         self.__lock = blautil.BlaLock()
 
-        self.__history = BlaPlaylist.History(self)
-        self.__mode = MODE_NORMAL
+        self.__header_box = gtk.HBox()
+        self.__header_box.pack_start(gtk.Label(name))
+        self.__header_box.show_all()
 
         self.__entry = gtk.Entry()
         self.__entry.set_icon_from_stock(

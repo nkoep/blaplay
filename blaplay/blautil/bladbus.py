@@ -42,7 +42,7 @@ def query_bus(query, arg=None):
     try:
         proxy = dbus.SessionBus().get_object(INTERFACE, OBJECT_PATH)
     except dbus.DBusException:
-        sys.exit()
+        raise SystemExit
 
     # Get an interface to the proxy. This offers direct access to methods
     # exposed through the interface.
@@ -86,7 +86,7 @@ def query_bus(query, arg=None):
         elif query in ["append", "new", "replace"] and arg:
             interface.parse_uris(query, arg)
 
-    sys.exit()
+    raise SystemExit
 
 
 class BlaDBus(dbus.service.Object):

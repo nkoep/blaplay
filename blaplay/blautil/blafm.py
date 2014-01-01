@@ -100,120 +100,118 @@ def create_popup_menu(track=None):
 
     return menu
 
-def post_message(params):
-    error, response = 1, "Socket error"
+def parse_response(response, key):
+    try:
+        response = Response(response[key])
+    except TypeError:
+        response = ResponseError("Invalid key")
+    except KeyError:
+        response = ResponseError(response["message"])
+    return response
+
+def post_message(params, key=None):
     conn = httplib.HTTPConnection("ws.audioscrobbler.com")
     params.append(("format", "json"))
     header = {"Content-type": "application/x-www-form-urlencoded"}
     try:
         conn.request("POST", "/2.0/?", urllib.urlencode(dict(params)), header)
-    except (socket.gaierror, socket.error) as (error, response):
-        pass
+    except httplib.HTTPException as exc:
+        return ResponseError(exc.message)
+
+    try:
+        response = conn.getresponse()
+    except httplib.HTTPException as exc:
+        return ResponseError(exc.message)
+    finally:
+        conn.close()
+
+    try:
+        content = response.read()
+        response = json.loads(content)
+    except (socket.timeout, ValueError):
+        return ResponseError(response.reason)
+
+    if key is not None:
+        response = parse_response(response, key)
     else:
-        try:
-            response = conn.getresponse()
-        except (httplib.BadStatusLine, socket.error):
-            pass
-        else:
-            try:
-                response = json.loads(response.read())
-            except (socket.timeout, ValueError):
-                error, response = response.status, response.reason
-            else:
-                error, response = 0, response
-    conn.close()
-    return error, response
+        response = Response(response)
+
+    return response
 
 def get_response(url, key):
-    # FIXME: Clean this mess up.
-    error, response = 0, None
     try:
-        try:
-            f = urllib2.urlopen(url, timeout=10)
-        except (socket.timeout, urllib2.URLError, IOError):
-            pass
-        else:
-            try:
-                response = json.loads(f.read())
-            except (socket.timeout, ValueError):
-                pass
-            else:
-                f.close()
-                try:
-                    response = response[key]
-                except TypeError:
-                    pass
-                except KeyError:
-                    error = response["error"]
-                    response = response["message"]
-    except:
-        print_w("FIXME")
-        import pprint
-        pprint.pprint(response)
-    return error, response
+        f = urllib2.urlopen(url, timeout=10)
+    except (socket.timeout, urllib2.URLError) as exc:
+        return ResponseError(exc.message)
 
-def get_image_url(images):
-    for image_dict in images:
-        if image_dict["size"] == "extralarge":
-            url = image_dict["#text"]
-            break
-    else:
-        raise ValueError("No extralarge cover found")
-    return url
+    try:
+        response = json.loads(f.read())
+    except ValueError as exc:
+        return ResponseError(exc.message)
+    finally:
+        f.close()
+
+    return parse_response(response, key)
+
+def get_image_url(image_urls):
+    for dict_ in image_urls:
+        if dict_["size"] == "extralarge":
+            return dict_["#text"]
+    return None
+
+def retrieve_image(image_base, image_urls):
+    image = None
+    url = get_image_url(image_urls)
+    if url:
+        image, _ = urllib.urlretrieve(
+            url, "%s.%s" % (image_base, blautil.get_extension(url)))
+    return image
 
 def get_cover(track, image_base):
-    path, cover = None, None
     url = "%s&method=album.getinfo&album=%s&artist=%s&autocorrect=1" % (
         blaconst.LASTFM_BASEURL, track[ALBUM].replace("&", "and"),
         track[ARTIST].replace("&", "and"))
     url = quote_url(url)
-    error, response = get_response(url, "album")
+    response = get_response(url, "album")
+    if isinstance(response, ResponseError):
+        print_d("Failed to retrieve cover: %s" % response)
+        return None
+    response = response.content
 
+    name = os.path.basename(image_base)
+    images = [os.path.join(blaconst.COVERS, f)
+              for f in os.listdir(blaconst.COVERS) if f.startswith(name)]
     try:
-        if error:
-            raise KeyError
-        images = response["image"]
-    except (TypeError, KeyError):
-        url = None
-    else:
-        url = get_image_url(images)
-
-    try:
-        if not url:
-            raise IOError
-        name = os.path.basename(image_base)
-        images = [os.path.join(blaconst.COVERS, f)
-                  for f in os.listdir(blaconst.COVERS) if f.startswith(name)]
         map(os.unlink, images)
-        cover, message = urllib.urlretrieve(
-            url, "%s.%s" % (image_base, blautil.get_extension(url)))
     except IOError:
         pass
 
-    return cover
+    try:
+        image_urls = response["image"]
+    except (TypeError, KeyError):
+        return None
+    return retrieve_image(image_base, image_urls)
 
 def get_biography(track, image_base):
-    image, biography = None, None
+    url = quote_url("%s&method=artist.getinfo&artist=%s" % (
+                    blaconst.LASTFM_BASEURL, track[ARTIST]))
+    response = get_response(url, "artist")
+    if isinstance(response, ResponseError):
+        print_d("Failed to retrieve artist biography: %s" % response)
+        return None, None
+    response = response.content
 
-    url = "%s&method=artist.getinfo&artist=%s" % (
-        blaconst.LASTFM_BASEURL, track[ARTIST])
-    url = quote_url(url)
-    error, response = get_response(url, "artist")
+    image = biography = None
 
+    # Retrieve the artist image.
     try:
-        images = response["image"]
+        image_urls = response["image"]
     except (TypeError, KeyError):
         pass
     else:
-        url = get_image_url(images)
-        try:
-            if not url:
-                raise IOError
-            image, message = urllib.urlretrieve(
-                url, "%s.%s" % (image_base, blautil.get_extension(url)))
-        except IOError:
-            pass
+        image = retrieve_image(image_base, image_urls)
 
+    # Retrieve the biography.
     try:
         biography = response["bio"]["content"]
     except (TypeError, KeyError):
@@ -225,15 +223,9 @@ def get_biography(track, image_base):
         biography = blautil.remove_html_tags(
             biography.replace(legal_notice, "").strip())
 
-    if error or response is None:
-        print_d("Failed to retrieve artist biography: %s (error %d)" % (
-                response, error))
-
     return image, biography
 
 def get_events(limit, recommended, city="", country=""):
-    events = None
-
     if recommended:
         session_key = BlaScrobbler.get_session_key()
         if not session_key:
@@ -250,67 +242,44 @@ def get_events(limit, recommended, city="", country=""):
 
         api_signature = sign_api_call(params)
         params.append(("api_sig", api_signature))
-        error, response = post_message(params)
-        try:
-            response = response["events"]
-        except (TypeError, KeyError):
-            pass
-
+        response = post_message(params, "events")
     else:
         location = ", ".join([city, country] if country else [city])
         url = "%s&method=geo.getEvents&location=%s&limit=%d" % (
-              blaconst.LASTFM_BASEURL, location, limit)
+            blaconst.LASTFM_BASEURL, location, limit)
         url = quote_url(url)
-        error, response = get_response(url, "events")
+        response = get_response(url, "events")
 
-    try:
-        # TODO: the reasonable thing to do here would be to set `error' and
-        #       response to a proper error-message-pair when response would be
-        #       returned as None from the callee
+    if isinstance(response, ResponseError):
+        print_d("Failed to retrieve recommended events: %s" % response)
+        return None
+    response = response.content
 
-        # If webservices are unavailable we might not get an error code despite
-        # an erroneous return message. Consequently `response' might actually
-        # be None.
-        if error:
-            raise TypeError
-        events = response["event"]
-    except (TypeError, KeyError):
-        print_d("Failed to retrieve recommended events: %s (error %d)" %
-                (response, error))
-    return events
+    return response["event"]
 
 def get_new_releases(recommended=False):
-    releases = []
     user = blacfg.getstring("lastfm", "user")
     if not user:
-        return releases
+        return []
 
     url = "%s&method=user.getNewReleases&user=%s&userecs=%d" % (
         blaconst.LASTFM_BASEURL, user, int(recommended))
     url = quote_url(url)
-    error, response = get_response(url, "albums")
+    response = get_response(url, "albums")
+    if isinstance(response, ResponseError):
+        print_d("Failed to get new releases: %s" % response)
+    response = response.content
 
-    # Same as above: we still might have an error even if `error' doesn't
-    # reflect it.
-    try:
-        if error:
-            raise TypeError
-        releases = response["album"]
-    except (TypeError, KeyError):
-        print_d("Failed to get new releases: %s (error %d)" %
-                (response, error))
-    return releases
+    return response["album"]
 
 def get_request_token():
     url = "%s&method=auth.gettoken" % blaconst.LASTFM_BASEURL
-    error, response = get_response(url, "token")
-    if not error:
-        token = response
-    else:
-        token = None
-        print_d("Failed to retrieve request token: %s (error %d)" %
-                (response, error))
-    return token
+    response = get_response(url, "token")
+    if isinstance(response, ResponseError):
+        print_d("Failed to retrieve request token: %s" % response)
+        return None
+
+    return response.content
 
 def sign_api_call(params):
     params.sort(key=lambda p: p[0].lower())
@@ -333,14 +302,21 @@ def love_unlove_song(track, unlove=False):
         ("sk", session_key)
     ]
 
-    # sign api call
+    # Sign API call.
     api_signature = sign_api_call(params)
     params.append(("api_sig", api_signature))
-    error, response = post_message(params)
-    if error:
-        print_d("Failed to love/unlove song: %s (error %d)" % (
-                response, error))
+    response = post_message(params)
+    if isinstance(response, ResponseError):
+        print_d("Failed to love/unlove song: %s" %  response)
 
+
+class Response(object):
+    def __init__(self, response):
+        self.content = response
+
+class ResponseError(Response):
+    def __repr__(self):
+        return self.content
 
 class BlaScrobbler(object):
     __requested_authorization = False
@@ -400,10 +376,10 @@ class BlaScrobbler(object):
 
                 api_signature = sign_api_call(params)
                 params.append(("api_sig", api_signature))
-                error, response = post_message(params)
-                if error:
-                    print_d("Failed to submit %d scrobbles to last.fm: %s "
-                            "(error %d)" % (len(item), response, error))
+                response = post_message(params)
+                if isinstance(response, ResponseError):
+                    print_d("Failed to submit %d scrobbles to last.fm: %s" % (
+                            len(item), response))
                 else:
                     map(self.__items.remove, items)
 
@@ -489,10 +465,9 @@ class BlaScrobbler(object):
         # sign api call
         api_signature = sign_api_call(params)
         params.append(("api_sig", api_signature))
-        error, response = post_message(params)
-        if error:
-            print_d("Failed to update nowplaying: %s (error %d)" %
-                    (response, error))
+        response = post_message(params)
+        if isinstance(response, ResponseError):
+            print_d("Failed to update nowplaying: %s" % response)
 
     def __query_status(self):
         state = player.get_state()
@@ -568,13 +543,13 @@ class BlaScrobbler(object):
         string = "&".join(["%s=%s" % p for p in params])
         url = "%s&api_sig=%s&%s" % (
               blaconst.LASTFM_BASEURL, api_signature, string)
-        error, response = get_response(url, "session")
-        if not error:
-            session_key = response["key"]
-            blacfg.set("lastfm", "sessionkey", session_key)
-        else:
+        response = get_response(url, "session")
+        if isinstance(response, ResponseError):
             session_key = None
             cls.__requested_authorization = True
+        else:
+            session_key = response.content["key"]
+            blacfg.set("lastfm", "sessionkey", session_key)
         return session_key
 
     def submit_track(self, player):

@@ -53,7 +53,7 @@ def update_menu(view):
     if view == blaconst.VIEW_PLAYLISTS:
         state = True
 
-    # TODO: update the "Clear" label for the playlist or queue
+    # TODO: Update the "Clear" label for the playlist or queue.
     for entry in blaconst.MENU_PLAYLISTS:
         uimanager.get_widget(entry).set_visible(state)
 

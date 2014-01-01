@@ -50,7 +50,7 @@ class PositionSlider(gtk.HScale):
         player.connect("track_changed", self.__track_changed)
 
         self.__seekid = gobject.timeout_add(
-                self.__seek_interval, self.__update_position)
+            self.__seek_interval, self.__update_position)
 
     def __scroll_timeout(self):
         player.seek(self.get_value())
@@ -60,32 +60,38 @@ class PositionSlider(gtk.HScale):
     def __scroll(self, scale, event):
         if self.__seeking or player.get_state() == blaconst.STATE_STOPPED:
             return True
-        if self.__scrollid: gobject.source_remove(self.__scrollid)
+        if self.__scrollid:
+            gobject.source_remove(self.__scrollid)
         self.__seeking = True
         self.__scrollid = gobject.timeout_add(
-                self.__scroll_delay, self.__scroll_timeout)
+            self.__scroll_delay, self.__scroll_timeout)
         return False
 
     def __value_changed(self, scale):
-        # check for position changes during seeking. the `__changed' attribute
+        # Check for position changes during seeking. The `__changed' attribute
         # is used to signal to the callback function of button_release_event's
-        # that it should perform a seek operation on the playback device
-        if self.__seeking: self.__changed = True
+        # that it should perform a seek operation on the playback device.
+        if self.__seeking:
+            self.__changed = True
         BlaStatusbar.update_position(self.get_value())
 
     def __seek_start(self, scale, event):
-        if player.get_state() == blaconst.STATE_STOPPED: return True
-        if hasattr(event, "button"): event.button = 2
+        if player.get_state() == blaconst.STATE_STOPPED:
+            return True
+        if hasattr(event, "button"):
+            event.button = 2
         self.__seeking = True
 
     def __seek_end(self, scale, event):
-        if player.get_state() == blaconst.STATE_STOPPED: return True
-        if hasattr(event, "button"): event.button = 2
+        if player.get_state() == blaconst.STATE_STOPPED:
+            return True
+        if hasattr(event, "button"):
+            event.button = 2
         self.__seeking = False
         if self.__changed:
-            # the slider length (upper bound of the adjustment) is directly
+            # The slider length (upper bound of the adjustment) is directly
             # proportional to the track length (in fact, it's the length of the
-            # track in nanoseconds). the offset we should add to the position
+            # track in nanoseconds). The offset we should add to the position
             # (number of units the slider would move in one update step) can
             # thus be calculated to 1e6 * __seek_interval.
             player.seek(self.get_value() + 1e6 * self.__seek_interval)
@@ -93,10 +99,11 @@ class PositionSlider(gtk.HScale):
 
     def __update_position(self):
         state = player.get_state()
-        if state == blaconst.STATE_STOPPED: self.set_value(0)
+        if state == blaconst.STATE_STOPPED:
+            self.set_value(0)
         elif (not state == blaconst.STATE_PAUSED and
-                not state == blaconst.STATE_STOPPED and
-                not self.__seeking):
+              not state == blaconst.STATE_STOPPED and
+              not self.__seeking):
             position = player.get_position()
             if position != 0:
                 self.set_value(position)
@@ -106,11 +113,12 @@ class PositionSlider(gtk.HScale):
     def __state_changed(self, player):
         if player.get_state() == blaconst.STATE_STOPPED or player.radio:
             self.set_sensitive(False)
-        else: self.set_sensitive(True)
+        else:
+            self.set_sensitive(True)
 
     def __track_changed(self, player):
-        # we need to remove the timer on track changes to make sure the slider
-        # really resets properly
+        # We need to remove the timer on track changes to make sure the slider
+        # really resets properly.
         self.set_value(0)
         gobject.source_remove(self.__seekid)
         track = player.get_track()
@@ -118,7 +126,7 @@ class PositionSlider(gtk.HScale):
         self.set_range(0, max(1, duration))
         self.set_increments(-int(duration / 100.0), -int(duration / 10.0))
         self.__seekid = gobject.timeout_add(
-                self.__seek_interval, self.__update_position)
+            self.__seek_interval, self.__update_position)
 
 class VolumeControl(gtk.HBox):
     __states = ["muted", "low", "medium", "high"]
@@ -128,10 +136,12 @@ class VolumeControl(gtk.HBox):
 
         self.__volume = int(blacfg.getfloat("player", "volume") * 100)
         state = blacfg.getboolean("player", "muted")
-        if not state: volume = self.__volume
-        else: volume = 0.0
+        if not state:
+            volume = self.__volume
+        else:
+            volume = 0.0
 
-        # the mute button
+        # The mute button
         self.__image = gtk.Image()
         mute = gtk.ToggleButton()
         mute.add(self.__image)
@@ -139,7 +149,7 @@ class VolumeControl(gtk.HBox):
         mute.set_active(state)
         mute.connect("toggled", self.__mute_toggled)
 
-        # the scale
+        # The volume scale
         self.__scale = gtk.HScale()
         self.__scale.set_range(0, 100)
         self.__scale.set_increments(-1, -10)
@@ -150,7 +160,7 @@ class VolumeControl(gtk.HBox):
         self.__scale.connect("value_changed", self.__volume_changed)
         self.__scale.connect("button_press_event", self.__button_press_event)
         self.__scale.connect(
-                "button_release_event", self.__button_release_event)
+            "button_release_event", self.__button_release_event)
         self.__scale.connect("scroll_event", self.__scroll_event)
         self.__scale.connect("key_press_event", lambda *x: True)
         self.__scale.connect("query_tooltip", self.__query_tooltip)
@@ -162,24 +172,33 @@ class VolumeControl(gtk.HBox):
         self.pack_start(self.__scale, expand=True)
 
     def __scroll_event(self, scale, event):
-        if blacfg.getboolean("player", "muted"): return True
+        if blacfg.getboolean("player", "muted"):
+            return True
 
     def __button_press_event(self, scale, event):
-        if blacfg.getboolean("player", "muted"): return True
-        if hasattr(event, "button"): event.button = 2
+        if blacfg.getboolean("player", "muted"):
+            return True
+        if hasattr(event, "button"):
+            event.button = 2
+        return False
 
     def __button_release_event(self, scale, event):
-        if blacfg.getboolean("player", "muted"): return True
+        if blacfg.getboolean("player", "muted"):
+            return True
 
-        if hasattr(event, "button"): event.button = 2
+        if hasattr(event, "button"):
+            event.button = 2
         self.__volume = self.__scale.get_value()
         player.set_volume(self.__volume)
+        return False
 
     def __volume_changed(self, scale):
         state = blacfg.getboolean("player", "muted")
 
-        if state: volume = self.__volume
-        else: volume = scale.get_value()
+        if state:
+            volume = self.__volume
+        else:
+            volume = scale.get_value()
 
         blacfg.set("player", "volume", volume / 100.0)
         player.set_volume(scale.get_value())
@@ -191,26 +210,31 @@ class VolumeControl(gtk.HBox):
         if state:
             self.__volume = self.__scale.get_value()
             self.__scale.set_value(0)
-        else: self.__scale.set_value(self.__volume)
+        else:
+            self.__scale.set_value(self.__volume)
 
     def __update_icon(self, state):
         icon_name = "audio-volume-%s"
         volume = self.__scale.get_value()
 
-        # unmute
+        # Unmute
         if not state:
             k = int(math.ceil(2.95 * volume / 100.0))
             icon_name %= self.__states[k]
-        # mute
-        else: icon_name %= self.__states[0]
+        # Mute
+        else:
+            icon_name %= self.__states[0]
         self.__image.set_from_icon_name(icon_name, gtk.ICON_SIZE_BUTTON)
 
     def __query_tooltip(self, *args):
         volume = self.__scale.get_value()
         if blacfg.getboolean("player", "logarithmic.volume.scale"):
-            if volume == 0: tooltip = "-Inf dB"
-            else: tooltip = "%.1f dB" % (50 * (volume / 100.0 - 1))
-        else: tooltip = "%d%%" % volume
+            if volume == 0:
+                tooltip = "-Inf dB"
+            else:
+                tooltip = "%.1f dB" % (50 * (volume / 100.0 - 1))
+        else:
+            tooltip = "%d%%" % volume
         self.__scale.set_tooltip_text(tooltip)
         return False
 
@@ -220,7 +244,7 @@ class BlaToolbar(gtk.HBox):
     def __init__(self):
         super(BlaToolbar, self).__init__(spacing=10)
 
-        # the button box
+        # The button box
         ctrlbar = gtk.Table(rows=1, columns=5, homogeneous=True)
         ctrlbar.set_name("ctrlbar")
         gtk.rc_parse_string(
@@ -235,8 +259,7 @@ class BlaToolbar(gtk.HBox):
 
             widget "*.GtkHBox.ctrlbar.GtkButton" style :
                 highest "blaplay-toolbar"
-            """
-        )
+            """)
 
         img = gtk.Image()
         play_pause = gtk.Button()
@@ -246,7 +269,8 @@ class BlaToolbar(gtk.HBox):
         ctrlbar.attach(play_pause, 0, 1, 0, 1)
 
         stop = gtk.Button()
-        stop.add(gtk.image_new_from_stock(
+        stop.add(
+            gtk.image_new_from_stock(
                 gtk.STOCK_MEDIA_STOP, gtk.ICON_SIZE_BUTTON))
         stop.set_relief(gtk.RELIEF_NONE)
         stop.set_tooltip_text("Stop")
@@ -254,20 +278,22 @@ class BlaToolbar(gtk.HBox):
         ctrlbar.attach(stop, 1, 2, 0, 1)
 
         previous = gtk.Button()
-        previous.add(gtk.image_new_from_stock(
+        previous.add(
+            gtk.image_new_from_stock(
                 gtk.STOCK_MEDIA_PREVIOUS, gtk.ICON_SIZE_BUTTON))
         previous.set_relief(gtk.RELIEF_NONE)
         previous.set_tooltip_text("Previous track")
         previous.connect("clicked", self.__ctrl, CMD_PREVIOUS)
         ctrlbar.attach(previous, 2, 3, 0, 1)
 
-        next = gtk.Button()
-        next.add(gtk.image_new_from_stock(
+        next_ = gtk.Button()
+        next_.add(
+            gtk.image_new_from_stock(
                 gtk.STOCK_MEDIA_NEXT, gtk.ICON_SIZE_BUTTON))
-        next.set_relief(gtk.RELIEF_NONE)
-        next.set_tooltip_text("Next track")
-        next.connect("clicked", self.__ctrl, CMD_NEXT)
-        ctrlbar.attach(next, 3, 4, 0, 1)
+        next_.set_relief(gtk.RELIEF_NONE)
+        next_.set_tooltip_text("Next track")
+        next_.connect("clicked", self.__ctrl, CMD_NEXT)
+        ctrlbar.attach(next_, 3, 4, 0, 1)
 
         random = gtk.Button()
         random.add(gtk.image_new_from_icon_name(
@@ -277,10 +303,10 @@ class BlaToolbar(gtk.HBox):
         random.connect("clicked", self.__ctrl, CMD_NEXT_RANDOM)
         ctrlbar.attach(random, 4, 5, 0, 1)
 
-        # position slider
+        # Position slider
         seekbar = PositionSlider()
 
-        # volume control
+        # Volume control
         volume = VolumeControl()
 
         self.pack_start(ctrlbar, expand=False)
@@ -294,25 +320,31 @@ class BlaToolbar(gtk.HBox):
 
     def __update_state(self, player, img, play_pause):
         state = player.get_state()
-        if state == self.__state: return
+        if state == self.__state:
+            return
 
         if state == blaconst.STATE_PLAYING:
-            s = gtk.STOCK_MEDIA_PAUSE
-            tt = "Pause"
+            stock = gtk.STOCK_MEDIA_PAUSE
+            tooltip = "Pause"
         elif state == blaconst.STATE_PAUSED or state == blaconst.STATE_STOPPED:
-            s = gtk.STOCK_MEDIA_PLAY
-            tt = "Play"
+            stock = gtk.STOCK_MEDIA_PLAY
+            tooltip = "Play"
 
-        img.set_from_stock(s, gtk.ICON_SIZE_BUTTON)
+        img.set_from_stock(stock, gtk.ICON_SIZE_BUTTON)
         img.show()
-        play_pause.set_tooltip_text(tt)
+        play_pause.set_tooltip_text(tooltip)
 
         self.__state = state
 
     def __ctrl(self, button, cmd):
-        if cmd == CMD_PLAYPAUSE: player.play_pause()
-        elif cmd == CMD_STOP: player.stop()
-        elif cmd == CMD_PREVIOUS: player.previous()
-        elif cmd == CMD_NEXT: player.next()
-        elif cmd == CMD_NEXT_RANDOM: player.random()
+        if cmd == CMD_PLAYPAUSE:
+            player.play_pause()
+        elif cmd == CMD_STOP:
+            player.stop()
+        elif cmd == CMD_PREVIOUS:
+            player.previous()
+        elif cmd == CMD_NEXT:
+            player.next()
+        elif cmd == CMD_NEXT_RANDOM:
+            player.random()
 

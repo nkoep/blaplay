@@ -180,10 +180,11 @@ class BlaSidePane(gtk.VBox):
             return True
 
         def __expose_event(self, *args):
-            # FIXME: if the player is paused and the video canvas gets exposed
+            # FIXME: If the player is paused and the video canvas gets exposed
             #        the last queued event paints the canvas in pure black
             #        AFTER gstreamer repaints the last active frame of the
-            #        video. obviously, we want the last active frame to be seen
+            #        video. Obviously, we want the last active frame to be
+            #        seen.
             if self.__is_video_canvas and player.video:
                 # Be sure to cancel any crossfade animations.
                 self.__alpha = 0.0

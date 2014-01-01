@@ -176,11 +176,7 @@ class BlaStatusbar(gtk.Table):
             self.__pb_label.set_visible(True)
 
         elif arg == "abort":
-            # FIXME: why should this raise a TypeError?
-            try:
-                gobject.source_remove(self.__tid)
-            except TypeError:
-                pass
+            gobject.source_remove(self.__tid)
             self.__track_info.set_visible(True)
             self.__pb.set_visible(False)
             self.__pb_label.set_visible(False)

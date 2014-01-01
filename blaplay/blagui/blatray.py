@@ -27,7 +27,7 @@ class BlaTray(gtk.StatusIcon):
     __metaclass__ = blautil.BlaSingletonMeta
 
     def __init__(self):
-        # TODO: add support for scroll-events
+        # TODO: Add support for scroll-events.
 
         super(BlaTray, self).__init__()
         self.set_from_icon_name(blaconst.APPNAME)
