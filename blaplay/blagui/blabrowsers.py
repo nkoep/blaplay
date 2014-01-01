@@ -328,7 +328,7 @@ class BlaQuery(object):
             self.query = lambda *x: True
 
     def __query(self, track):
-        strings = [track[identifier] for identifier in [ARTIST, TITLE, ALBUM]]
+        strings = [track[identifier] for identifier in (ARTIST, TITLE, ALBUM)]
 
         if (blacfg.getint("library", "organize.by") ==
             blaconst.ORGANIZE_BY_DIRECTORY):
@@ -401,8 +401,8 @@ class BlaLibraryBrowser(gtk.VBox):
                 cb = cls.__organize_by_artist_album
             elif view == blaconst.ORGANIZE_BY_ALBUM:
                 cb = cls.__organize_by_album
-            elif view in [blaconst.ORGANIZE_BY_GENRE,
-                          blaconst.ORGANIZE_BY_YEAR]:
+            elif view in (blaconst.ORGANIZE_BY_GENRE,
+                          blaconst.ORGANIZE_BY_YEAR):
                 def cb(uri, comps):
                     return cls.__organize_by_genre_year(uri, comps, view=view)
             else:

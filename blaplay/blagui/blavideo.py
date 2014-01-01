@@ -80,8 +80,8 @@ class BlaVideoCanvas(gtk.DrawingArea):
     def __button_press_event(self, event):
         if event.button == 1 and event.type == gtk.gdk._2BUTTON_PRESS:
             self.emit("toggle_fullscreen")
-        elif event.button == 3 and event.type not in [gtk.gdk._2BUTTON_PRESS,
-                                                      gtk.gdk._3BUTTON_PRESS]:
+        elif event.button == 3 and event.type not in (gtk.gdk._2BUTTON_PRESS,
+                                                      gtk.gdk._3BUTTON_PRESS):
             if not player.video:
                 return False
 

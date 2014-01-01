@@ -134,7 +134,7 @@ class BlaTrack(dict):
     # TODO: cache properties which don't change over time
 
     def get_cover_basepath(self):
-        if "" in [self[ARTIST], self[ALBUM]]:
+        if "" in (self[ARTIST], self[ALBUM]):
             return None
         base = "%s-%s" % (
             self[ARTIST].replace(" ", "_"), self[ALBUM].replace(" ", "_"))
@@ -151,7 +151,7 @@ class BlaTrack(dict):
         return None
 
     def get_lyrics_key(self):
-        if "" in [self[ARTIST], self[TITLE]]:
+        if "" in (self[ARTIST], self[TITLE]):
             return ""
         lyrics_key = "%s-%s" % (
             self[ARTIST].replace(" ", "_").replace("/", "_"),

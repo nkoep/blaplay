@@ -50,7 +50,7 @@ class Mp4(BlaTrack):
             raise TagParseError
 
         for key, values in (audio.tags or {}).iteritems():
-            if key in ["disk", "trkn"]:
+            if key in ("disk", "trkn"):
                 value = ["%d/%d" % values[0]]
             elif key.startswith("----:"):
                 key = key[5:]
@@ -105,7 +105,7 @@ class Mp4(BlaTrack):
 
             # Track and disc numbers are stored as a list of tuples so handle
             # them separately.
-            if identifier in [TRACK, DISC]:
+            if identifier in (TRACK, DISC):
                 values = values.split("/")
                 try:
                     v1 = int(values[0])
