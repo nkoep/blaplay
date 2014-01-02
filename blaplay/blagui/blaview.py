@@ -79,7 +79,6 @@ class BlaSidePane(gtk.VBox):
             # startup, even if the side pane is set to hidden in the config.
             def startup_complete(*args):
                 drawing_area.realize()
-                BlaView.update_view(blacfg.getint("general", "view"))
             blaplay.bla.connect("startup_complete", startup_complete)
 
         def __update_timestamp(self):
@@ -616,6 +615,10 @@ class BlaView(gtk.HPaned):
         self.pack2(self.__side_pane, resize=False, shrink=False)
 
         self.set_show_side_pane(blacfg.getboolean("general", "side.pane"))
+
+        def startup_complete(*args):
+            self.update_view(blacfg.getint("general", "view"))
+        blaplay.bla.connect("startup_complete", startup_complete)
 
     def set_show_side_pane(self, state):
         self.__side_pane.set_visible(state)

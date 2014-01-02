@@ -130,7 +130,6 @@ MENU = """
             <menuitem action="NewReleases"/>
             <separator/>
             <menuitem action="Browsers"/>
-            <menuitem action="PlaylistTabs"/>
             <menuitem action="SidePane"/>
             <menuitem action="Statusbar"/>
             <menuitem action="Visualization"/>
@@ -150,7 +149,7 @@ MENU_PLAYLISTS = _builder(
     ["File/AddFiles", "File/AddDirectories", "File/SavePlaylist",
      "Edit/AddNewPlaylist", "Edit/RemovePlaylist",
      "Edit/LockUnlockPlaylist", "Edit/NewPlaylistFrom", "Edit/Search",
-     "View/PlaylistTabs", "View/JumpToPlayingTrack"])
+     "View/JumpToPlayingTrack"])
 MENU_EDIT = _builder(
     "/Menu/Edit/%s",
     ["Paste", "Clear", "Select", "Select/SelectAll",

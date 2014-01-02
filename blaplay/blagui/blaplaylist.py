@@ -2294,7 +2294,6 @@ class BlaPlaylistManager(gtk.Notebook):
         player.connect_object("get_track", BlaPlaylistManager.get_track, self)
 
         self.show_all()
-        self.show_tabs(blacfg.getboolean("general", "playlist.tabs"))
 
         blaplay.bla.register_for_cleanup(self)
 
@@ -2974,11 +2973,6 @@ class BlaPlaylistManager(gtk.Notebook):
     @classmethod
     def show_properties(cls, *args):
         cls.get_current_playlist().show_properties()
-
-    @classmethod
-    def show_tabs(cls, state):
-        cls.__instance.set_show_tabs(state)
-        blacfg.setboolean("general", "playlist.tabs", state)
 
     @classmethod
     def jump_to_playing_track(cls):

@@ -125,9 +125,6 @@ class BlaMainWindow(BlaBaseWindow):
         toggle_actions = [
             ("Browsers", None, "_Browsers", None, "", self.__toggle_browsers,
              blacfg.getboolean("general", "browsers")),
-            ("PlaylistTabs", None, "Playlist _tabs", None, "",
-             self.__toggle_tabs, blacfg.getboolean("general",
-                                                   "playlist.tabs")),
             ("SidePane", None, "_Side pane", None, "",
              self.__toggle_side_pane, blacfg.getboolean("general",
                                                         "side.pane")),
@@ -280,10 +277,6 @@ class BlaMainWindow(BlaBaseWindow):
     def __toggle_browsers(self, event):
         state = event.get_active()
         self.__browsers.set_visible(state)
-
-    def __toggle_tabs(self, event):
-        self.__view.views[blaconst.VIEW_PLAYLISTS].show_tabs(
-            event.get_active())
 
     def __toggle_side_pane(self, event):
         self.__view.set_show_side_pane(event.get_active())
