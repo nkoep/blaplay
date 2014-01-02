@@ -34,6 +34,10 @@ from blaplay.blautil import blametadata
 import blaguiutils
 
 
+def set_view(view):
+    BlaView().set_view(view)
+
+
 class BlaSidePane(gtk.VBox):
     track = None
 
@@ -447,7 +451,7 @@ class BlaSidePane(gtk.VBox):
         self.__tb2.delete(
             self.__tb2.get_start_iter(), self.__tb2.get_end_iter())
 
-    def update_view(self, view):
+    def set_active_view(self, view):
         path = self.__treeview.get_selection().get_selected_rows()[-1][0][0]
         if view == path:
             return True
@@ -525,31 +529,33 @@ def BlaViewMeta(view_name):
     return _BlaViewMeta
 
 class BlaView(gtk.HPaned):
+    __metaclass__ = blautil.BlaSingletonMeta
+
     def __init__(self):
         super(BlaView, self).__init__()
 
         actions = [
-            ("Clear", None, "_Clear", None, "", BlaView.clear),
+            ("Clear", None, "_Clear", None, "", self.__clear),
             ("SelectAll", None, "All", None, "",
-             lambda *x: BlaView.select(blaconst.SELECT_ALL)),
+             lambda *x: self.__select(blaconst.SELECT_ALL)),
             ("SelectComplement", None, "Complement", None, "",
-             lambda *x: BlaView.select(blaconst.SELECT_COMPLEMENT)),
+             lambda *x: self.__select(blaconst.SELECT_COMPLEMENT)),
             ("SelectByArtist", None, "By artist", None, "",
-             lambda *x: BlaView.select(blaconst.SELECT_BY_ARTISTS)),
+             lambda *x: self.__select(blaconst.SELECT_BY_ARTISTS)),
             ("SelectByAlbum", None, "By album", None, "",
-             lambda *x: BlaView.select(blaconst.SELECT_BY_ALBUMS)),
+             lambda *x: self.__select(blaconst.SELECT_BY_ALBUMS)),
             ("SelectByAlbumArtist", None, "By album artist", None, "",
-             lambda *x: BlaView.select(blaconst.SELECT_BY_ALBUM_ARTISTS)),
+             lambda *x: self.__select(blaconst.SELECT_BY_ALBUM_ARTISTS)),
             ("SelectByGenre", None, "By genre", None, "",
-             lambda *x: BlaView.select(blaconst.SELECT_BY_GENRES)),
-            ("Cut", None, "Cut", None, "", BlaView.cut),
-            ("Copy", None, "Copy", None, "", BlaView.copy),
-            ("Remove", None, "Remove", None, "", BlaView.remove),
-            ("Paste", None, "Paste", None, "", BlaView.paste),
+             lambda *x: self.__select(blaconst.SELECT_BY_GENRES)),
+            ("Cut", None, "Cut", None, "", self.__cut),
+            ("Copy", None, "Copy", None, "", self.__copy),
+            ("Remove", None, "Remove", None, "", self.__remove),
+            ("Paste", None, "Paste", None, "", self.__paste),
             ("RemoveDuplicates", None, "Remove _duplicates", None, "",
-             BlaView.remove_duplicates),
+             self.__remove_duplicates),
             ("RemoveInvalidTracks", None, "Remove _invalid tracks", None, "",
-             BlaView.remove_invalid_tracks)
+             self.__remove_invalid_tracks)
         ]
         ui_manager.add_actions(actions)
 
@@ -566,7 +572,7 @@ class BlaView(gtk.HPaned):
         ]
         ui_manager.add_radio_actions(
             radio_actions, value=blacfg.getint("general", "view"),
-            on_change=lambda *x: BlaView.update_view(
+            on_change=lambda *x: self.set_view(
             x[-1].get_current_value()))
 
         from blaplaylist import BlaPlaylistManager, BlaQueue
@@ -574,13 +580,12 @@ class BlaView(gtk.HPaned):
         from blaradio import BlaRadio
         from blaeventbrowser import BlaEventBrowser
         from blareleasebrowser import BlaReleaseBrowser
-        type(self).views = [
-            BlaPlaylistManager(), BlaQueue(), BlaRadio(), BlaVideo(),
-            BlaEventBrowser(), BlaReleaseBrowser()]
+        self.__views = [BlaPlaylistManager(), BlaQueue(), BlaRadio(),
+                        BlaVideo(), BlaEventBrowser(), BlaReleaseBrowser()]
 
-        type(self).__container = gtk.Viewport()
+        self.__container = gtk.Viewport()
         self.__container.set_shadow_type(gtk.SHADOW_NONE)
-        type(self).__side_pane = BlaSidePane(self.views)
+        self.__side_pane = BlaSidePane(self.__views)
 
         player.connect(
             "state_changed", lambda *x: self.__side_pane.update_track())
@@ -589,7 +594,7 @@ class BlaView(gtk.HPaned):
         def sync_handler():
             view = blacfg.getint("general", "view")
             if view == blaconst.VIEW_VIDEO:
-                element = self.views[blaconst.VIEW_VIDEO]
+                element = self.__views[blaconst.VIEW_VIDEO]
             else:
                 element = self.__side_pane.cover_display
                 # Coerce the cover display into a video canvas.
@@ -601,7 +606,7 @@ class BlaView(gtk.HPaned):
             return 0
         player.set_sync_handler(sync_handler)
 
-        for view in self.views:
+        for view in self.__views:
             view.connect("count_changed", self.__side_pane.update_count)
             view.init()
 
@@ -615,75 +620,65 @@ class BlaView(gtk.HPaned):
         self.set_show_side_pane(blacfg.getboolean("general", "side.pane"))
 
         def startup_complete(*args):
-            self.update_view(blacfg.getint("general", "view"))
+            self.set_view(blacfg.getint("general", "view"))
         blaplay.bla.connect("startup_complete", startup_complete)
+
+    def __mediator(self, method_name, *args):
+        view = blacfg.getint("general", "view")
+        if view in (blaconst.VIEW_PLAYLISTS, blaconst.VIEW_QUEUE):
+            getattr(self.__views[view], method_name)(*args)
+
+    def __clear(self, *args):
+        self.__mediator("clear")
+
+    def __select(self, type_):
+        self.__mediator("select", type_)
+
+    def __cut(self, *args):
+        self.__mediator("cut")
+
+    def __copy(self, *args):
+        self.__mediator("copy")
+
+    def __paste(self, *args):
+        self.__mediator("paste")
+
+    def __remove(self, *args):
+        self.__mediator("remove")
+
+    def __remove_duplicates(self, *args):
+        self.__mediator("remove_duplicates")
+
+    def __remove_invalid_tracks(self, *args):
+        self.__mediator("remove_invalid_tracks")
 
     def set_show_side_pane(self, state):
         self.__side_pane.set_visible(state)
         blacfg.setboolean("general", "side.pane", state)
 
-    @classmethod
-    def update_view(cls, view, init=False):
+    def set_view(self, view):
         view_prev = blacfg.getint("general", "view")
         blacfg.set("general", "view", view)
 
         if player.video:
             # If the previous view was the video view coerce the cover art
             # display into acting as new video canvas.
-            cls.__side_pane.cover_display.use_as_video_canvas(
+            self.__side_pane.cover_display.use_as_video_canvas(
                 view != blaconst.VIEW_VIDEO)
 
-        child = cls.__container.get_child()
+        child = self.__container.get_child()
         if view == view_prev and child is not None:
             return
         if child is not None:
-            cls.__container.remove(child)
-        child = cls.views[view]
+            self.__container.remove(child)
+        child = self.__views[view]
         if child.get_parent() is not None:
             child.unparent()
-        cls.__container.add(child)
+        self.__container.add(child)
         child.update_statusbar()
 
         # Not all menu items are available for all views so update them
         # accordingly.
         ui_manager.update_menu(view)
-        cls.__side_pane.update_view(view)
-
-    @classmethod
-    def __mediator(cls, method_name, *args):
-        view = blacfg.getint("general", "view")
-        if view in (blaconst.VIEW_PLAYLISTS, blaconst.VIEW_QUEUE):
-            getattr(cls.views[view], method_name)(*args)
-
-    @classmethod
-    def clear(cls, *args):
-        cls.__mediator("clear")
-
-    @classmethod
-    def select(cls, type_):
-        cls.__mediator("select", type_)
-
-    @classmethod
-    def cut(cls, *args):
-        cls.__mediator("cut")
-
-    @classmethod
-    def copy(cls, *args):
-        cls.__mediator("copy")
-
-    @classmethod
-    def paste(cls, *args):
-        cls.__mediator("paste")
-
-    @classmethod
-    def remove(cls, *args):
-        cls.__mediator("remove")
-
-    @classmethod
-    def remove_duplicates(cls, *args):
-        cls.__mediator("remove_duplicates")
-
-    @classmethod
-    def remove_invalid_tracks(cls, *args):
-        cls.__mediator("remove_invalid_tracks")
+        self.__side_pane.set_active_view(view)
 

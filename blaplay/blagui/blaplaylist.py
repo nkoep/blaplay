@@ -37,11 +37,11 @@ ui_manager = blaplay.bla.ui_manager
 from blaplay.blacore import blaconst, blacfg
 from blaplay import blautil, blagui
 from blaplay.formats._identifiers import *
-from blaview import BlaViewMeta
 from blawindows import BlaScrolledWindow
 from blaplay.blautil import blafm
 from blastatusbar import BlaStatusbar
 from blatagedit import BlaTagedit
+import blaview
 import blaguiutils
 
 (COLUMN_QUEUE_POSITION, COLUMN_PLAYING, COLUMN_TRACK, COLUMN_ARTIST,
@@ -62,10 +62,6 @@ COLUMNS_DEFAULT_QUEUE = (COLUMN_QUEUE_POSITION, COLUMN_ARTIST, COLUMN_TITLE,
 
 MODE_NORMAL, MODE_SORTED, MODE_FILTERED = 1 << 0, 1 << 1, 1 << 2
 
-
-def force_view():
-    from blaview import BlaView
-    BlaView.update_view(blaconst.VIEW_PLAYLISTS)
 
 def parse_playlist_stats(count, size, length_seconds):
     values = [("seconds", 60), ("minutes", 60), ("hours", 24), ("days",)]
@@ -704,7 +700,7 @@ class BlaListItem(object):
             self.playlist.update_icon(clear=True)
 
 class BlaQueue(BlaScrolledWindow):
-    __metaclass__ = BlaViewMeta("Queue")
+    __metaclass__ = blaview.BlaViewMeta("Queue")
 
     __layout = (
         gobject.TYPE_PYOBJECT,  # An instance of BlaListItem
@@ -2196,7 +2192,7 @@ class BlaPlaylist(gtk.VBox):
             BlaTagedit(uris)
 
 class BlaPlaylistManager(gtk.Notebook):
-    __metaclass__ = BlaViewMeta("Playlists")
+    __metaclass__ = blaview.BlaViewMeta("Playlists")
 
     __gsignals__ = {
         "play_track": blautil.signal(1)
@@ -2865,7 +2861,7 @@ class BlaPlaylistManager(gtk.Notebook):
         playlist.clear()
         playlist.add_items(create_items_from_uris(uris))
         cls.__instance.get_track(blaconst.TRACK_NEXT, False)
-        force_view()
+        blaview.set_view(blaconst.VIEW_PLAYLISTS)
 
     @classmethod
     def add_to_current_playlist(cls, uris, resolve=False):
@@ -2879,7 +2875,7 @@ class BlaPlaylistManager(gtk.Notebook):
             return
 
         playlist.add_items(create_items_from_uris(uris), select_rows=True)
-        force_view()
+        blaview.set_view(blaconst.VIEW_PLAYLISTS)
 
     @classmethod
     def send_to_new_playlist(cls, items, name="", resolve=False, select=False):
@@ -2900,7 +2896,7 @@ class BlaPlaylistManager(gtk.Notebook):
 
         playlist = cls.__instance.add_playlist(name=name, focus=True)
         playlist.add_items(items, select_rows=select)
-        force_view()
+        blaview.set_view(blaconst.VIEW_PLAYLISTS)
 
     @classmethod
     def update_statusbar(cls, playlist=None):

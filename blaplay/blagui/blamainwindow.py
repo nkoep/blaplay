@@ -306,7 +306,7 @@ class BlaMainWindow(BlaBaseWindow):
         if response == gtk.RESPONSE_OK and path:
             path = path.strip()
             if BlaPlaylistManager.open_playlist(path):
-                BlaView.update_view(blaconst.VIEW_PLAYLISTS)
+                self.__view.set_view(blaconst.VIEW_PLAYLISTS)
                 blacfg.set("general", "filechooser.directory",
                            os.path.dirname(path))
 
