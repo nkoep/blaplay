@@ -30,9 +30,6 @@ DND_TARGETS = {
     DND_URIS: ("text/uri-list", 0, DND_URIS)
 }
 
-uimanager = None
-accelgroup = None
-
 
 def init():
     from blamainwindow import BlaMainWindow
@@ -41,33 +38,7 @@ def init():
     theme = gtk.icon_theme_get_default()
     gtk.window_set_default_icon_name(blaconst.APPNAME)
 
-    window = BlaMainWindow()
-    window.update_title()
-
-    return window
-
-def update_menu(view):
-    from blaplaylist import BlaPlaylistManager, BlaQueue
-
-    state = False
-    if view == blaconst.VIEW_PLAYLISTS:
-        state = True
-
-    # TODO: Update the "Clear" label for the playlist or queue.
-    for entry in blaconst.MENU_PLAYLISTS:
-        uimanager.get_widget(entry).set_visible(state)
-
-    if view in [blaconst.VIEW_PLAYLISTS, blaconst.VIEW_QUEUE]:
-        clipboard = (BlaPlaylistManager.clipboard
-                     if view == blaconst.VIEW_PLAYLISTS
-                     else BlaQueue.clipboard)
-        uimanager.get_widget("/Menu/Edit/Paste").set_sensitive(bool(clipboard))
-        state = True
-    else:
-        state = False
-
-    for entry in blaconst.MENU_EDIT:
-        uimanager.get_widget(entry).set_visible(state)
+    return BlaMainWindow()
 
 def is_accel(event, accel):
     # Convenience function from Quod Libet to check for accelerator matches.

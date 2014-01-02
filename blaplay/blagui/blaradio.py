@@ -311,11 +311,12 @@ class BlaRadio(gtk.VBox):
         except TypeError:
             return False
 
+        from blauimanager import BlaUIManager
+        accel_group = BlaUIManager().get_accel_group()
         menu = gtk.Menu()
         m = gtk.MenuItem("Remove")
         mod, key = gtk.accelerator_parse("Delete")
-        m.add_accelerator(
-            "activate", blagui.accelgroup, mod, key, gtk.ACCEL_VISIBLE)
+        m.add_accelerator("activate", accel_group, mod, key, gtk.ACCEL_VISIBLE)
         m.connect("activate", self.__remove_stations)
         menu.append(m)
         menu.show_all()

@@ -338,6 +338,8 @@ class BlaTagedit(BlaWindow):
                 break
 
         self.__pb.set_visible(False)
+        # TODO: Emit a "metadata_changed" signal so the window can listen for
+        #       the signal and change its title itself.
         blaplay.bla.window.update_title()
         from blaplay.blagui.blaplaylist import BlaPlaylistManager
         BlaPlaylistManager.invalidate_visible_rows()
@@ -607,11 +609,13 @@ class BlaTagedit(BlaWindow):
                  lambda *x: self.__delete_tags(identifiers)),
                 ("Capitalize", None, lambda *x: self.__capitalize(identifiers))
             ]
+            from blauimanager import BlaUIManager
+            accel_group = BlaUIManager().get_accel_group()
             for label, accel, callback in items:
                 m = gtk.MenuItem(label)
                 if accel:
                     mod, key = gtk.accelerator_parse(accel)
-                    m.add_accelerator("activate", blagui.accelgroup, mod, key,
+                    m.add_accelerator("activate", accel_group, mod, key,
                                       gtk.ACCEL_VISIBLE)
                 m.connect("activate", callback)
                 menu.append(m)

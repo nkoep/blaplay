@@ -68,7 +68,8 @@ class BlaStatusbar(gtk.Table):
             states = [False] * len(blaconst.ORDER_LITERALS)
             states[order] = True
             for idx, order in enumerate(blaconst.MENU_ORDER):
-                action = blagui.uimanager.get_widget(order)
+                from blauimanager import BlaUIManager
+                action = BlaUIManager().get_widget(order)
                 action.set_active(states[idx])
         self.__order.connect("changed", order_changed)
 
@@ -86,11 +87,6 @@ class BlaStatusbar(gtk.Table):
 
         player.connect("state_changed", self.__changed)
         library.connect("progress", self.update_progress)
-
-        # Once the signal handlers are hooked up get the initial status string
-        # by forcing a view update.
-        from blaplay.blagui.blaview import BlaView
-        BlaView.update_view(blacfg.getint("general", "view"))
 
         self.show_all()
         # TODO: group these two

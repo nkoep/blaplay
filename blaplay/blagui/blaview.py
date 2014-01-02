@@ -29,6 +29,7 @@ from blaplay import blautil, blagui
 from blaplay.formats._identifiers import *
 from blawindows import BlaScrolledWindow
 from blastatusbar import BlaStatusbar
+from blauimanager import BlaUIManager
 from blaplay.blautil import blametadata
 import blaguiutils
 
@@ -78,6 +79,7 @@ class BlaSidePane(gtk.VBox):
             # startup, even if the side pane is set to hidden in the config.
             def startup_complete(*args):
                 drawing_area.realize()
+                BlaView.update_view(blacfg.getint("general", "view"))
             blaplay.bla.connect("startup_complete", startup_complete)
 
         def __update_timestamp(self):
@@ -380,8 +382,9 @@ class BlaSidePane(gtk.VBox):
         view = selection.get_selected_rows()[-1][0][0]
         states = [False] * len(self.__treeview.get_model())
         states[view] = True
+        ui_manager = BlaUIManager()
         for idx, view in enumerate(blaconst.MENU_VIEWS):
-            action = blagui.uimanager.get_widget(view)
+            action = ui_manager.get_widget(view)
             action.set_active(states[idx])
 
     @blautil.idle
@@ -527,6 +530,48 @@ class BlaView(gtk.HPaned):
     def __init__(self):
         super(BlaView, self).__init__()
 
+        ui_manager = BlaUIManager()
+        actions = [
+            ("Clear", None, "_Clear", None, "", BlaView.clear),
+            ("SelectAll", None, "All", None, "",
+             lambda *x: BlaView.select(blaconst.SELECT_ALL)),
+            ("SelectComplement", None, "Complement", None, "",
+             lambda *x: BlaView.select(blaconst.SELECT_COMPLEMENT)),
+            ("SelectByArtist", None, "By artist", None, "",
+             lambda *x: BlaView.select(blaconst.SELECT_BY_ARTISTS)),
+            ("SelectByAlbum", None, "By album", None, "",
+             lambda *x: BlaView.select(blaconst.SELECT_BY_ALBUMS)),
+            ("SelectByAlbumArtist", None, "By album artist", None, "",
+             lambda *x: BlaView.select(blaconst.SELECT_BY_ALBUM_ARTISTS)),
+            ("SelectByGenre", None, "By genre", None, "",
+             lambda *x: BlaView.select(blaconst.SELECT_BY_GENRES)),
+            ("Cut", None, "Cut", None, "", BlaView.cut),
+            ("Copy", None, "Copy", None, "", BlaView.copy),
+            ("Remove", None, "Remove", None, "", BlaView.remove),
+            ("Paste", None, "Paste", None, "", BlaView.paste),
+            ("RemoveDuplicates", None, "Remove _duplicates", None, "",
+             BlaView.remove_duplicates),
+            ("RemoveInvalidTracks", None, "Remove _invalid tracks", None, "",
+             BlaView.remove_invalid_tracks)
+        ]
+        ui_manager.add_actions(actions)
+
+        radio_actions = [
+            ("Playlists", None, "_Playlists", None, "",
+             blaconst.VIEW_PLAYLISTS),
+            ("Queue", None, "_Queue", None, "", blaconst.VIEW_QUEUE),
+            ("Radio", None, "R_adio", None, "", blaconst.VIEW_RADIO),
+            ("Video", None, "_Video", None, "", blaconst.VIEW_VIDEO),
+            ("RecommendedEvents", None, "_Recommended events", None, "",
+             blaconst.VIEW_EVENTS),
+            ("NewReleases", None, "_New releases", None, "",
+             blaconst.VIEW_RELEASES),
+        ]
+        ui_manager.add_radio_actions(
+            radio_actions, value=blacfg.getint("general", "view"),
+            on_change=lambda *x: BlaView.update_view(
+            x[-1].get_current_value()))
+
         from blaplaylist import BlaPlaylistManager, BlaQueue
         from blavideo import BlaVideo
         from blaradio import BlaRadio
@@ -598,7 +643,7 @@ class BlaView(gtk.HPaned):
 
         # Not all menu items are available for all views so update them
         # accordingly.
-        blagui.update_menu(view)
+        BlaUIManager().update_menu(view)
         cls.__side_pane.update_view(view)
 
     @classmethod

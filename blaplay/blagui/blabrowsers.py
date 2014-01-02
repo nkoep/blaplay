@@ -297,6 +297,8 @@ class BlaTreeView(blaguiutils.BlaTreeViewBase):
                  ("Properties", "<Alt>Return",
                   lambda *x: BlaTagedit(tracks) if tracks else True, True)])
 
+        from blauimanager import BlaUIManager
+        accel_group = BlaUIManager().get_accel_group()
         menu = gtk.Menu()
         for item in items:
             if item is None:
@@ -306,7 +308,7 @@ class BlaTreeView(blaguiutils.BlaTreeViewBase):
                 m = gtk.MenuItem(label)
                 if accel is not None:
                     mod, key = gtk.accelerator_parse(accel)
-                    m.add_accelerator("activate", blagui.accelgroup, mod, key,
+                    m.add_accelerator("activate", accel_group, mod, key,
                                       gtk.ACCEL_VISIBLE)
                 m.connect("activate", callback)
                 m.set_sensitive(sensitive)

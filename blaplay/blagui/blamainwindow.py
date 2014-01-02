@@ -25,6 +25,7 @@ library = blaplay.bla.library
 from blaplay.blacore import blaconst, blacfg
 from blaplay import blautil, blagui
 from blaplay.formats._identifiers import *
+from blauimanager import BlaUIManager
 from blawindows import BlaBaseWindow
 from blatoolbar import BlaToolbar
 from blabrowsers import BlaBrowsers
@@ -91,10 +92,8 @@ class BlaMainWindow(BlaBaseWindow):
                                   button_press_hook)
 
         # Main menu
-        blagui.uimanager = uimanager = gtk.UIManager()
-        blagui.accelgroup = uimanager.get_accel_group()
-        self.add_accel_group(blagui.accelgroup)
-        actiongroup = gtk.ActionGroup("blagui-actions")
+        ui_manager = BlaUIManager()
+        self.add_accel_group(ui_manager.get_accel_group())
 
         actions = [
             # Menus and submenus
@@ -116,57 +115,13 @@ class BlaMainWindow(BlaBaseWindow):
              lambda *x: self.__add_tracks(files=False)),
             ("SavePlaylist", None, "_Save playlist...", None, "",
              self.__save_playlist),
-            ("AddNewPlaylist", None, "Add new playlist", "<Ctrl>T", "",
-             lambda *x: BlaPlaylistManager.add_playlist(focus=True)),
-            ("RemovePlaylist", None, "Remove playlist", "<Ctrl>W", "",
-             lambda *x: BlaPlaylistManager.remove_playlist()),
             ("Quit", gtk.STOCK_QUIT, "_Quit", "<Ctrl>Q", "",
              lambda *x: blaplay.shutdown()),
-            ("Clear", None, "_Clear", None, "", BlaView.clear),
-            ("LockUnlockPlaylist", None, "Lock/Unlock playlist", None, "",
-             BlaPlaylistManager.toggle_lock_playlist),
-            ("SelectAll", None, "All", None, "",
-             lambda *x: BlaView.select(blaconst.SELECT_ALL)),
-            ("SelectComplement", None, "Complement", None, "",
-             lambda *x: BlaView.select(blaconst.SELECT_COMPLEMENT)),
-            ("SelectByArtist", None, "By artist", None, "",
-             lambda *x: BlaView.select(blaconst.SELECT_BY_ARTISTS)),
-            ("SelectByAlbum", None, "By album", None, "",
-             lambda *x: BlaView.select(blaconst.SELECT_BY_ALBUMS)),
-            ("SelectByAlbumArtist", None, "By album artist", None, "",
-             lambda *x: BlaView.select(blaconst.SELECT_BY_ALBUM_ARTISTS)),
-            ("SelectByGenre", None, "By genre", None, "",
-             lambda *x: BlaView.select(blaconst.SELECT_BY_GENRES)),
-            ("Cut", None, "Cut", None, "", BlaView.cut),
-            ("Copy", None, "Copy", None, "", BlaView.copy),
-            ("Remove", None, "Remove", None, "", BlaView.remove),
-            ("Paste", None, "Paste", None, "", BlaView.paste),
-            ("PlaylistFromSelection", None, "Selection", None, "",
-             lambda *x: BlaPlaylistManager.new_playlist(
-             blaconst.PLAYLIST_FROM_SELECTION)),
-            ("PlaylistFromArtists", None, "Selected artist(s)", None, "",
-             lambda *x: BlaPlaylistManager.new_playlist(
-             blaconst.PLAYLIST_FROM_ARTISTS)),
-            ("PlaylistFromAlbums", None, "Selected album(s)", None, "",
-             lambda *x: BlaPlaylistManager.new_playlist(
-             blaconst.PLAYLIST_FROM_ALBUMS)),
-            ("PlaylistFromAlbumArtists", None, "Selected album artist(s)",
-             None, "", lambda *x: BlaPlaylistManager.new_playlist(
-             blaconst.PLAYLIST_FROM_ALBUM_ARTISTS)),
-            ("PlaylistFromGenre", None, "Selected genre(s)", None, "",
-             lambda *x: BlaPlaylistManager.new_playlist(
-             blaconst.PLAYLIST_FROM_GENRE)),
-            ("RemoveDuplicates", None, "Remove _duplicates", None, "",
-             BlaView.remove_duplicates),
-            ("RemoveInvalidTracks", None, "Remove _invalid tracks", None, "",
-             BlaView.remove_invalid_tracks),
-            ("Search", None, "_Search...", "<Ctrl>F", "",
-             lambda *x: BlaPlaylistManager.enable_search()),
             ("Preferences", None, "Pre_ferences...", None, "", BlaPreferences),
-            ("JumpToPlayingTrack", None, "_Jump to playing track", "<Ctrl>J",
-             "", lambda *x: BlaPlaylistManager.jump_to_playing_track()),
             ("About", None, "_About...", None, "", BlaAbout)
         ]
+        ui_manager.add_actions(actions)
+
         toggle_actions = [
             ("Browsers", None, "_Browsers", None, "", self.__toggle_browsers,
              blacfg.getboolean("general", "browsers")),
@@ -183,34 +138,19 @@ class BlaMainWindow(BlaBaseWindow):
              self.__toggle_visualization,
              blacfg.getboolean("general", "show.visualization"))
         ]
-        radio_actions0 = [
+        ui_manager.add_toggle_actions(toggle_actions)
+
+        radio_actions = [
             ("OrderNormal", None, "_Normal", None, "", blaconst.ORDER_NORMAL),
             ("OrderRepeat", None, "_Repeat", None, "", blaconst.ORDER_REPEAT),
             ("OrderShuffle", None, "_Shuffle", None, "",
              blaconst.ORDER_SHUFFLE)
         ]
-        radio_actions1 = [
-            ("Playlists", None, "_Playlists", None, "",
-             blaconst.VIEW_PLAYLISTS),
-            ("Queue", None, "_Queue", None, "", blaconst.VIEW_QUEUE),
-            ("Radio", None, "R_adio", None, "", blaconst.VIEW_RADIO),
-            ("Video", None, "_Video", None, "", blaconst.VIEW_VIDEO),
-            ("RecommendedEvents", None, "_Recommended events", None, "",
-             blaconst.VIEW_EVENTS),
-            ("NewReleases", None, "_New releases", None, "",
-             blaconst.VIEW_RELEASES),
-        ]
-        actiongroup.add_actions(actions)
-        actiongroup.add_toggle_actions(toggle_actions)
-        actiongroup.add_radio_actions(
-            radio_actions0, value=blacfg.getint("general", "play.order"),
+        # TODO: Emit "order_changed" signal in the on_change handler instead
+        #       and let interested widgets handle this instead.
+        ui_manager.add_radio_actions(
+            radio_actions, value=blacfg.getint("general", "play.order"),
             on_change=BlaStatusbar.set_order)
-        actiongroup.add_radio_actions(
-            radio_actions1, value=blacfg.getint("general", "view"),
-            on_change=lambda *x: BlaView.update_view(
-            x[-1].get_current_value()))
-        uimanager.insert_action_group(actiongroup, 0)
-        uimanager.add_ui_from_string(blaconst.MENU)
 
         # This is the topmost box that holds all the other components.
         self.add(gtk.VBox())
@@ -230,7 +170,7 @@ class BlaMainWindow(BlaBaseWindow):
         hpane.show()
 
         # Restore pane positions.
-        def notify_cb(pane, propspec, key):
+        def notify(pane, propspec, key):
             blacfg.set("general", key, str(pane.get_position()))
         for pane, side in [(hpane, "left"), (self.__view, "right")]:
             key = "pane.pos.%s" % side
@@ -238,7 +178,7 @@ class BlaMainWindow(BlaBaseWindow):
                 pane.set_position(blacfg.getint("general", key))
             except TypeError:
                 pass
-            pane.connect("notify", notify_cb, key)
+            pane.connect("notify", notify, key)
 
         # Create a vbox hpane and the statusbar. This allows for setting a
         # border around those items which excludes the menubar and the toolbar.
@@ -248,12 +188,14 @@ class BlaMainWindow(BlaBaseWindow):
         vbox.pack_start(self.__statusbar, expand=False)
         vbox.show()
 
-        self.child.pack_start(uimanager.get_widget("/Menu"), expand=False)
+        self.child.pack_start(ui_manager.get_widget("/Menu"), expand=False)
         self.child.pack_start(self.__toolbar, expand=False)
         self.child.pack_start(vbox)
         self.child.show()
 
         self.__tray = BlaTray()
+
+        self.update_title()
 
     def update_title(self, *args):
         track = player.get_track()

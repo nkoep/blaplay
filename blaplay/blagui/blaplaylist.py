@@ -41,6 +41,7 @@ from blawindows import BlaScrolledWindow
 from blaplay.blautil import blafm
 from blastatusbar import BlaStatusbar
 from blatagedit import BlaTagedit
+from blauimanager import BlaUIManager
 import blaguiutils
 
 (COLUMN_QUEUE_POSITION, COLUMN_PLAYING, COLUMN_TRACK, COLUMN_ARTIST,
@@ -173,14 +174,15 @@ def popup(treeview, event, view_id, target):
     elif view_id == blaconst.VIEW_QUEUE:
         element = BlaQueue
 
+    accel_group = BlaUIManager().get_accel_group()
+
     try:
         path = treeview.get_path_at_pos(*map(int, [event.x, event.y]))[0]
     except TypeError:
         menu = gtk.Menu()
         m = gtk.MenuItem("Paste")
         mod, key = gtk.accelerator_parse("<Ctrl>V")
-        m.add_accelerator(
-            "activate", blagui.accelgroup, mod, key, gtk.ACCEL_VISIBLE)
+        m.add_accelerator("activate", accel_group, mod, key, gtk.ACCEL_VISIBLE)
         m.connect("activate", element.paste)
         m.set_sensitive(bool(element.clipboard))
         menu.append(m)
@@ -215,8 +217,8 @@ def popup(treeview, event, view_id, target):
         m = gtk.MenuItem(label)
         if accelerator:
             mod, key = gtk.accelerator_parse(accelerator)
-            m.add_accelerator(
-                "activate", blagui.accelgroup, mod, key, gtk.ACCEL_VISIBLE)
+            m.add_accelerator("activate", accel_group, mod, key,
+                              gtk.ACCEL_VISIBLE)
         m.connect("activate", callback)
         m.set_sensitive(visibility)
         menu.append(m)
@@ -305,8 +307,8 @@ def popup(treeview, event, view_id, target):
         for label, accel, callback in items:
             m = gtk.MenuItem(label)
             mod, key = gtk.accelerator_parse(accel)
-            m.add_accelerator(
-                "activate", blagui.accelgroup, mod, key, gtk.ACCEL_VISIBLE)
+            m.add_accelerator("activate", accel_group, mod, key,
+                              gtk.ACCEL_VISIBLE)
             m.connect("activate", callback)
             menu.append(m)
 
@@ -328,8 +330,7 @@ def popup(treeview, event, view_id, target):
 
     m = gtk.MenuItem("Properties")
     mod, key = gtk.accelerator_parse("<Alt>Return")
-    m.add_accelerator("activate", blagui.accelgroup, mod, key,
-                      gtk.ACCEL_VISIBLE)
+    m.add_accelerator("activate", accel_group, mod, key, gtk.ACCEL_VISIBLE)
     m.connect("activate", element.show_properties)
     menu.append(m)
 
@@ -1006,6 +1007,7 @@ class BlaQueue(BlaScrolledWindow):
             try:
                 playlist_idx, path = item
             except ValueError:
+                # Library tracks that are not part of a playlist.
                 item = BlaListItem(item)
             else:
                 item = playlists[playlist_idx].get_item_from_path(path)
@@ -1017,16 +1019,16 @@ class BlaQueue(BlaScrolledWindow):
     @classmethod
     def cut(cls, *args):
         cls.clipboard = cls.__get_items(remove=True)
-        blagui.update_menu(blaconst.VIEW_QUEUE)
+        BlaUIManager().update_menu(blaconst.VIEW_QUEUE)
 
     @classmethod
     def copy(cls, *args):
         # We specifically don't create actual copies of items here as it's not
         # desired to have unique ones in the queue. Copied and pasted tracks
-        # should still refer to the same BlaListItem instances which are part
-        # (possibly part of a playlist).
+        # should still refer to the same BlaListItem instances which are
+        # possibly part of a playlist.
         cls.clipboard = cls.__get_items(remove=False)
-        blagui.update_menu(blaconst.VIEW_QUEUE)
+        BlaUIManager().update_menu(blaconst.VIEW_QUEUE)
 
     @classmethod
     def paste(cls, *args, **kwargs):
@@ -2206,7 +2208,37 @@ class BlaPlaylistManager(gtk.Notebook):
 
     def __init__(self):
         super(BlaPlaylistManager, self).__init__()
+
         type(self).__instance = self
+
+        actions = [
+            ("AddNewPlaylist", None, "Add new playlist", "<Ctrl>T", "",
+             lambda *x: BlaPlaylistManager.add_playlist(focus=True)),
+            ("RemovePlaylist", None, "Remove playlist", "<Ctrl>W", "",
+             lambda *x: BlaPlaylistManager.remove_playlist()),
+            ("LockUnlockPlaylist", None, "Lock/Unlock playlist", None, "",
+             BlaPlaylistManager.toggle_lock_playlist),
+            ("PlaylistFromSelection", None, "Selection", None, "",
+             lambda *x: BlaPlaylistManager.new_playlist(
+             blaconst.PLAYLIST_FROM_SELECTION)),
+            ("PlaylistFromArtists", None, "Selected artist(s)", None, "",
+             lambda *x: BlaPlaylistManager.new_playlist(
+             blaconst.PLAYLIST_FROM_ARTISTS)),
+            ("PlaylistFromAlbums", None, "Selected album(s)", None, "",
+             lambda *x: BlaPlaylistManager.new_playlist(
+             blaconst.PLAYLIST_FROM_ALBUMS)),
+            ("PlaylistFromAlbumArtists", None, "Selected album artist(s)",
+             None, "", lambda *x: BlaPlaylistManager.new_playlist(
+             blaconst.PLAYLIST_FROM_ALBUM_ARTISTS)),
+            ("PlaylistFromGenre", None, "Selected genre(s)", None, "",
+             lambda *x: BlaPlaylistManager.new_playlist(
+             blaconst.PLAYLIST_FROM_GENRE)),
+            ("Search", None, "_Search...", "<Ctrl>F", "",
+             lambda *x: BlaPlaylistManager.enable_search()),
+            ("JumpToPlayingTrack", None, "_Jump to playing track", "<Ctrl>J",
+             "", lambda *x: BlaPlaylistManager.jump_to_playing_track())
+        ]
+        BlaUIManager().add_actions(actions)
 
         self.set_scrollable(True)
 
@@ -2558,7 +2590,8 @@ class BlaPlaylistManager(gtk.Notebook):
         except AttributeError:
             return
         cls.__instance.__lock_button.set_tooltip_text(label)
-        blagui.uimanager.get_widget("/Menu/Edit/LockUnlockPlaylist").set_label(
+
+        BlaUIManager().get_widget("/Menu/Edit/LockUnlockPlaylist").set_label(
             label)
 
     @classmethod
@@ -2770,14 +2803,14 @@ class BlaPlaylistManager(gtk.Notebook):
     @classmethod
     def cut(cls, *args):
         cls.clipboard = cls.remove()
-        blagui.update_menu(blaconst.VIEW_PLAYLISTS)
+        BlaUIManager().update_menu(blaconst.VIEW_PLAYLISTS)
 
     @classmethod
     def copy(cls, *args):
         playlist = cls.get_current_playlist()
         paths = playlist.get_selected_paths()
         cls.clipboard = map(copy, playlist.get_items(paths))
-        blagui.update_menu(blaconst.VIEW_PLAYLISTS)
+        BlaUIManager().update_menu(blaconst.VIEW_PLAYLISTS)
 
     @classmethod
     def paste(cls, *args, **kwargs):
