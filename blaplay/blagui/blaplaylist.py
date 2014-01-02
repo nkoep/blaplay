@@ -106,8 +106,10 @@ def parse_playlist_stats(count, size, length_seconds):
     size = "%.1f %s" % (size, unit)
 
     if count == 1:
-        return "%s track (%s) | %s" % (count, size, length)
-    return "%s tracks (%s) | %s" % (count, size, length)
+        tracks_label = "track"
+    else:
+        tracks_label = "tracks"
+    return "%s %s | %s | %s" % (count, tracks_label, size, length)
 
 def update_columns(treeview, view_id):
     treeview.disconnect_changed_signal()
