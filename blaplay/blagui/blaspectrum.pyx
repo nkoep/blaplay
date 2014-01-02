@@ -122,13 +122,12 @@ cdef inline float cubic_interpolate(float y0, float y1, float y2, float y3,
    return a * xxx + b * xx + c * x + d
 
 
-cdef class Spectrum(object):
+cdef class BlaSpectrum(object):
     # most numbers for this class were precomputed and just plugged in. this
     # makes the whole thing entirely unmaintainable. we might or might not
     # change this in the future. for now it really doesn't matter as the job is
     # done and the class does what it's supposed to do
 
-    identifier = "Spectrum"
     property height:
         def __get__(self): return 154
 

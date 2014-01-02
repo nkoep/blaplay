@@ -17,7 +17,7 @@ from Cython.Distutils import build_ext
 try:
     import numpy as np
 except ImportError:
-    pass
+    np = None
 
 from blaplay.blacore import blaconst
 from blaplay import blautil
@@ -34,10 +34,10 @@ class clean(d_clean):
     def run(self):
         d_clean.run(self)
 
-        base = os.path.dirname(__file__)
+        base = os.path.abspath(os.path.dirname(__file__))
 
         for mod in self.distribution.ext_modules:
-            paths = ["%s.c" % blautil.toss_extension(src)
+            paths = [os.path.abspath("%s.c" % blautil.toss_extension(src))
                      for src in mod.sources]
             paths.append(
                 os.path.join(base, "%s.so" % mod.name.replace(".", "/")))
@@ -251,19 +251,16 @@ class BlaDistribution(Distribution):
 if __name__ == "__main__":
     description = "Minimalist audio player for GNU/Linux written in Python"
 
-    # Visualization modules
-    visualizations = [f for f in os.listdir("visualizations")
-                      if blautil.get_extension(f) == "pyx"]
+    # Spectrum visualization
     extra_compile_args = ["-std=gnu99"]
     try:
         extra_compile_args.append("-I%s" % np.get_include())
-    except NameError:
+    except AttributeError:
         pass
-    ext_modules = [
-        Extension("blaplay.visualizations.%s" % blautil.toss_extension(f),
-                  ["visualizations/%s" % f], libraries=["fftw3f"],
-                  extra_compile_args=extra_compile_args)
-        for f in visualizations]
+    path = "blaplay/blagui/blaspectrum.pyx"
+    ext_modules = [Extension(blautil.toss_extension(path.replace("/", ".")),
+                             [path], libraries=["fftw3f"],
+                             extra_compile_args=extra_compile_args)]
 
     # Icons
     base = "blaplay/images"

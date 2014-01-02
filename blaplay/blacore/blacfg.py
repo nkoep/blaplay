@@ -62,7 +62,6 @@ class BlaCfg(RawConfigParser, gobject.GObject):
                 "queue.remove.when.activated": "yes",
                 "search.after.timeout": "no",
                 "show.visualization": "yes",
-                "visualization": "",
                 "releases.filter": blaconst.NEW_RELEASES_FROM_LIBRARY,
                 "events.country": "",
                 "events.city": "",

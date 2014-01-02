@@ -20,14 +20,16 @@ import pango
 
 import blaplay
 player = blaplay.bla.player
-from blaplay.blacore import blaconst, blacfg
-from blaplay import blautil, blagui, visualizations
+from blaplay.blacore import blacfg
+from blaplay import blautil, blagui
+import blaguiutils
 
 
 class BlaVisualization(gtk.Viewport):
     __metaclass__ = blautil.BlaSingletonMeta
 
     __tid_draw = __tid_consume = -1
+    # TODO: Make this configurable in the preferences dialog.
     __rate = 35 # frames per second
 
     def __init__(self):
@@ -36,21 +38,56 @@ class BlaVisualization(gtk.Viewport):
         self.__drawing_area = gtk.DrawingArea()
         self.add(self.__drawing_area)
 
-        self.connect_object("button_press_event",
-                            BlaVisualization.__button_press_event, self)
-
         player.connect("track_changed", self.flush_buffers)
         player.connect("seeked", self.flush_buffers)
         self.__drawing_area.connect_object(
             "expose_event", BlaVisualization.__expose, self)
         def size_allocate(drawingarea, allocation):
             try:
-                self.__module.set_width(allocation.width)
+                self.__spectrum.set_width(allocation.width)
             except AttributeError:
                 pass
         self.connect("size_allocate", size_allocate)
-        self.set_visible(blacfg.getboolean("general", "show.visualization"))
+
         self.show_all()
+
+        def startup_complete(*args):
+            self.set_visible(
+                blacfg.getboolean("general", "show.visualization"))
+        blaplay.bla.connect("startup_complete", startup_complete)
+
+    def __set_visible(self, state):
+        super(BlaVisualization, self).set_visible(state)
+        blaplay.bla.ui_manager.get_widget(
+            "/Menu/View/Visualization").set_active(state)
+
+    def __enable(self):
+        try:
+            from blaspectrum import BlaSpectrum
+        except ImportError as exc:
+            blaguiutils.error_dialog("Failed to enable spectrum visualization",
+                                     exc.message)
+            self.__disable()
+            return
+
+        self.__spectrum = BlaSpectrum()
+        self.__spectrum.set_width(self.get_allocation().width)
+        self.set_size_request(-1, self.__spectrum.height)
+        self.__set_visible(True)
+        self.__cid = player.connect_object(
+            "new_buffer", BlaSpectrum.new_buffer, self.__spectrum)
+
+        # TODO: Suspend during paused and stopped states.
+        def queue_draw():
+            self.__drawing_area.queue_draw()
+            return True
+        gobject.source_remove(self.__tid_draw)
+        self.__tid_draw = gobject.timeout_add(
+            int(1000 / self.__rate), queue_draw)
+        self.__tid_consume = gobject.timeout_add(
+            int(1000 / self.__rate), self.__spectrum.consume_buffer)
+
+        blacfg.setboolean("general", "show.visualization", True)
 
     def __disable(self):
         try:
@@ -58,72 +95,9 @@ class BlaVisualization(gtk.Viewport):
         except AttributeError:
             pass
         map(gobject.source_remove, [self.__tid_draw, self.__tid_consume])
-        try:
-            del self.__module
-        except AttributeError:
-            pass
-
-        self.__module = None
-        gtk.Widget.set_visible(self, False)
-
-        # Set the menu item to inactive. This will not create circular calls as
-        # the callback for the CheckMenuItem's activate signal only fires if
-        # the value actually changes.
-        blaplay.bla.ui_manager.get_widget(
-            "/Menu/View/Visualization").set_active(False)
-
-    def __initialize_module(self, identifier):
-        try:
-            module = visualizations.modules[identifier]
-        except KeyError:
-            self.__disable()
-        else:
-            self.__module = module()
-            self.__module.set_width(self.get_allocation().width)
-            self.set_size_request(-1, self.__module.height)
-            try:
-                if player.handler_is_connected(self.__cid):
-                    player.disconnect(self.__cid)
-            except AttributeError:
-                pass
-            gtk.Widget.set_visible(self, True)
-            self.__cid = player.connect_object(
-                "new_buffer", module.new_buffer, self.__module)
-            self.__set_timer()
-
-    def __set_timer(self):
-        # TODO: Suspend during paused and stopped states.
-        def queue_draw():
-            self.__drawing_area.queue_draw()
-            return True
-        gobject.source_remove(self.__tid_draw)
-        self.__tid_draw = gobject.timeout_add(int(1000 / self.__rate),
-                                              queue_draw)
-        self.__tid_consume = gobject.timeout_add(int(1000 / self.__rate),
-                                                 self.__module.consume_buffer)
-
-    def __button_press_event(self, event):
-        if event.button != 3 or event.type in (gtk.gdk._2BUTTON_PRESS,
-                                               gtk.gdk._3BUTTON_PRESS):
-            return False
-
-        def activate(item, identifier):
-            blacfg.set("general", "visualization", identifier)
-            self.__initialize_module(identifier)
-
-        identifier = blacfg.getstring("general", "visualization")
-
-        menu = gtk.Menu()
-        for module in sorted(visualizations.modules.keys(), key=str.lower):
-            m = gtk.CheckMenuItem(module)
-            m.set_draw_as_radio(True)
-            m.connect("activate", activate, module)
-            menu.append(m)
-            if module == identifier:
-                m.set_active(True)
-
-        menu.show_all()
-        menu.popup(None, None, None, event.button, event.time)
+        self.__spectrum = None
+        self.__set_visible(False)
+        blacfg.setboolean("general", "show.visualization", False)
 
     def __expose(self, event):
         # This callback does not fire if the main window is hidden which means
@@ -133,7 +107,7 @@ class BlaVisualization(gtk.Viewport):
         cr = self.__drawing_area.window.cairo_create()
         pc = self.__drawing_area.get_pango_context()
         try:
-            self.__module.draw(cr, pc, self.__drawing_area.get_style())
+            self.__spectrum.draw(cr, pc, self.__drawing_area.get_style())
         except AttributeError:
             fdesc = gtk.widget_get_default_style().font_desc
             try:
@@ -146,27 +120,16 @@ class BlaVisualization(gtk.Viewport):
             cr.show_layout(layout)
 
     def flush_buffers(self, *args):
-        # FIXME: remove this method and every call to it once the buffering
-        #        issue of the visualization base class has been worked out
+        # TODO: Remove this method and every call to it once the buffering
+        #       issue of the visualization base class has been worked out.
         try:
-            self.__module.flush_buffers()
+            self.__spectrum.flush_buffers()
         except AttributeError:
             pass
 
     def set_visible(self, state):
-        blacfg.setboolean("general", "show.visualization", state)
-        if not state:
-            return self.__disable()
-
-        identifier = blacfg.getstring("general", "visualization")
-        if not identifier:
-            try:
-                identifier = sorted(
-                    visualizations.modules.keys(), key=str.lower)[0]
-            except IndexError:
-                # TODO: Paint "No visualizations available." on the da.
-                pass
-            else:
-                blacfg.set("general", "visualization", identifier)
-        self.__initialize_module(identifier)
+        if state:
+            self.__enable()
+        else:
+            self.__disable()
 

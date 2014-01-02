@@ -1,10 +1,8 @@
 include README
-include LICENSE
+include COPYING
 include NEWS
-include BUGS
 include blaplay.desktop
-include visualizations/*.pyx
+include blaplay/blagui/*.pyx
 recursive-include blaplay/images *.svg *.png *.theme
-exclude blaplay/*.so
-exclude blaplay/visualizations/*.so
+exclude blaplay/blagui/*.so
 

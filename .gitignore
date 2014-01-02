@@ -2,7 +2,7 @@
 *.swp
 *.pyc
 *.pyo
-visualizations/*.c
+*.c
 *.so
 *.html
 *.cache
