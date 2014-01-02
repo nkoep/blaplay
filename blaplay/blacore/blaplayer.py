@@ -168,6 +168,7 @@ class BlaPlayer(gobject.GObject):
         elif message.type == gst.MESSAGE_TAG:
             self.__parse_tags(message.parse_tag())
         elif message.type == gst.MESSAGE_BUFFERING:
+            # TODO: Emit "buffering" message for the statusbar to listen for.
             # We can't import from blastatusbar on module level as it'd create
             # circular imports.
             global BlaStatusbar

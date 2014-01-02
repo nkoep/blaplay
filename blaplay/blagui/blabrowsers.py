@@ -33,7 +33,6 @@ from blaplay import blautil, blagui
 from blaplay.formats._identifiers import *
 from blawindows import BlaScrolledWindow
 from blaplaylist import BlaPlaylistManager, BlaQueue
-from blavisualization import BlaVisualization
 from blatagedit import BlaTagedit
 import blaguiutils
 
@@ -1080,36 +1079,21 @@ class BlaFileBrowser(gtk.VBox):
         uris = blautil.filepaths2uris([model[path][0] for path in paths])
         selection_data.set_uris(uris)
 
-class BlaBrowsers(gtk.VBox):
+class BlaBrowsers(gtk.Notebook):
     def __init__(self):
-        super(BlaBrowsers, self).__init__(spacing=blaconst.WIDGET_SPACING)
+        super(BlaBrowsers, self).__init__()
 
         type(self).__library_browser = BlaLibraryBrowser(self)
         self.__file_browser = BlaFileBrowser(self)
-        notebook = gtk.Notebook()
-        notebook.append_page(self.__library_browser, gtk.Label("Library"))
-        notebook.append_page(self.__file_browser, gtk.Label("Filesystem"))
+        self.append_page(self.__library_browser, gtk.Label("Library"))
+        self.append_page(self.__file_browser, gtk.Label("Filesystem"))
 
-        self.pack_start(notebook, expand=True)
-        viewport = gtk.Viewport()
-        viewport.set_shadow_type(gtk.SHADOW_IN)
-        viewport.add(BlaVisualization(viewport))
-        self.pack_start(viewport, expand=False)
-
-        notebook.show_all()
-        self.show()
-
-        self.set_visible(blacfg.getboolean("general", "browsers"))
+        self.show_all()
 
         page_num = blacfg.getint("general", "browser.view")
-        if page_num != 0 and page_num != 1:
+        if page_num not in (0, 1):
             page_num = 0
-        notebook.set_current_page(page_num)
-        notebook.connect(
-            "switch_page",
-            lambda *x: blacfg.set("general", "browser.view", x[-1]))
-
-    def set_visible(self, state):
-        super(BlaBrowsers, self).set_visible(state)
-        blacfg.setboolean("general", "browsers", state)
+        self.set_current_page(page_num)
+        self.connect("switch_page",
+                     lambda *x: blacfg.set("general", "browser.view", x[-1]))
 

@@ -26,7 +26,6 @@ from blaplay.blacore import blacfg, blaconst
 from blaplay import blagui
 from blawindows import BlaUniqueWindow, BlaScrolledWindow
 from blabrowsers import BlaBrowsers
-from blavisualization import BlaVisualization
 import blaguiutils
 
 

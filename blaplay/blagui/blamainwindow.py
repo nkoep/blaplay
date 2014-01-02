@@ -154,14 +154,22 @@ class BlaMainWindow(BlaBaseWindow):
         # Create instances of the main parts of the GUI.
         self.__toolbar = BlaToolbar()
         self.__browsers = BlaBrowsers()
+        self.__visualization = BlaVisualization()
         self.__view = BlaView()
         self.__statusbar = BlaStatusbar()
 
         player.connect("state_changed", self.update_title)
 
+        # Group browsers and visualization widget.
+        self.__vbox_left = gtk.VBox(spacing=blaconst.WIDGET_SPACING)
+        self.__vbox_left.pack_start(self.__browsers, expand=True)
+        self.__vbox_left.pack_start(self.__visualization, expand=False)
+        self.__vbox_left.show()
+        self.__vbox_left.set_visible(blacfg.getboolean("general", "browsers"))
+
         # Pack the browser + view-widget into a gtk.HPane instance.
         hpane = gtk.HPaned()
-        hpane.pack1(self.__browsers, resize=False, shrink=False)
+        hpane.pack1(self.__vbox_left, resize=False, shrink=False)
         hpane.pack2(self.__view, resize=True, shrink=True)
         hpane.show()
 
@@ -240,7 +248,7 @@ class BlaMainWindow(BlaBaseWindow):
         self.present()
         if not blacfg.getboolean("general", "always.show.tray"):
             self.__tray.set_visible(False)
-        BlaVisualization.flush_buffers()
+        self.__visualization.flush_buffers()
 
     def toggle_hide(self):
         self.__hide_windows(self.get_visible())
@@ -275,16 +283,17 @@ class BlaMainWindow(BlaBaseWindow):
 
     def __toggle_browsers(self, event):
         state = event.get_active()
-        self.__browsers.set_visible(state)
+        self.__vbox_left.set_visible(state)
+        blacfg.setboolean("general", "browsers", state)
+
+    def __toggle_visualization(self, event):
+        self.__visualization.set_visible(event.get_active())
 
     def __toggle_side_pane(self, event):
         self.__view.set_show_side_pane(event.get_active())
 
     def __toggle_statusbar(self, event):
         self.__statusbar.set_visible(event.get_active())
-
-    def __toggle_visualization(self, event):
-        BlaVisualization.set_visible(event.get_active())
 
     def __set_file_chooser_directory(self, diag):
         directory = blacfg.getstring("general", "filechooser.directory")

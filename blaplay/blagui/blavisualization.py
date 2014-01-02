@@ -16,38 +16,40 @@
 
 import gobject
 import gtk
+import pango
 
 import blaplay
 player = blaplay.bla.player
 from blaplay.blacore import blaconst, blacfg
 from blaplay import blautil, blagui, visualizations
-from blaplay.blagui import blaguiutils
 
 
-class BlaVisualization(gtk.DrawingArea):
-    __tid = __tid2 = -1
+class BlaVisualization(gtk.Viewport):
+    __metaclass__ = blautil.BlaSingletonMeta
+
+    __tid_draw = __tid_consume = -1
     __rate = 35 # frames per second
 
-    def __init__(self, viewport):
+    def __init__(self):
         super(BlaVisualization, self).__init__()
 
-        type(self).__instance = self
-        self.__viewport = viewport
-        self.__viewport.connect_object(
-            "button_press_event", BlaVisualization.__button_press_event,
-            self)
+        self.__drawing_area = gtk.DrawingArea()
+        self.add(self.__drawing_area)
+
+        self.connect_object("button_press_event",
+                            BlaVisualization.__button_press_event, self)
 
         player.connect("track_changed", self.flush_buffers)
         player.connect("seeked", self.flush_buffers)
-        self.connect("expose_event", self.__expose)
+        self.__drawing_area.connect_object(
+            "expose_event", BlaVisualization.__expose, self)
         def size_allocate(drawingarea, allocation):
             try:
                 self.__module.set_width(allocation.width)
             except AttributeError:
                 pass
         self.connect("size_allocate", size_allocate)
-        self.set_visible(blacfg.getboolean("general", "show.visualization"),
-                         quiet=True)
+        self.set_visible(blacfg.getboolean("general", "show.visualization"))
         self.show_all()
 
     def __disable(self):
@@ -55,14 +57,14 @@ class BlaVisualization(gtk.DrawingArea):
             player.disconnect(self.__cid)
         except AttributeError:
             pass
-        map(gobject.source_remove, [self.__tid, self.__tid2])
+        map(gobject.source_remove, [self.__tid_draw, self.__tid_consume])
         try:
             del self.__module
         except AttributeError:
             pass
 
         self.__module = None
-        self.__viewport.set_visible(False)
+        gtk.Widget.set_visible(self, False)
 
         # Set the menu item to inactive. This will not create circular calls as
         # the callback for the CheckMenuItem's activate signal only fires if
@@ -70,14 +72,10 @@ class BlaVisualization(gtk.DrawingArea):
         blaplay.bla.ui_manager.get_widget(
             "/Menu/View/Visualization").set_active(False)
 
-    def __initialize_module(self, identifier, quiet=False):
+    def __initialize_module(self, identifier):
         try:
             module = visualizations.modules[identifier]
         except KeyError:
-            if not visualizations.modules:
-                msg = "No visualizations available."
-                if not quiet:
-                    blaguiutils.error_dialog(msg)
             self.__disable()
         else:
             self.__module = module()
@@ -88,19 +86,21 @@ class BlaVisualization(gtk.DrawingArea):
                     player.disconnect(self.__cid)
             except AttributeError:
                 pass
-            self.__viewport.set_visible(True)
+            gtk.Widget.set_visible(self, True)
             self.__cid = player.connect_object(
                 "new_buffer", module.new_buffer, self.__module)
             self.__set_timer()
 
     def __set_timer(self):
+        # TODO: Suspend during paused and stopped states.
         def queue_draw():
-            self.queue_draw()
+            self.__drawing_area.queue_draw()
             return True
-        gobject.source_remove(self.__tid)
-        self.__tid = gobject.timeout_add(int(1000 / self.__rate), queue_draw)
-        self.__tid2 = gobject.timeout_add(int(1000 / self.__rate),
-                                          self.__module.consume_buffer)
+        gobject.source_remove(self.__tid_draw)
+        self.__tid_draw = gobject.timeout_add(int(1000 / self.__rate),
+                                              queue_draw)
+        self.__tid_consume = gobject.timeout_add(int(1000 / self.__rate),
+                                                 self.__module.consume_buffer)
 
     def __button_press_event(self, event):
         if event.button != 3 or event.type in (gtk.gdk._2BUTTON_PRESS,
@@ -125,28 +125,38 @@ class BlaVisualization(gtk.DrawingArea):
         menu.show_all()
         menu.popup(None, None, None, event.button, event.time)
 
-    def __expose(self, drawingarea, event):
+    def __expose(self, event):
         # This callback does not fire if the main window is hidden which means
-        # that nothing is actually calculated in a visualization element which
-        # saves some CPU time. This is not the case if the window is just
+        # that nothing is actually calculated in a visualization element, in
+        # turn saving some CPU time. This is not the case if the window is just
         # obscured by another one.
-        self.__module.draw(self.window.cairo_create(),
-                           self.get_pango_context(), self.get_style())
+        cr = self.__drawing_area.window.cairo_create()
+        pc = self.__drawing_area.get_pango_context()
+        try:
+            self.__module.draw(cr, pc, self.__drawing_area.get_style())
+        except AttributeError:
+            fdesc = gtk.widget_get_default_style().font_desc
+            try:
+                layout = self.__layout
+            except AttributeError:
+                layout = self.__layout = pango.Layout(pc)
+            layout.set_font_description(fdesc)
+            cr.move_to(100, 100)
+            layout.set_markup("No visualization available")
+            cr.show_layout(layout)
 
-    @classmethod
-    def flush_buffers(cls, *args):
+    def flush_buffers(self, *args):
         # FIXME: remove this method and every call to it once the buffering
         #        issue of the visualization base class has been worked out
         try:
-            cls.__instance.__module.flush_buffers()
+            self.__module.flush_buffers()
         except AttributeError:
             pass
 
-    @classmethod
-    def set_visible(cls, state, quiet=False):
+    def set_visible(self, state):
         blacfg.setboolean("general", "show.visualization", state)
         if not state:
-            return cls.__instance.__disable()
+            return self.__disable()
 
         identifier = blacfg.getstring("general", "visualization")
         if not identifier:
@@ -154,8 +164,9 @@ class BlaVisualization(gtk.DrawingArea):
                 identifier = sorted(
                     visualizations.modules.keys(), key=str.lower)[0]
             except IndexError:
+                # TODO: Paint "No visualizations available." on the da.
                 pass
             else:
                 blacfg.set("general", "visualization", identifier)
-        cls.__instance.__initialize_module(identifier, quiet=quiet)
+        self.__initialize_module(identifier)
 
