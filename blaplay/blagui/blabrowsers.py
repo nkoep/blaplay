@@ -297,8 +297,7 @@ class BlaTreeView(blaguiutils.BlaTreeViewBase):
                  ("Properties", "<Alt>Return",
                   lambda *x: BlaTagedit(tracks) if tracks else True, True)])
 
-        from blauimanager import BlaUIManager
-        accel_group = BlaUIManager().get_accel_group()
+        accel_group = blaplay.bla.ui_manager.get_accel_group()
         menu = gtk.Menu()
         for item in items:
             if item is None:

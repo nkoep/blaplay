@@ -33,6 +33,7 @@ import numpy as np
 import blaplay
 player = blaplay.bla.player
 library = blaplay.bla.library
+ui_manager = blaplay.bla.ui_manager
 from blaplay.blacore import blaconst, blacfg
 from blaplay import blautil, blagui
 from blaplay.formats._identifiers import *
@@ -41,7 +42,6 @@ from blawindows import BlaScrolledWindow
 from blaplay.blautil import blafm
 from blastatusbar import BlaStatusbar
 from blatagedit import BlaTagedit
-from blauimanager import BlaUIManager
 import blaguiutils
 
 (COLUMN_QUEUE_POSITION, COLUMN_PLAYING, COLUMN_TRACK, COLUMN_ARTIST,
@@ -64,9 +64,8 @@ MODE_NORMAL, MODE_SORTED, MODE_FILTERED = 1 << 0, 1 << 1, 1 << 2
 
 
 def force_view():
-    if blacfg.getint("general", "view") != blaconst.VIEW_PLAYLISTS:
-        from blaview import BlaView
-        BlaView.update_view(blaconst.VIEW_PLAYLISTS)
+    from blaview import BlaView
+    BlaView.update_view(blaconst.VIEW_PLAYLISTS)
 
 def parse_playlist_stats(count, size, length_seconds):
     values = [("seconds", 60), ("minutes", 60), ("hours", 24), ("days",)]
@@ -174,7 +173,7 @@ def popup(treeview, event, view_id, target):
     elif view_id == blaconst.VIEW_QUEUE:
         element = BlaQueue
 
-    accel_group = BlaUIManager().get_accel_group()
+    accel_group = ui_manager.get_accel_group()
 
     try:
         path = treeview.get_path_at_pos(*map(int, [event.x, event.y]))[0]
@@ -1019,7 +1018,7 @@ class BlaQueue(BlaScrolledWindow):
     @classmethod
     def cut(cls, *args):
         cls.clipboard = cls.__get_items(remove=True)
-        BlaUIManager().update_menu(blaconst.VIEW_QUEUE)
+        ui_manager.update_menu(blaconst.VIEW_QUEUE)
 
     @classmethod
     def copy(cls, *args):
@@ -1028,7 +1027,7 @@ class BlaQueue(BlaScrolledWindow):
         # should still refer to the same BlaListItem instances which are
         # possibly part of a playlist.
         cls.clipboard = cls.__get_items(remove=False)
-        BlaUIManager().update_menu(blaconst.VIEW_QUEUE)
+        ui_manager.update_menu(blaconst.VIEW_QUEUE)
 
     @classmethod
     def paste(cls, *args, **kwargs):
@@ -2198,6 +2197,7 @@ class BlaPlaylist(gtk.VBox):
 
 class BlaPlaylistManager(gtk.Notebook):
     __metaclass__ = BlaViewMeta("Playlists")
+
     __gsignals__ = {
         "play_track": blautil.signal(1)
     }
@@ -2238,7 +2238,7 @@ class BlaPlaylistManager(gtk.Notebook):
             ("JumpToPlayingTrack", None, "_Jump to playing track", "<Ctrl>J",
              "", lambda *x: BlaPlaylistManager.jump_to_playing_track())
         ]
-        BlaUIManager().add_actions(actions)
+        ui_manager.add_actions(actions)
 
         self.set_scrollable(True)
 
@@ -2590,8 +2590,7 @@ class BlaPlaylistManager(gtk.Notebook):
             return
         cls.__instance.__lock_button.set_tooltip_text(label)
 
-        BlaUIManager().get_widget("/Menu/Edit/LockUnlockPlaylist").set_label(
-            label)
+        ui_manager.get_widget("/Menu/Edit/LockUnlockPlaylist").set_label(label)
 
     @classmethod
     def get_active_playlist(cls):
@@ -2802,14 +2801,14 @@ class BlaPlaylistManager(gtk.Notebook):
     @classmethod
     def cut(cls, *args):
         cls.clipboard = cls.remove()
-        BlaUIManager().update_menu(blaconst.VIEW_PLAYLISTS)
+        ui_manager.update_menu(blaconst.VIEW_PLAYLISTS)
 
     @classmethod
     def copy(cls, *args):
         playlist = cls.get_current_playlist()
         paths = playlist.get_selected_paths()
         cls.clipboard = map(copy, playlist.get_items(paths))
-        BlaUIManager().update_menu(blaconst.VIEW_PLAYLISTS)
+        ui_manager.update_menu(blaconst.VIEW_PLAYLISTS)
 
     @classmethod
     def paste(cls, *args, **kwargs):

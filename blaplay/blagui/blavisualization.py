@@ -67,8 +67,8 @@ class BlaVisualization(gtk.DrawingArea):
         # Set the menu item to inactive. This will not create circular calls as
         # the callback for the CheckMenuItem's activate signal only fires if
         # the value actually changes.
-        from blauimanager import BlaUIManager
-        BlaUIManager().get_widget("/Menu/View/Visualization").set_active(False)
+        blaplay.bla.ui_manager.get_widget(
+            "/Menu/View/Visualization").set_active(False)
 
     def __initialize_module(self, identifier, quiet=False):
         try:

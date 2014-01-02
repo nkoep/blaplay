@@ -25,7 +25,6 @@ library = blaplay.bla.library
 from blaplay.blacore import blaconst, blacfg
 from blaplay import blautil, blagui
 from blaplay.formats._identifiers import *
-from blauimanager import BlaUIManager
 from blawindows import BlaBaseWindow
 from blatoolbar import BlaToolbar
 from blabrowsers import BlaBrowsers
@@ -92,7 +91,7 @@ class BlaMainWindow(BlaBaseWindow):
                                   button_press_hook)
 
         # Main menu
-        ui_manager = BlaUIManager()
+        ui_manager = blaplay.bla.ui_manager
         self.add_accel_group(ui_manager.get_accel_group())
 
         actions = [

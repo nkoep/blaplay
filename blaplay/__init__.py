@@ -27,7 +27,9 @@ cli_queue = None
 
 
 class Blaplay(gobject.GObject):
-    __slots__ = ("library", "player", "window")
+    __metaclass__ = blautil.BlaSingletonMeta
+    __slots__ = ("library", "player", "ui_manager", "window")
+
     __gsignals__ = {
         "startup_complete": blautil.signal(0)
     }
@@ -36,7 +38,7 @@ class Blaplay(gobject.GObject):
 
     def __init__(self):
         super(Blaplay, self).__init__()
-        self.library = self.player = self.window = None
+        self.library = self.player = self.ui_manager = self.window = None
 
     def __setattr__(self, attr, value):
         # The attributes for this class are frozen. That is, we only allow the
@@ -125,6 +127,9 @@ def finish_startup():
     bla.player = blaplayer.init()
 
     # Initialize the GUI.
+    from blaplay.blagui.blauimanager import BlaUIManager
+    bla.ui_manager = BlaUIManager()
+
     from blaplay import blagui
     bla.window = blagui.init()
 

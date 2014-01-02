@@ -609,8 +609,7 @@ class BlaTagedit(BlaWindow):
                  lambda *x: self.__delete_tags(identifiers)),
                 ("Capitalize", None, lambda *x: self.__capitalize(identifiers))
             ]
-            from blauimanager import BlaUIManager
-            accel_group = BlaUIManager().get_accel_group()
+            accel_group = blaplay.bla.ui_manager.get_accel_group()
             for label, accel, callback in items:
                 m = gtk.MenuItem(label)
                 if accel:

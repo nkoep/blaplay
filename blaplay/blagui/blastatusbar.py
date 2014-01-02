@@ -67,9 +67,9 @@ class BlaStatusbar(gtk.Table):
             order = cb.get_active()
             states = [False] * len(blaconst.ORDER_LITERALS)
             states[order] = True
+            ui_manager = blaplay.bla.ui_manager
             for idx, order in enumerate(blaconst.MENU_ORDER):
-                from blauimanager import BlaUIManager
-                action = BlaUIManager().get_widget(order)
+                action = ui_manager.get_widget(order)
                 action.set_active(states[idx])
         self.__order.connect("changed", order_changed)
 

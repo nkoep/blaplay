@@ -24,12 +24,12 @@ import pango
 import blaplay
 player = blaplay.bla.player
 library = blaplay.bla.library
+ui_manager = blaplay.bla.ui_manager
 from blaplay.blacore import blaconst, blacfg
 from blaplay import blautil, blagui
 from blaplay.formats._identifiers import *
 from blawindows import BlaScrolledWindow
 from blastatusbar import BlaStatusbar
-from blauimanager import BlaUIManager
 from blaplay.blautil import blametadata
 import blaguiutils
 
@@ -381,7 +381,6 @@ class BlaSidePane(gtk.VBox):
         view = selection.get_selected_rows()[-1][0][0]
         states = [False] * len(self.__treeview.get_model())
         states[view] = True
-        ui_manager = BlaUIManager()
         for idx, view in enumerate(blaconst.MENU_VIEWS):
             action = ui_manager.get_widget(view)
             action.set_active(states[idx])
@@ -529,7 +528,6 @@ class BlaView(gtk.HPaned):
     def __init__(self):
         super(BlaView, self).__init__()
 
-        ui_manager = BlaUIManager()
         actions = [
             ("Clear", None, "_Clear", None, "", BlaView.clear),
             ("SelectAll", None, "All", None, "",
@@ -636,6 +634,8 @@ class BlaView(gtk.HPaned):
                 view != blaconst.VIEW_VIDEO)
 
         child = cls.__container.get_child()
+        if view == view_prev and child is not None:
+            return
         if child is not None:
             cls.__container.remove(child)
         child = cls.views[view]
@@ -646,7 +646,7 @@ class BlaView(gtk.HPaned):
 
         # Not all menu items are available for all views so update them
         # accordingly.
-        BlaUIManager().update_menu(view)
+        ui_manager.update_menu(view)
         cls.__side_pane.update_view(view)
 
     @classmethod
