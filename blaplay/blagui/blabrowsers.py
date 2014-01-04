@@ -33,7 +33,6 @@ from blaplay import blautil, blagui
 from blaplay.formats._identifiers import *
 from blawindows import BlaScrolledWindow
 from blaplaylist import BlaPlaylistManager, BlaQueue
-from blatagedit import BlaTagedit
 import blaguiutils
 
 
@@ -179,11 +178,6 @@ class BlaTreeView(blaguiutils.BlaTreeViewBase):
         if blagui.is_accel(event, "Q"):
             self.__send_to_queue()
 
-        elif blagui.is_accel(event, "<Alt>Return"):
-            tracks = self.get_tracks()
-            if tracks:
-                BlaTagedit(tracks)
-
         elif (blagui.is_accel(event, "Return") or
               blagui.is_accel(event, "KP_Enter")):
             action = blacfg.getint("library", "return.action")
@@ -289,12 +283,8 @@ class BlaTreeView(blaguiutils.BlaTreeViewBase):
              blautil.open_directory(directory), bool(directory)),
         ]
         if self.__browser_id == blaconst.BROWSER_LIBRARY:
-            items.extend(
-                [("Add to playback queue", "Q",
-                  lambda *x: self.__send_to_queue(), True),
-                 None,
-                 ("Properties", "<Alt>Return",
-                  lambda *x: BlaTagedit(tracks) if tracks else True, True)])
+            items.append(("Add to playback queue", "Q",
+                          lambda *x: self.__send_to_queue(), True))
 
         accel_group = blaplay.bla.ui_manager.get_accel_group()
         menu = gtk.Menu()
