@@ -117,6 +117,8 @@ def post_message(params, key=None):
         conn.request("POST", "/2.0/?", urllib.urlencode(dict(params)), header)
     except httplib.HTTPException as exc:
         return ResponseError(exc.message)
+    except socket.gaierror as (error, string):
+        return ResponseError("%d: %s" % (error, string))
 
     try:
         response = conn.getresponse()
@@ -146,7 +148,7 @@ def get_response(url, key):
 
     try:
         response = json.loads(f.read())
-    except ValueError as exc:
+    except (socket.timeout, ValueError) as exc:
         return ResponseError(exc.message)
     finally:
         f.close()
@@ -268,6 +270,7 @@ def get_new_releases(recommended=False):
     response = get_response(url, "albums")
     if isinstance(response, ResponseError):
         print_d("Failed to get new releases: %s" % response)
+        return None
     response = response.content
 
     return response["album"]
