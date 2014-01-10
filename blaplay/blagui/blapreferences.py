@@ -116,7 +116,7 @@ class BlaPreferences(BlaUniqueWindow):
                 if (restrict_string !=
                     blacfg.getstring("library", "restrict.to") or
                     exclude_string != blacfg.getstring("library", "exclude")):
-                    gobject.timeout_add(500, library.update_library)
+                    library.sync()
             self.connect("destroy", destroy)
 
             hbox = gtk.HBox(spacing=10)

@@ -52,7 +52,7 @@ def init():
 def update_library():
     global pending_save, BlaPlaylistManager
 
-    library.update_library()
+    library.sync()
     pending_save = False
 
     if BlaPlaylistManager is None:
@@ -591,7 +591,7 @@ class BlaLibrary(gobject.GObject):
             self.__tracks_ool[uri] = track
             del self.__tracks[uri]
 
-    def update_library(self):
+    def sync(self):
         self.emit("library_changed")
         self.__save_library()
         self.__monitored_directories = map(
@@ -739,7 +739,7 @@ class BlaLibrary(gobject.GObject):
                     self.add(track)
                 yield True
 
-            self.update_library()
+            self.sync()
             self.__library_monitor.add_directory(directory)
             self.emit("progress", 1.0)
 
@@ -801,5 +801,5 @@ class BlaLibrary(gobject.GObject):
         # library something went wrong so move them to __tracks_ool as well.
         if not mds:
             map(remove_track, self.__tracks.iterkeys())
-        self.update_library()
+        self.sync()
         self.__library_monitor.remove_directories(directory)

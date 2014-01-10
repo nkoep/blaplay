@@ -386,7 +386,7 @@ class BlaTagEditor(BlaMetadataViewer):
         blaplay.bla.window.update_title()
         from blaplay.blagui.blaplaylist import BlaPlaylistManager
         BlaPlaylistManager.invalidate_visible_rows()
-        library.update_library()
+        library.sync()
 
         self._update_model(self._uris)
 
