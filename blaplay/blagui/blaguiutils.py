@@ -125,11 +125,10 @@ class BlaTreeViewBase(gtk.TreeView):
     }
 
     def __init__(self, *args, **kwargs):
-        # TODO: rename to __empty_selection_allowed
-        self.__allow_no_selection = kwargs.pop("allow_no_selection", True)
+        self.__allow_empty_selection = kwargs.pop(
+            "allow_empty_selection", True)
         set_button_event_handlers = kwargs.pop(
             "set_button_event_handlers", True)
-        kwargs.pop("multicol", None) # TODO: Remove this.
         super(BlaTreeViewBase, self).__init__(*args, **kwargs)
 
         self.set_enable_search(False)
@@ -162,7 +161,7 @@ class BlaTreeViewBase(gtk.TreeView):
         try:
             path, column = self.get_path_at_pos(x, y)[:2]
         except TypeError:
-            if self.__allow_no_selection:
+            if self.__allow_empty_selection:
                 self.__allow_selection(True)
                 selection.unselect_all()
                 if event.button == 3:

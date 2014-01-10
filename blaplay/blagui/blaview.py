@@ -305,7 +305,8 @@ class BlaSidePane(gtk.VBox):
         # Set up the view selector.
         viewport = gtk.Viewport()
         viewport.set_shadow_type(gtk.SHADOW_IN)
-        self.__treeview = blaguiutils.BlaTreeViewBase(allow_no_selection=False)
+        self.__treeview = blaguiutils.BlaTreeViewBase(
+            allow_empty_selection=False)
         self.__treeview.get_selection().set_mode(gtk.SELECTION_SINGLE)
         self.__treeview.set_headers_visible(False)
         self.__treeview.set_property("rules_hint", True)
