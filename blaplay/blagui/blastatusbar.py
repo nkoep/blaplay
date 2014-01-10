@@ -73,9 +73,22 @@ class BlaStatusbar(gtk.Table):
                 action.set_active(states[idx])
         self.__order.connect("changed", order_changed)
 
-        table = gtk.Table(rows=1, columns=2)
+        table = gtk.Table(rows=1, columns=3)
+
         table.attach(gtk.Label("Order:"), 0, 1, 0, 1, xpadding=10)
         table.attach(self.__order, 1, 2, 0, 1)
+        button = gtk.Button()
+        button.set_tooltip_text("Clear queue")
+        from blaplaylist import BlaQueue
+        queue = BlaQueue()
+        button.connect("clicked", lambda *x: queue.clear())
+        queue.connect("count_changed",
+                      lambda *x: button.set_sensitive(x[-1] > 0))
+        button.add(gtk.image_new_from_stock(gtk.STOCK_CLEAR,
+                                            gtk.ICON_SIZE_BUTTON))
+        button.set_relief(gtk.RELIEF_NONE)
+        button.set_sensitive(False)
+        table.attach(button, 2, 3, 0, 1),
 
         count = 0
         for widget, xalign in [(hbox, 0.0), (self.__view_info, 0.5),

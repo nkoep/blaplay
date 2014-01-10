@@ -310,7 +310,6 @@ class BlaSidePane(gtk.VBox):
         self.__treeview.get_selection().set_mode(gtk.SELECTION_SINGLE)
         self.__treeview.set_headers_visible(False)
         self.__treeview.set_property("rules_hint", True)
-        self.__treeview.connect("popup", self.__popup_menu)
         r = gtk.CellRendererText()
         r.set_property("ellipsize", pango.ELLIPSIZE_END)
         c = gtk.TreeViewColumn()
@@ -407,16 +406,6 @@ class BlaSidePane(gtk.VBox):
         notebook.show()
         hbox.show_all()
         self.show()
-
-    def __popup_menu(self, treeview, event):
-        from blaplaylist import BlaQueue
-
-        menu = gtk.Menu()
-        m = gtk.MenuItem("Clear queue")
-        m.connect("activate", lambda *x: BlaQueue.clear())
-        menu.append(m)
-        menu.show_all()
-        menu.popup(None, None, None, event.button, event.time)
 
     def __selection_changed(self, selection):
         view = selection.get_selected_rows()[-1][0][0]
