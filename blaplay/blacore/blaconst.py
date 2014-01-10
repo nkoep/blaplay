@@ -130,9 +130,9 @@ MENU = """
             <menuitem action="NewReleases"/>
             <separator/>
             <menuitem action="Browsers"/>
+            <menuitem action="Visualization"/>
             <menuitem action="SidePane"/>
             <menuitem action="Statusbar"/>
-            <menuitem action="Visualization"/>
             <separator/>
             <menuitem action="JumpToPlayingTrack"/>
         </menu>
@@ -178,14 +178,15 @@ BROWSER_LIBRARY, BROWSER_FILESYSTEM = xrange(2)
  SELECT_BY_ALBUM_ARTISTS, SELECT_BY_GENRES) = xrange(6)
 
 # Playlist constants
-QUEUE_MAX_ITEMS = 128
+TAG_EDITOR_MAX_ITEMS = QUEUE_MAX_ITEMS = 128
 ORDER_NORMAL, ORDER_REPEAT, ORDER_SHUFFLE = xrange(3)
 ORDER_LITERALS = ["Normal", "Repeat", "Shuffle"]
 #ORDER = ["Normal", "Repeat", "Repeat album", "Shuffle", "Shuffle albums"]
 (PLAYLIST_FROM_SELECTION, PLAYLIST_FROM_ARTISTS, PLAYLIST_FROM_ALBUMS,
  PLAYLIST_FROM_ALBUM_ARTISTS, PLAYLIST_FROM_GENRE) = xrange(5)
 
-METADATA_LYRICS, METADATA_BIOGRAPHY = xrange(2)
+(METADATA_TAGS, METADATA_PROPERTIES, METADATA_LYRICS,
+ METADATA_BIOGRAPHY) = xrange(4)
 
 # Events browser
 EVENTS_RECOMMENDED, EVENTS_ALL = xrange(2)

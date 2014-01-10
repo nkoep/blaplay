@@ -40,7 +40,6 @@ from blaplay.formats._identifiers import *
 from blawindows import BlaScrolledWindow
 from blaplay.blautil import blafm
 from blastatusbar import BlaStatusbar
-from blatagedit import BlaTagedit
 import blaview
 import blaguiutils
 
@@ -323,14 +322,6 @@ def popup(treeview, event, view_id, target):
               lambda *x: blautil.open_directory(os.path.dirname(item.uri)))
     menu.append(m)
 
-    menu.append(gtk.SeparatorMenuItem())
-
-    m = gtk.MenuItem("Properties")
-    mod, key = gtk.accelerator_parse("<Alt>Return")
-    m.add_accelerator("activate", accel_group, mod, key, gtk.ACCEL_VISIBLE)
-    m.connect("activate", element.show_properties)
-    menu.append(m)
-
     menu.show_all()
     menu.popup(None, None, None, event.button, event.time)
 
@@ -514,7 +505,7 @@ class BlaTreeView(blaguiutils.BlaTreeViewBase):
     queue_instance = None
 
     def __init__(self, view_id=None):
-        super(BlaTreeView, self).__init__(multicol=True)
+        super(BlaTreeView, self).__init__()
 
         if view_id == blaconst.VIEW_PLAYLISTS:
             BlaTreeView.playlist_instances.append(self)
@@ -760,8 +751,6 @@ class BlaQueue(BlaScrolledWindow):
             self.paste()
         elif blagui.is_accel(event, "Delete"):
             self.remove()
-        elif blagui.is_accel(event, "<Alt>Return"):
-            self.show_properties()
         return False
 
     def __drag_data_get(self, treeview, drag_context, selection_data, info,
@@ -910,13 +899,6 @@ class BlaQueue(BlaScrolledWindow):
         selection.unselect_all()
         select_path = selection.select_path
         map(select_path, paths)
-
-    @classmethod
-    def show_properties(cls, *args):
-        model, paths = cls.__treeview.get_selection().get_selected_rows()
-        uris = [model[path][0].uri for path in paths]
-        if uris:
-            BlaTagedit(uris)
 
     @classmethod
     def update_queue_positions(cls):
@@ -1196,6 +1178,18 @@ class BlaPlaylist(gtk.VBox):
         self.__filter_box.set_visible(False)
 
         self.__treeview = BlaTreeView(view_id=blaconst.VIEW_PLAYLISTS)
+        def selection_changed(selection):
+            # FIXME: This gets called for each newly selected item in
+            #        `add_items'.
+            if BlaPlaylistManager.get_current_playlist() != self:
+                return False
+            paths = selection.get_selected_rows()[-1]
+            uris = [item.uri for item in self.get_items_from_paths(paths)]
+            # FIXME: Ugly hack. Can be removed once we made the playlist
+            #        manager a singleton.
+            BlaPlaylistManager._BlaPlaylistManager__instance.emit(
+                "selection_changed", uris)
+        self.__treeview.get_selection().connect("changed", selection_changed)
         self.__treeview.connect_object(
             "sort_column", BlaPlaylist.sort, self)
         self.__treeview.connect("row_activated", self.play_item)
@@ -1473,7 +1467,7 @@ class BlaPlaylist(gtk.VBox):
                 blautil.resolve_uris(selection_data.get_uris()))
             items = create_items_from_uris(uris)
 
-        # FIXME: if we don't add anything here GTK issues an assertion warning
+        # FIXME: If we don't add anything here GTK issues an assertion warning.
         if items:
             self.add_items(items, drop_info=drop_info, select_rows=True)
 
@@ -1489,8 +1483,7 @@ class BlaPlaylist(gtk.VBox):
             ("Delete", delete),
             ("Q", lambda: self.send_to_queue()),
             ("R", lambda: self.remove_from_queue(self.__treeview)),
-            ("Escape", self.disable_search),
-            ("<Alt>Return", self.show_properties)
+            ("Escape", self.disable_search)
         ]
         for accel, callback in accels:
             if is_accel(event, accel):
@@ -1687,7 +1680,8 @@ class BlaPlaylist(gtk.VBox):
             # times make sure it gets a new id by creating a shallow copy.
             if item.playlist == self:
                 items[idx] = copy(item)
-            item.playlist = self
+            else:
+                item.playlist = self
 
         # If drop_info is -1 insert at the cursor or at the end of the playlist
         # if nothing is selected.
@@ -1708,7 +1702,7 @@ class BlaPlaylist(gtk.VBox):
         reverse = False
         model = self.__freeze_treeview()
         iterator = None
-        if drop_info:
+        if drop_info is not None:
             path, pos = drop_info
             iterator = model.get_iter(path)
 
@@ -1732,10 +1726,11 @@ class BlaPlaylist(gtk.VBox):
         if reverse:
             items.reverse()
 
+        # Insert into the actual model.
         for item in items:
             iterator = insert_func(iterator, [item, None])
 
-        # Insertion is likely to destroy the sort order so remove any sort
+        # Insertion is likely to destroy the sort order so remove sort
         # indicators.
         for column in self.__treeview.get_columns():
             column.set_sort_indicator(False)
@@ -1761,7 +1756,7 @@ class BlaPlaylist(gtk.VBox):
         else:
             list_ = self.__all_items
 
-        if drop_info:
+        if drop_info is not None:
             path, pos = drop_info
             if pos in [gtk.TREE_VIEW_DROP_BEFORE,
                        gtk.TREE_VIEW_DROP_INTO_OR_BEFORE]:
@@ -1771,12 +1766,12 @@ class BlaPlaylist(gtk.VBox):
         else:
             start = len(list_)
 
-        # Make sure to insert into the list `list_' references by using slice
-        # notation to assign the new values.
+        # Insert into the list `list_' references by using slice notation to
+        # assign the new values.
         list_[:] = list_[:start] + items + list_[start:]
 
-        # FIXME: this is the second check whether the list is sorted in this
-        #        function
+        # FIXME: This is the second check whether the list is sorted in this
+        #        function.
         if self.__mode & MODE_SORTED:
             if start > 0:
                 item = list_[start-1]
@@ -2161,6 +2156,16 @@ class BlaPlaylist(gtk.VBox):
 
     def set_row(self, path, row_align=0.5, keep_selection=False,
                 set_cursor=True):
+        # FIXME: There's a serious issue here. This method often gets called
+        #        with keep_selection=True after a set of paths has been
+        #        selected. Since the call to gtk.TreeView.set_cursor unsets
+        #        the selection, we save the selected paths, set the cursor and
+        #        then select the remaining paths again. Long story short, we
+        #        often select rows just to unselect and select them again in
+        #        this method. Since this method doesn't mutate the model we
+        #        can drop the `keep_selection' argument for a new paths=[]
+        #        kwarg.
+
         # Wrap the actual heavy lifting in gobject.idle_add. If we decorate the
         # instance method itself we can't use kwargs anymore which is rather
         # annoying for this particular method due to the number of arguments.
@@ -2187,17 +2192,16 @@ class BlaPlaylist(gtk.VBox):
         if path:
             set_row()
 
-    def show_properties(self):
+    def get_selected_uris(self):
         paths = self.get_selected_paths()
-        uris = [item.uri for item in self.get_items(paths)]
-        if uris:
-            BlaTagedit(uris)
+        return [item.uri for item in self.get_items(paths)]
 
 class BlaPlaylistManager(gtk.Notebook):
     __metaclass__ = blaview.BlaViewMeta("Playlists")
 
     __gsignals__ = {
-        "play_track": blautil.signal(1)
+        "play_track": blautil.signal(1),
+        "selection_changed": blautil.signal(1)
     }
 
     __instance = None   # Instance of BlaPlaylist needed for classmethods
@@ -2268,6 +2272,7 @@ class BlaPlaylistManager(gtk.Notebook):
             playlist = self.get_nth_page(args[-1])
             self.update_playlist_lock_state()
             self.update_statusbar(playlist)
+            self.emit("selection_changed", playlist.get_selected_uris())
         self.connect_after("switch_page", switch_page)
 
         self.connect("button_press_event", self.__button_press_event)
@@ -2317,7 +2322,7 @@ class BlaPlaylistManager(gtk.Notebook):
         # DND from the filebrowser or an external source
         elif info == blagui.DND_URIS:
             items = blautil.resolve_uris(selection_data.get_uris())
-            # FIXME: find a better solution than the resolve flag
+            # FIXME: Find a better solution than the resolve flag.
             resolve = True
 
         self.send_to_new_playlist(items, resolve=resolve, select=select)
@@ -2394,10 +2399,10 @@ class BlaPlaylistManager(gtk.Notebook):
             if response == gtk.RESPONSE_OK:
                 name = entry.get_text()
                 if not name.strip():
-                    # FIXME: if this dialog is present when we quit we get a
+                    # FIXME: If this dialog is present when we quit we get a
                     #        weird assertion which doesn't seem to have
                     #        anything to do with this line, followed by a
-                    #        segfault
+                    #        segfault.
                     blaguiutils.error_dialog(
                         text="Invalid playlist name",
                         secondary_text="A playlist name must not consist "
@@ -2631,6 +2636,7 @@ class BlaPlaylistManager(gtk.Notebook):
         if uris is None:
             return False
         playlist = cls.__instance.add_playlist(focus=True, name=name)
+        # FIXME: add_tracks doesn't exist anymore!!
         playlist.add_tracks(uris=uris)
         return True
 
@@ -2697,7 +2703,8 @@ class BlaPlaylistManager(gtk.Notebook):
         else:
             self.add_playlist()
 
-        # FIXME: weird to handle this here. do this with a pipe instead
+        # FIXME: Strange to handle this here. Do it with a pipe or via DBus
+        #        instead.
 #        try:
 #            action, uris = blaplay.cli_queue
 #            blaplay.cli_queue = None
@@ -2966,10 +2973,6 @@ class BlaPlaylistManager(gtk.Notebook):
     def next(cls):
         for playlist in cls.__instance:
             yield playlist
-
-    @classmethod
-    def show_properties(cls, *args):
-        cls.get_current_playlist().show_properties()
 
     @classmethod
     def jump_to_playing_track(cls):

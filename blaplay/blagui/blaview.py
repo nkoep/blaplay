@@ -29,6 +29,7 @@ from blaplay.blacore import blaconst, blacfg
 from blaplay import blautil, blagui
 from blaplay.formats._identifiers import *
 from blawindows import BlaScrolledWindow
+from blatagedit import BlaTagEditor, BlaProperties
 from blastatusbar import BlaStatusbar
 from blaplay.blautil import blametadata
 import blaguiutils
@@ -273,6 +274,8 @@ class BlaSidePane(gtk.VBox):
         sw = BlaScrolledWindow()
         sw.set_shadow_type(gtk.SHADOW_NONE)
         sw.add(self.__tv)
+        sw.show_all()
+
         self.__style = self.__tv.get_modifier_style().copy()
         self.__tb = self.__tv.get_buffer()
         self.__tb.create_tag("bold", weight=pango.WEIGHT_BOLD)
@@ -292,6 +295,8 @@ class BlaSidePane(gtk.VBox):
         sw2 = BlaScrolledWindow()
         sw2.set_shadow_type(gtk.SHADOW_NONE)
         sw2.add(self.__tv2)
+        sw2.show_all()
+
         self.__tb2 = self.__tv2.get_buffer()
         self.__tb2.create_tag("bold", weight=pango.WEIGHT_BOLD)
         self.__tb2.create_tag("large", scale=pango.SCALE_LARGE)
@@ -300,7 +305,7 @@ class BlaSidePane(gtk.VBox):
         # Set up the view selector.
         viewport = gtk.Viewport()
         viewport.set_shadow_type(gtk.SHADOW_IN)
-        self.__treeview = blaguiutils.BlaTreeViewBase(multicol=False)
+        self.__treeview = blaguiutils.BlaTreeViewBase(allow_no_selection=False)
         self.__treeview.get_selection().set_mode(gtk.SELECTION_SINGLE)
         self.__treeview.set_headers_visible(False)
         self.__treeview.set_property("rules_hint", True)
@@ -330,27 +335,61 @@ class BlaSidePane(gtk.VBox):
 
         self.cover_display = BlaSidePane.BlaCoverDisplay()
 
-        hbox = gtk.HBox(spacing=5)
+        hbox = gtk.HBox(spacing=blaconst.WIDGET_SPACING)
         hbox.pack_start(viewport, expand=True)
         hbox.pack_start(self.cover_display, expand=False, fill=True)
 
+        notebook.append_page(BlaTagEditor(views[blaconst.VIEW_PLAYLISTS]),
+                             gtk.Label("Tags"))
+        notebook.append_page(BlaProperties(views[blaconst.VIEW_PLAYLISTS]),
+                             gtk.Label("Properties"))
         notebook.append_page(sw, gtk.Label("Lyrics"))
         notebook.append_page(sw2, gtk.Label("Biography"))
 
-        # Add the `modify metadata' button.
-        button = gtk.Button()
-        button.set_tooltip_text("Edit metadata")
-        button.set_relief(gtk.RELIEF_NONE)
-        button.set_focus_on_click(False)
-        button.add(
-            gtk.image_new_from_stock(gtk.STOCK_EDIT, gtk.ICON_SIZE_MENU))
-        style = gtk.RcStyle()
-        style.xthickness = style.ythickness = 0
-        button.modify_style(style)
-        button.connect("clicked", lambda *x: print_d("TODO"))
-        button.show_all()
-        # TODO: implement a widget to edit metadata
-#        notebook.set_action_widget(button, gtk.PACK_END)
+        def switch_page(notebook, page, page_num):
+            action_widget = notebook.get_action_widget(gtk.PACK_END)
+            if action_widget.child is not None:
+                action_widget.remove(action_widget.child)
+
+            page = notebook.get_nth_page(page_num)
+            blacfg.set("general", "metadata.view", page_num)
+
+            if page_num == blaconst.METADATA_TAGS:
+                widget = page.get_control_widget()
+            elif page_num == blaconst.METADATA_LYRICS:
+                button = gtk.Button()
+                button.set_tooltip_text("Edit lyrics")
+                button.set_relief(gtk.RELIEF_NONE)
+                button.set_focus_on_click(False)
+                button.add(
+                    gtk.image_new_from_stock(gtk.STOCK_EDIT,
+                                             gtk.ICON_SIZE_MENU))
+                style = gtk.RcStyle()
+                style.xthickness = style.ythickness = 0
+                button.modify_style(style)
+                # TODO: Implement a widget to edit metadata.
+                button.connect("clicked", lambda *x: False)
+                button.show_all()
+                widget = button
+
+                action_widget.set_visible(False)
+                return
+            else:
+                action_widget.set_visible(False)
+                return
+
+            action_widget.add(widget)
+            action_widget.set_visible(True)
+            action_widget.show_all()
+
+        viewport = gtk.Viewport()
+        viewport.set_shadow_type(gtk.SHADOW_NONE)
+        notebook.set_action_widget(viewport, gtk.PACK_END)
+        notebook.connect("switch_page", switch_page)
+        page_num = blacfg.getint("general", "metadata.view")
+        notebook.set_current_page(page_num)
+        # Make sure the notebook's action widget gets initialized.
+        switch_page(notebook, None, page_num)
 
         self.pack_start(notebook, expand=True)
         self.pack_start(hbox, expand=False)
@@ -364,12 +403,9 @@ class BlaSidePane(gtk.VBox):
         self.fetcher.connect_object(
             "cover", type(self.cover_display).update, self.cover_display)
 
-        page_num = blacfg.getint("general", "metadata.view")
-        notebook.set_current_page(page_num)
-        notebook.connect(
-            "switch_page",
-            lambda notebook, child, page_num: blacfg.set(
-                "general", "metadata.view", page_num))
+        notebook.show()
+        hbox.show_all()
+        self.show()
 
     def __popup_menu(self, treeview, event):
         from blaplaylist import BlaQueue
@@ -612,7 +648,7 @@ class BlaView(gtk.HPaned):
 
         self.show()
         self.__container.show_all()
-        self.__side_pane.show_all()
+        self.__side_pane.show()
 
         self.pack1(self.__container, resize=True, shrink=False)
         self.pack2(self.__side_pane, resize=False, shrink=False)

@@ -25,6 +25,7 @@ import pango
 
 import blaplay
 library = blaplay.bla.library
+from blaplay.blacore import blaconst
 from blaplay import blautil, blagui
 from blaplay.formats._blatrack import BlaTrack
 from blaplay.formats._identifiers import *
@@ -32,346 +33,190 @@ from blawindows import BlaWindow, BlaScrolledWindow
 import blaguiutils
 
 
-# FIXME: This largely implements the same methods as
-#        blaguiutils.BlaTreeViewBase. Merge these again.
-class BlaTreeView(gtk.TreeView):
-    __gsignals__ = {
-        "popup": blautil.signal(1),
-        "set_value": blautil.signal(2),
-        "delete_tags": blautil.signal(1)
+class BlaMetadataViewer(gtk.VBox):
+    __metaclass__ = blautil.BlaSingletonMeta
+
+    __gsignals__= {
+        "value_changed": blautil.signal(2)
     }
 
-    def __init__(self, *args, **kwargs):
-        self.__allow_no_selection = kwargs.pop("allow_no_selection", True)
-        self.__is_editable = kwargs.pop("is_editable", False)
-        super(BlaTreeView, self).__init__(*args, **kwargs)
+    class TreeView(blaguiutils.BlaTreeViewBase):
+        def __init__(self, *args, **kwargs):
+            self.__is_editable = kwargs.pop("is_editable", False)
+            super(BlaMetadataViewer.TreeView, self).__init__(*args, **kwargs)
 
-        if not self.__allow_no_selection:
-            self.set_rubber_banding(True)
-        self.set_enable_search(False)
-        self.connect_object("button_press_event",
-                            BlaTreeView.__button_press_event, self)
-        self.connect_object("button_release_event",
-                            BlaTreeView.__button_release_event, self)
-        self.connect_object("key_press_event",
-                            BlaTreeView.__key_press_event, self)
-        self.get_selection().set_mode(gtk.SELECTION_MULTIPLE)
-        self.__pending_event = None
-
-    def __key_press_event(self, event):
-        if blagui.is_accel(event, "Delete"):
-            model, paths = self.get_selection().get_selected_rows()
-            identifiers = [model[path][0] for path in paths]
-            self.emit("delete_tags", identifiers)
-
-    def __button_press_event(self, event):
-        selection = self.get_selection()
-        x, y = map(int, [event.x, event.y])
-        try:
-            path, column, cellx, celly = self.get_path_at_pos(x, y)
-        except TypeError:
-            if event.button == 3:
-                self.emit("popup", event)
-            if self.__allow_no_selection:
-                selection.unselect_all()
-            return False
-
-        self.grab_focus()
-        if event.button in (1, 2):
-
-            selection = self.get_selection()
-            r = column.get_cell_renderers()[0]
-
-            if ((selection.path_is_selected(path) or
-                event.type == gtk.gdk._2BUTTON_PRESS) and
-                column == self.get_column(1)):
-                if not r.get_property("editing"):
-                    r.set_property("editable", self.__is_editable and True)
-                    self.set_cursor_on_cell(path, focus_column=column,
-                                            focus_cell=r, start_editing=True)
-                    selection.set_select_function(lambda *args: True)
-                return True
-            else:
-                if self.__allow_no_selection:
-                    if (event.state & (gtk.gdk.CONTROL_MASK |
-                                       gtk.gdk.SHIFT_MASK)):
-                        self.__pending_event = None
-                        selection.set_select_function(lambda *args: True)
-                    else:
-                        if not r.get_property("editing"):
-                            try:
-                                text = self.__editable.get_text()
-                            except AttributeError:
-                                pass
-                            else:
-                                r.emit("edited", path, text)
-                            r.set_property("editable", False)
-                elif (selection.path_is_selected(path) and
-                      selection.count_selected_rows() == 1 and
-                      event.state & gtk.gdk.CONTROL_MASK):
+            def row_activated(treeview, path, column):
+                if not treeview.get_selection().path_is_selected(path):
                     return True
+                treeview.set_cursor(path, treeview.get_columns()[-1],
+                                    start_editing=True)
+            self.connect("row_activated", row_activated)
 
-        else: # event.button == 3
-            if not selection.path_is_selected(path):
-                self.set_cursor(path, column, 0)
-            else:
-                column.focus_cell(column.get_cell_renderers()[0])
-            self.emit("popup", event)
-            return True
-
-        return False
-
-    def __button_release_event(self, event):
-        try:
-            r = self.get_columns()[1].get_cell_renderers()[0]
-        except IndexError:
-            pass
-        else:
-            return False
-
-        if self.__pending_event:
-            selection = self.get_selection()
-            oldevent = self.__pending_event
-            self.__pending_event = None
-            selection.set_select_function(lambda *x: True)
-            safezone = 10
-            if not (oldevent[0]-safezone <= event.x <= oldevent[0]+safezone and
-                    oldevent[1]-safezone <= event.y <= oldevent[1]+safezone):
-                return True
+        def _button_press_event(self, treeview, event):
             x, y = map(int, [event.x, event.y])
             try:
-                path, column, cellx, celly = self.get_path_at_pos(x, y)
+                path = self.get_path_at_pos(x, y)[0]
             except TypeError:
-                return True
-            self.set_cursor(path, column, 0)
+                path = None
 
-        return False
+            if (event.button == 1 and event.type == gtk.gdk.BUTTON_PRESS and
+                path is not None and
+                self.get_selection().path_is_selected(path)):
+                return False
 
-    def editing_started(self, renderer, editable, path):
-        self.__editable = editable
-        if self.get_model()[path][1] is None:
-            self.__editable.set_text("")
-        self.__old_value = self.__editable.get_text()
-        self.__old_path = path
-        return False
+            if path is None:
+                self.grab_focus()
+            return super(BlaMetadataViewer.TreeView, self)._button_press_event(
+                treeview, event)
 
-    def edited(self, renderer, path, text, tageditor):
-        if self.__old_path is None or text == self.__old_value:
-            return False
-        model = self.get_model()
-        row = model[self.__old_path]
-        identifier = row[0]
-        row[1] = text
-        self.emit("set_value", identifier, text)
-        self.__old_value = ""
-        self.__old_path = None
+    def __init__(self, is_editable, playlist_manager):
+        super(BlaMetadataViewer, self).__init__(
+            spacing=blaconst.WIDGET_SPACING)
 
-class BlaTagedit(BlaWindow):
-    def __init__(self, uris):
-        super(BlaTagedit, self).__init__(
-            with_closebutton=False, with_cancelbutton=False,
-            close_on_escape=False)
-        self.__tracks = {}
+        model = gtk.ListStore(gobject.TYPE_PYOBJECT, gobject.TYPE_PYOBJECT)
 
-        self.connect("key_press_event", self.__key_press_event)
-        self.connect("delete_event", self.__apply_and_close)
-        self.set_default_size(750, 475)
-        self.set_size_request(380, 275)
-        self.set_resizable(True)
+        self._treeview = BlaMetadataViewer.TreeView(
+            model, is_editable=is_editable)
+        self._treeview.set_reorderable(False)
+        self._treeview.set_rubber_banding(True)
+        self._treeview.set_property("rules_hint", True)
 
-        def get_label(uri):
-            track = library[uri]
-            if not track[TITLE]:
-                return track.basename
-            return track[TITLE]
+        # Name column
+        r = gtk.CellRendererText()
+        self._treeview.insert_column_with_data_func(
+            -1, "Name", r, self.__cdf_name)
 
-        if len(uris) == 1:
-            label = "Properties - \"%s\"" % get_label(uris[0])
-        elif len(uris) <= 3:
-            label = "Properties (%d items) - " % len(uris)
-            label = label + "\"%s\", " * (len(uris) - 1) + "\"%s\""
-            label = label % tuple(map(get_label, uris))
-        else:
-            label = "Properties (%d items) - " % len(uris)
-            label = label + "\"%s\", " * 2 + "\"%s\", ..."
-            label = label % tuple(map(get_label, uris[0:3]))
-
-        self.set_title(label)
-
-        # Notebook and its pages
-        notebook = gtk.Notebook()
-        sw, self.__treeview_metadata = self.__set_up_page(is_editable=True)
-        notebook.append_page(sw, gtk.Label("Metadata"))
-
-        sw, self.__treeview_properties = self.__set_up_page(is_editable=False)
-        notebook.append_page(sw, gtk.Label("Properties"))
-
-        # Undo button
-        button = gtk.Button("Undo")
-        button.connect_object("clicked", BlaTagedit.__undo, self)
-        self.buttonbox.pack_start(button)
-
-        # Close button
-        button = gtk.Button(stock=gtk.STOCK_CLOSE)
-        button.connect("clicked", self.__apply_and_close)
-        self.buttonbox.pack_start(button)
-
-        button = gtk.Button("Apply")
-        button.connect_object("clicked", BlaTagedit.__apply, self)
-        self.buttonbox.pack_start(button)
-
-        paned = gtk.HPaned()
-
-        # File list
-        sw = BlaScrolledWindow()
-        sw.set_shadow_type(gtk.SHADOW_OUT)
-
-        self.__file_list = BlaTreeView(allow_no_selection=False)
-        self.__file_list.set_rubber_banding(True)
-        self.__file_list.set_fixed_height_mode(True)
-        self.__file_list.set_enable_search(False)
-        self.__file_list.set_property("rules_hint", True)
-
+        # Value column
         r = gtk.CellRendererText()
         r.set_property("ellipsize", pango.ELLIPSIZE_END)
-        column = gtk.TreeViewColumn("Files")
-        column.set_sizing(gtk.TREE_VIEW_COLUMN_FIXED)
-        column.pack_start(r)
-        def cell_data_func(column, renderer, model, iterator):
-            renderer.set_property("text", os.path.basename(model[iterator][0]))
-        column.set_cell_data_func(r, cell_data_func)
-        self.__file_list.append_column(column)
-        self.__file_list.connect("popup", self.__file_list_popup)
+        r.set_property("editable", is_editable)
+        self._treeview.insert_column_with_data_func(
+            -1, "Value", r, self.__cdf_value)
+        if is_editable:
+            def editing_started(renderer, editable, path):
+                self._treeview.set_cursor(path)
+                model = self._treeview.get_model()
+                # Remove the "Varies between tracks" label.
+                if model[path][1] is None:
+                    editable.set_text("")
+            r.connect("editing_started", editing_started)
+            def edited(renderer, path, text):
+                row = self._treeview.get_model()[path]
+                identifier = row[0]
+                if row[1] != text:
+                    row[1] = text
+                    self.emit("value_changed", identifier, text)
+            r.connect("edited", edited)
 
-        model = gtk.ListStore(gobject.TYPE_STRING)
-        append = model.append
-        for uri in uris:
-            append([uri])
-        self.__file_list.set_model(model)
-        selection = self.__file_list.get_selection()
-        selection.connect("changed", lambda *x: self.__update_selection())
-        selection.select_all()
+        for column in self._treeview.get_columns():
+            column.set_sizing(gtk.TREE_VIEW_COLUMN_AUTOSIZE)
 
-        sw.add(self.__file_list)
-        sw.set_size_request(175, -1)
+        # Wrap the treeview.
+        sw = BlaScrolledWindow()
+        sw.add(self._treeview)
 
-        paned.pack1(sw, resize=False, shrink=False)
-        paned.pack2(notebook, resize=True, shrink=True)
-        self.vbox.set_spacing(5)
-        self.vbox.pack_start(paned)
-        self.__pb = gtk.ProgressBar()
-        self.vbox.pack_start(self.__pb, expand=False)
-        self.show_all()
-        if len(uris) == 1:
-            sw.set_visible(False)
-        self.__pb.set_visible(False)
+        self._pb = gtk.ProgressBar()
+        self._pb.set_visible(False)
 
-    def __undo(self, uris=None):
-        if not uris:
-            uris = [row[0] for row in self.__file_list.get_model()]
-        pop = self.__tracks.pop
-        for uri in uris:
-            pop(uri, None)
-        self.__update_selection()
+        self.pack_start(sw, expand=True)
+        self.pack_start(self._pb, expand=False)
 
-    def __file_list_popup(self, treeview, event):
-        if not treeview.get_path_at_pos(*map(int, [event.x, event.y])):
-            return
+        playlist_manager.connect_object(
+            "selection_changed", BlaMetadataViewer._update_model, self)
 
-        model, paths = treeview.get_selection().get_selected_rows()
-        uris = [model[path][0] for path in paths]
+        self._uris = []
 
-        menu = gtk.Menu()
+        sw.show_all()
+        self.show()
 
-        m = gtk.MenuItem("Revert changes")
-        m.connect("activate", lambda *x: self.__undo(uris))
-        menu.append(m)
+    def _populate_model(self, model):
+        pass
 
-        menu.show_all()
-        menu.popup(None, None, None, event.button, event.time)
-        return False
-
-    def __apply_and_close(self, *args):
-        response = gtk.RESPONSE_YES
-        if self.__tracks:
-            response = blaguiutils.question_dialog(
-                text="There are unsaved modifications.",
-                secondary_text="Save changes?", with_cancel_button=True,
-                parent=self)
-            if response == gtk.RESPONSE_YES:
-                self.__apply()
-        if response != gtk.RESPONSE_CANCEL:
-            self.destroy()
-
-    def __apply(self):
-        def process():
-            try:
-                c = 1.0 / len(self.__tracks)
-            except ZeroDivisionError:
-                yield False
-            else:
-                self.__pb.set_visible(True)
-            idx = 0
-            for uri, track in self.__tracks.iteritems():
-                self.__pb.set_fraction(c * (idx+1))
-                self.__pb.set_text(uri)
-                if uri in library:
-                    ns["update_library"] = True
-                library[uri] = track
-                ns["succeeded"] += int(track.save())
-                idx += 1
-                yield True
-
-            self.__pb.set_fraction(1.0)
-            ns["wait"] = False
-            yield False
-
-        ns = {"wait": True, "update_library": False, "succeeded": 0}
-        text = gtk.Label()
-        text.set_alignment(0.0, 0.5)
-        text.set_ellipsize(pango.ELLIPSIZE_MIDDLE)
-        p = process()
-        gobject.idle_add(p.next)
-
-        while ns["wait"]:
-            if gtk.events_pending() and gtk.main_iteration():
-                break
-
-        self.__pb.set_visible(False)
-        # TODO: Emit a "metadata_changed" signal so the window can listen for
-        #       the signal and change its title itself.
-        blaplay.bla.window.update_title()
-        from blaplay.blagui.blaplaylist import BlaPlaylistManager
-        BlaPlaylistManager.invalidate_visible_rows()
-        if ns["update_library"]:
-            library.update_library()
-        succeeded = ns["succeeded"]
-        l = len(self.__tracks)
-        self.__tracks.clear()
-        self.__pb.set_visible(False)
-        if l > 0 and succeeded != l:
-            blaguiutils.warning_dialog(
-                "Failed to write tags on %d of %d files." % ((l-succeeded), l),
-                "This usually indicates missing resources.", parent=self)
-
-    def __update_selection(self):
-        model, paths = self.__file_list.get_selection().get_selected_rows()
-        uris = [model[path][0] for path in paths]
-        cursor = self.__file_list.get_cursor()[0]
-
-        # Update metadata
-        model = self.__treeview_metadata.get_model()
-        self.__treeview_metadata.freeze_child_notify()
-        self.__treeview_metadata.set_model(None)
+    def _update_model(self, uris):
+        model = self._treeview.get_model()
         model.clear()
 
-        tracks = []
-        for uri in uris:
-            try:
-                track = self.__tracks[uri]
-            except KeyError:
-                track = library[uri]
-            tracks.append(track)
+        self._uris = uris
+        if not self._uris:
+            return
+
+        sw = self.get_children()[0]
+        if len(uris) > blaconst.TAG_EDITOR_MAX_ITEMS:
+            if sw.child == self._treeview:
+                sw.remove(self._treeview)
+                viewport = gtk.Viewport()
+                viewport.add(gtk.Label("Too many items selected"))
+                viewport.set_shadow_type(gtk.SHADOW_NONE)
+                viewport.show_all()
+                sw.add(viewport)
+            return
+        else:
+            if sw.child != self._treeview:
+                sw.remove(sw.child)
+                sw.add(self._treeview)
+
+        self._populate_model(model)
+
+    def __cdf_name(self, column, renderer, model, iterator):
+        identifier = model[iterator][0]
+        try:
+            text = IDENTIFIER_LABELS[identifier]
+        except TypeError:
+            text = "<%s>" % identifier.upper()
+        renderer.set_property("text", text)
+
+    def __cdf_value(self, column, renderer, model, iterator):
+        value = model[iterator][1]
+        if value is None:
+            renderer.set_property("markup", "<i>Varies between tracks</i>")
+        else:
+            renderer.set_property("text", value)
+
+class BlaTagEditor(BlaMetadataViewer):
+    __metaclass__ = blautil.BlaSingletonMeta
+
+    def __init__(self, playlist_manager):
+        super(BlaTagEditor, self).__init__(is_editable=True,
+                                           playlist_manager=playlist_manager)
+
+        def key_press_event(treeview, event):
+            if blagui.is_accel(event, "Delete"):
+                model, paths = treeview.get_selection().get_selected_rows()
+                identifiers = [model[path][0] for path in paths]
+                if identifiers:
+                    self.__delete_tags(identifiers)
+
+        self._treeview.connect("key_press_event", key_press_event)
+        self._treeview.connect_object("popup", BlaTagEditor.__popup, self)
+        self.connect_object("value_changed", BlaTagEditor.__set_value, self)
+
+        self.__hbox = gtk.HBox()
+        buttons = [
+            ("Undo changes", gtk.STOCK_UNDO, BlaTagEditor.__undo),
+            ("Apply changes", gtk.STOCK_OK, BlaTagEditor.__apply)
+        ]
+        for tooltip, stock, callback in buttons:
+            button = gtk.Button()
+            button.set_tooltip_text(tooltip)
+            button.set_relief(gtk.RELIEF_NONE)
+            button.set_focus_on_click(False)
+            button.add(
+                gtk.image_new_from_stock(stock, gtk.ICON_SIZE_MENU))
+            style = gtk.RcStyle()
+            style.xthickness = style.ythickness = 0
+            button.modify_style(style)
+            button.connect_object("clicked", callback, self)
+            self.__hbox.pack_start(button)
+        self.__hbox.set_sensitive(False)
+
+        self._modified = blautil.BlaNotifyDict()
+        def callback(dict_):
+            self.__hbox.set_sensitive(len(dict_) != 0)
+        self._modified.connect(callback)
+
+    def _populate_model(self, model):
+        tracks = [self._modified.get(uri, library[uri])
+                  for uri in iter(self._uris)]
 
         # The standard tags
         for identifier in IDENTIFIER_TAGS:
@@ -409,73 +254,8 @@ class BlaTagedit(BlaWindow):
                     break
             model.append([tag, value])
 
-        self.__treeview_metadata.set_model(model)
-
-        # Update properties
-        model = self.__treeview_properties.get_model()
-        self.__treeview_properties.freeze_child_notify()
-        self.__treeview_properties.set_model(None)
-        model.clear()
-
-        if cursor is None:
-            uri = uris[0]
-        else:
-            uri = self.__file_list.get_model()[cursor][0]
-        track = library[uri]
-
-        for identifier in IDENTIFIER_PROPERTIES:
-            if not track[identifier] and identifier != MONITORED_DIRECTORY:
-                continue
-            elif identifier == FILESIZE:
-                text = track.get_filesize()
-            elif identifier == MTIME:
-                text = ctime(track[MTIME])
-            elif identifier == LENGTH:
-                text = track.duration
-            elif identifier == BITRATE:
-                text = track.bitrate
-            elif identifier == SAMPLING_RATE:
-                text = track.sampling_rate
-            elif identifier == CHANNELS:
-                text = str(track[CHANNELS])
-            else:
-                text = track[identifier]
-            model.append([identifier, text])
-
-        self.__treeview_properties.set_model(model)
-
-        # Unfreeze signal emission
-        self.__treeview_metadata.thaw_child_notify()
-        self.__treeview_properties.thaw_child_notify()
-
-    def __key_press_event(self, treeview, event):
-        try:
-            r = self.__treeview_metadata.get_column(1).get_cell_renderers()[0]
-            if r.get_property("editing"):
-                raise AttributeError
-            if blagui.is_accel(event, "Escape"):
-                self.__apply_and_close()
-        except AttributeError:
-            pass
-        return False
-
-    def __cell_data_func_name(self, column, renderer, model, iterator):
-        identifier = model[iterator][0]
-        try:
-            text = IDENTIFIER_LABELS[identifier]
-        except TypeError:
-            text = "<%s>" % identifier.upper()
-        renderer.set_property("text", text)
-
-    def __cell_data_func_value(self, column, renderer, model, iterator):
-        value = model[iterator][1]
-        if value is None:
-            renderer.set_property("markup", "<i>Varies across tracks</i>")
-        else:
-            renderer.set_property("text", value)
-
     def __add_tag(self, *args):
-        diag = blaguiutils.BlaDialog(parent=self, title="Add tag")
+        diag = blaguiutils.BlaDialog(title="Add tag")
         diag.set_size_request(250, -1)
 
         table = gtk.Table(columns=2, rows=2, homogeneous=False)
@@ -495,114 +275,77 @@ class BlaTagedit(BlaWindow):
         if response == gtk.RESPONSE_OK:
             name = entry_name.get_text()
             value = entry_value.get_text()
-            if name and value and name not in IDENTIFIER_TAGS:
+            if name not in IDENTIFIER_TAGS:
                 self.__set_value(name, value)
-                self.__update_selection()
         diag.destroy()
 
+    def __update_model_and_restore_selection(self):
+        try:
+            cursor_path, column = self._treeview.get_cursor()
+        except TypeError:
+            cursor_path = column = None
+        selection = self._treeview.get_selection()
+        model, paths = selection.get_selected_rows()
+        ids = [model[path][0] for path in paths]
+        # TODO: Only update the model if a field was removed or added.
+        self._update_model(self._uris)
+        paths = [row.path for row in model if row[0] in ids]
+        if cursor_path is not None:
+            self._treeview.set_cursor(cursor_path, column)
+        map(selection.select_path, paths)
+
     def __set_value(self, identifier, value):
-        model, paths = self.__file_list.get_selection().get_selected_rows()
-        for path in paths:
-            uri = model[path][0]
-            if not self.__tracks.has_key(uri):
+        for uri in iter(self._uris):
+            if not self._modified.has_key(uri):
                 # copy-on-write
-                self.__tracks[uri] = deepcopy(library[uri])
-            self.__tracks[uri][identifier] = value
+                self._modified[uri] = deepcopy(library[uri])
+            self._modified[uri][identifier] = value
+
+        self.__update_model_and_restore_selection()
 
     def __delete_tags(self, identifiers):
-        model, paths = self.__file_list.get_selection().get_selected_rows()
-        for path in paths:
-            uri = model[path][0]
-            if not self.__tracks.has_key(uri):
+        for uri in iter(self._uris):
+            if not self._modified.has_key(uri):
                 # copy-on-write
-                self.__tracks[uri] = deepcopy(library[uri])
+                self._modified[uri] = deepcopy(library[uri])
             for identifier in identifiers:
-                del self.__tracks[uri][identifier]
+                del self._modified[uri][identifier]
 
-        # Update the model and select the tags that survived deletion (i.e.
-        # the standard tags).
-        self.__update_selection()
-        selection = self.__treeview_metadata.get_selection()
-        model = self.__treeview_metadata.get_model()
-        paths = [r.path for r in model if r[0] in identifiers]
-        map(selection.select_path, paths)
+        self.__update_model_and_restore_selection()
 
     def __capitalize(self, identifiers):
         def capitalize(s):
             return re.sub(r"(^|\s)(\S)",
                           lambda m: m.group(1) + m.group(2).upper(), s)
 
-        model, paths = self.__file_list.get_selection().get_selected_rows()
-        for path in paths:
-            uri = model[path][0]
+        for uri in iter(self._uris):
             try:
-                track = self.__tracks[uri]
+                track = self._modified[uri]
             except KeyError:
                 track = library[uri]
             for identifier in identifiers:
-                value = track[identifier]
-                value = capitalize(value)
-
+                value = capitalize(track[identifier])
                 if value != track[identifier]:
-                    if not self.__tracks.has_key(uri):
+                    if not self._modified.has_key(uri):
                         # copy-on-write
-                        self.__tracks[uri] = deepcopy(track)
-                    self.__tracks[uri][identifier] = value
+                        self._modified[uri] = deepcopy(track)
+                    self._modified[uri][identifier] = value
 
-        self.__update_selection()
-        selection = self.__treeview_metadata.get_selection()
-        model = self.__treeview_metadata.get_model()
-        paths = [r.path for r in model if r[0] in identifiers]
-        map(selection.select_path, paths)
+        self.__update_model_and_restore_selection()
 
-    def __set_up_page(self, is_editable):
-        sw = BlaScrolledWindow()
-
-        model = gtk.ListStore(gobject.TYPE_PYOBJECT, gobject.TYPE_PYOBJECT)
-        tv = BlaTreeView(model, is_editable=is_editable)
-
-        tv.set_enable_search(False)
-        tv.set_reorderable(False)
-        tv.set_rubber_banding(True)
-
-        tv.set_property("rules_hint", True)
-        r = gtk.CellRendererText()
-        column = gtk.TreeViewColumn("Name")
-        column.pack_start(r)
-        column.set_cell_data_func(r, self.__cell_data_func_name)
-        tv.append_column(column)
-
-        r = gtk.CellRendererText()
-        r.set_property("ellipsize", pango.ELLIPSIZE_END)
-        column = gtk.TreeViewColumn("Value")
-        column.pack_start(r)
-        column.set_cell_data_func(r, self.__cell_data_func_value)
-        tv.append_column(column)
-
-        if is_editable:
-            r.set_property("editable", True)
-            r.connect("editing_started", tv.editing_started)
-            r.connect("edited", tv.edited, self)
-            tv.connect("popup", self.__popup)
-            tv.connect_object("set_value", BlaTagedit.__set_value, self)
-            tv.connect_object("delete_tags", BlaTagedit.__delete_tags, self)
-
-        sw.add(tv)
-        return sw, tv
-
-    def __popup(self, treeview, event):
+    def __popup(self, event):
         menu = gtk.Menu()
         m = gtk.MenuItem("Add tag...")
         m.connect("activate", self.__add_tag)
         menu.append(m)
 
         try:
-            path, column, x, y = treeview.get_path_at_pos(
-                    *map(int, [event.x, event.y]))
+            path, column, x, y = self._treeview.get_path_at_pos(
+                *map(int, [event.x, event.y]))
         except TypeError:
             pass
         else:
-            model, paths = treeview.get_selection().get_selected_rows()
+            model, paths = self._treeview.get_selection().get_selected_rows()
             identifiers = [model[path][0] for path in paths]
             items = [
                 ("Delete tag", "Delete",
@@ -621,4 +364,78 @@ class BlaTagedit(BlaWindow):
 
         menu.show_all()
         menu.popup(None, None, None, event.button, event.time)
+
+    def __apply(self):
+        if len(self._modified) == 0:
+            return
+
+        self._pb.set_visible(True)
+        unit = 1.0 / len(self._modified)
+        idx = 0
+        succeeded = 0
+        for uri, track in self._modified.iteritems():
+            self._pb.set_fraction(unit * (idx+1))
+            self._pb.set_text(uri)
+            library[uri] = track
+            succeeded += int(track.save())
+            idx += 1
+        self._pb.set_visible(False)
+
+        # TODO: Emit a "metadata_changed" signal so the window can listen for
+        #       the signal and change its title itself.
+        blaplay.bla.window.update_title()
+        from blaplay.blagui.blaplaylist import BlaPlaylistManager
+        BlaPlaylistManager.invalidate_visible_rows()
+        library.update_library()
+
+        self._update_model(self._uris)
+
+        n_modified = len(self._modified)
+        if n_modified > 0 and succeeded != n_modified:
+            blaguiutils.warning_dialog(
+                "Failed to write tags for %d of %d files." %
+                ((n_modified-succeeded), n_modified))
+        self._modified.clear()
+
+    def __undo(self):
+        self._modified.clear()
+        self.__update_model_and_restore_selection()
+
+    def get_control_widget(self):
+        return self.__hbox
+
+class BlaProperties(BlaMetadataViewer):
+    def __init__(self, playlist_manager):
+        super(BlaProperties, self).__init__(is_editable=False,
+                                            playlist_manager=playlist_manager)
+
+    def _populate_model(self, model):
+        def get_value(track, identifier):
+            if not track[identifier] and identifier != MONITORED_DIRECTORY:
+                return None
+            elif identifier == FILESIZE:
+                value = track.get_filesize()
+            elif identifier == MTIME:
+                value = ctime(track[MTIME])
+            elif identifier == LENGTH:
+                value = track.duration
+            elif identifier == BITRATE:
+                value = track.bitrate
+            elif identifier == SAMPLING_RATE:
+                value = track.sampling_rate
+            elif identifier == CHANNELS:
+                value = str(track[CHANNELS])
+            else:
+                value = track[identifier]
+            return value
+
+        tracks = [library[uri] for uri in iter(self._uris)]
+
+        for identifier in IDENTIFIER_PROPERTIES:
+            value = get_value(tracks[0], identifier)
+            for track in tracks[1:]:
+                if value != get_value(track, identifier):
+                    value = None
+                    break
+            model.append([identifier, value])
 

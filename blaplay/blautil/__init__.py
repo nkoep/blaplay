@@ -398,6 +398,31 @@ class BlaOrderedSet(collections.MutableSet):
     def __del__(self):
         self.clear()
 
+class BlaNotifyDict(dict):
+    __slots__ = ("__callbacks")
+
+    def __init__(self, *args, **kwargs):
+        super(BlaNotifyDict, self).__init__(*args, **kwargs)
+        self.__callbacks = []
+
+    def connect(self, callback, user_data=()):
+        self.__callbacks.append((callback, user_data))
+
+    def __notify_wrap(method):
+        def wrapper(self, *args, **kwargs):
+            result = method(self, *args, **kwargs)
+            for callback, user_data in self.__callbacks:
+                callback(self, *user_data)
+            return result
+        return wrapper
+
+    __setitem__ = __notify_wrap(dict.__setitem__)
+    pop = __notify_wrap(dict.pop)
+    popitem = __notify_wrap(dict.popitem)
+    update = __notify_wrap(dict.update)
+    __delitem__ = __notify_wrap(dict.__delitem__)
+    clear = __notify_wrap(dict.clear)
+
 # Note that assignment to an existing key is still possible by deleting the
 # relevant entry first. It's still a decent precautionary measure to avoid
 # accidental overrides of existing keys.
