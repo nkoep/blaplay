@@ -2636,8 +2636,7 @@ class BlaPlaylistManager(gtk.Notebook):
         if uris is None:
             return False
         playlist = cls.__instance.add_playlist(focus=True, name=name)
-        # FIXME: add_tracks doesn't exist anymore!!
-        playlist.add_tracks(uris=uris)
+        playlist.add_items(create_items_from_uris(uris))
         return True
 
     @classmethod
