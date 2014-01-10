@@ -65,7 +65,7 @@ class BlaCellRendererPixbuf(blaguiutils.BlaCellRendererBase):
         return (0, 0, IMAGE_SIZE, height)
 
     def on_render(self, window, widget, background_area, cell_area,
-            expose_area, flags):
+                  expose_area, flags):
         cr = window.cairo_create()
         content = self.get_property("content")
         if isinstance(content, str):
