@@ -104,20 +104,13 @@ class BlaVisualization(gtk.Viewport):
         # that nothing is actually calculated in a visualization element, in
         # turn saving some CPU time. This is not the case if the window is just
         # obscured by another one.
-        cr = self.__drawing_area.window.cairo_create()
-        pc = self.__drawing_area.get_pango_context()
+        drawing_area = self.__drawing_area
         try:
-            self.__spectrum.draw(cr, pc, self.__drawing_area.get_style())
+            self.__spectrum.draw(drawing_area.window.cairo_create(),
+                                 drawing_area.get_pango_context(),
+                                 drawing_area.get_style())
         except AttributeError:
-            fdesc = gtk.widget_get_default_style().font_desc
-            try:
-                layout = self.__layout
-            except AttributeError:
-                layout = self.__layout = pango.Layout(pc)
-            layout.set_font_description(fdesc)
-            cr.move_to(100, 100)
-            layout.set_markup("No visualization available")
-            cr.show_layout(layout)
+            pass
 
     def flush_buffers(self, *args):
         # TODO: Remove this method and every call to it once the buffering
