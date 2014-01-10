@@ -20,7 +20,6 @@ pygtk.require("2.0")
 import gtk
 
 from blaplay.blacore import blaconst
-from blaguiutils import BlaTreeViewBase
 
 # DND constants
 DND_LIBRARY, DND_PLAYLIST, DND_URIS = xrange(3)

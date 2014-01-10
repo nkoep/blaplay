@@ -119,8 +119,11 @@ class BlaCellRenderer(blaguiutils.BlaCellRendererBase):
 
 class BlaTreeView(blaguiutils.BlaTreeViewBase):
     def __init__(self, parent, multicol, browser_id):
-        super(BlaTreeView, self).__init__(
-            multicol=multicol, renderer=0, text_column=1)
+        super(BlaTreeView, self).__init__()
+
+        self.__renderer = 0
+        self.__text_column = 1
+        self.__multicol = multicol
 
         self.__parent = parent
         self.__browser_id = browser_id
@@ -197,6 +200,44 @@ class BlaTreeView(blaguiutils.BlaTreeViewBase):
 
         return False
 
+    def __accept_button_event(self, column, path, event, check_expander):
+        # TODO: get rid of this method and implement it only where necessary
+        #       (i.e. the library browser)
+        if (not blacfg.getboolean("library", "custom.browser") or
+            self.__multicol or self.__renderer is None):
+            return True
+
+        renderer = column.get_cell_renderers()[self.__renderer]
+        model = self.get_model()
+        iterator = model.get_iter(path)
+
+        layout = renderer.get_layout(
+                self, model.get_value(iterator, self.__text_column))
+        width = layout.get_pixel_size()[0]
+        cell_area = self.get_cell_area(path, column)
+        expander_size = self.style_get_property("expander_size")
+
+        # check vertical position of click event
+        if not (event.y >= cell_area.y+PADDING_Y and
+                event.y <= cell_area.y+cell_area.height):
+            return False
+
+        # check for click on expander and if the row has children
+        if (check_expander and
+            event.x >= cell_area.x+PADDING_X-expander_size and
+            event.x <= cell_area.x+PADDING_X and
+            model.iter_has_child(iterator) and
+            event.type not in [gtk.gdk._2BUTTON_PRESS,
+                               gtk.gdk._3BUTTON_PRESS]):
+            return True
+
+        # check for click in the highlighted area
+        if (event.x >= cell_area.x+PADDING_X and
+            event.x <= cell_area.x+width):
+            return True
+
+        return False
+
     def __button_press_event(self, event):
         if self.__browser_id == blaconst.BROWSER_FILESYSTEM:
             return False
@@ -214,6 +255,11 @@ class BlaTreeView(blaguiutils.BlaTreeViewBase):
             action = blacfg.getint("library", "middleclick.action")
 
         path = self.get_path_at_pos(*map(int, [event.x, event.y]))[0]
+        # TODO: remove me
+        if False and not self.__accept_button_event(column, path, event,
+                                          check_expander=(event.button == 1)):
+            self.__allow_selection(True)
+            selection.unselect_all()
 
         # Handle LMB events
         if event.button == 1 and action == blaconst.ACTION_EXPAND_COLLAPSE:

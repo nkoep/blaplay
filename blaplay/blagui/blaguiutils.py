@@ -121,113 +121,47 @@ class BlaCellRendererBase(gtk.GenericCellRenderer):
 
 class BlaTreeViewBase(gtk.TreeView):
     __gsignals__ = {
-        "popup": blautil.signal(1)
+        "popup": blautil.signal(1),
     }
 
     def __init__(self, *args, **kwargs):
-        self.__multicol = kwargs.pop("multicol", False)
-        self.__renderer = kwargs.pop("renderer", None)
-        self.__text_column = kwargs.pop("text_column", None)
         # TODO: rename to __empty_selection_allowed
         self.__allow_no_selection = kwargs.pop("allow_no_selection", True)
         set_button_event_handlers = kwargs.pop(
             "set_button_event_handlers", True)
-
+        kwargs.pop("multicol", None) # TODO: Remove this.
         super(BlaTreeViewBase, self).__init__(*args, **kwargs)
 
         self.set_enable_search(False)
+        self.set_property("rules_hint", True)
+        self.set_rubber_banding(True)
         self.get_selection().set_mode(gtk.SELECTION_MULTIPLE)
 
-        self.__pending = False
         if set_button_event_handlers:
-            self.connect_object("button_press_event",
-                                BlaTreeViewBase.__button_press_event, self)
+            self.connect("button_press_event", self._button_press_event)
             self.connect_object("button_release_event",
                                 BlaTreeViewBase.__button_release_event, self)
+            self.__pending_event = None
 
-        # Hook up signals for drag and drop.
         def drag_begin(treeview, context):
             context.set_icon_stock(gtk.STOCK_DND, 0, 0)
-            self.__dragging = True
         self.connect_after("drag_begin", drag_begin)
         def drag_failed(treeview, context, result):
-            self.__drag_aborted = True
-            self.__allow_selection(True)
-            # Eat the animation event in case a receiver rejects the drop.
             return True
         self.connect("drag_failed", drag_failed)
-        def drag_end(treeview, context):
-            self.__allow_selection(True)
-            self.__dragging = False
-        self.connect("drag_end", drag_end)
-        self.__dragging = False
-        self.__drag_aborted = False
 
     def __allow_selection(self, yes):
         self.get_selection().set_select_function(lambda *x: yes)
 
-    def __accept_button_event(self, column, path, event, check_expander):
-        # TODO: get rid of this method and implement it only where necessary
-        #       (i.e. the library browser)
-        if (not blacfg.getboolean("library", "custom.browser") or
-            self.__multicol or self.__renderer is None):
+    def _button_press_event(self, treeview, event):
+        if event.button not in (1, 2, 3):
             return True
 
-        renderer = column.get_cell_renderers()[self.__renderer]
-        model = self.get_model()
-        iterator = model.get_iter(path)
-
-        layout = renderer.get_layout(
-                self, model.get_value(iterator, self.__text_column))
-        width = layout.get_pixel_size()[0]
-        cell_area = self.get_cell_area(path, column)
-        expander_size = self.style_get_property("expander_size")
-
-        # check vertical position of click event
-        if not (event.y >= cell_area.y+PADDING_Y and
-                event.y <= cell_area.y+cell_area.height):
-            return False
-
-        # check for click on expander and if the row has children
-        if (check_expander and
-            event.x >= cell_area.x+PADDING_X-expander_size and
-            event.x <= cell_area.x+PADDING_X and
-            model.iter_has_child(iterator) and
-            event.type not in [gtk.gdk._2BUTTON_PRESS,
-                               gtk.gdk._3BUTTON_PRESS]):
-            return True
-
-        # check for click in the highlighted area
-        if (event.x >= cell_area.x+PADDING_X and
-            event.x <= cell_area.x+width):
-            return True
-
-        return False
-
-    # DND with multiple selection in gtk is a real pain. The problem boils down
-    # to the fact that the default handler for "button_press_event" immediately
-    # unselects the current selection. This makes it annoyingly difficult to
-    # distinguish between a regular button click which should just select a row
-    # in the treeview and the initiation of a DND operation.
-    def __button_press_event(self, event):
-        # Never block on double or triple click events.
-        if (event.type == gtk.gdk._2BUTTON_PRESS or
-            event.type == gtk.gdk._3BUTTON_PRESS):
-            self.__allow_selection(True)
-            return False
-
-        if event.button not in [1, 2, 3]:
-            return True
-
-        self.grab_focus()
         selection = self.get_selection()
-
+        x, y = map(int, [event.x, event.y])
         try:
-            path, column = self.get_path_at_pos(
-                *map(int, [event.x, event.y]))[:2]
+            path, column = self.get_path_at_pos(x, y)[:2]
         except TypeError:
-            # If the click event didn't hit a row check if we allow deselecting
-            # all rows in the view and do so if we do.
             if self.__allow_no_selection:
                 self.__allow_selection(True)
                 selection.unselect_all()
@@ -235,59 +169,48 @@ class BlaTreeViewBase(gtk.TreeView):
                     self.emit("popup", event)
             return True
 
-        # TODO: remove me
-        if not self.__accept_button_event(column, path, event,
-                                          check_expander=(event.button== 1)):
-            self.__allow_selection(True)
-            selection.unselect_all()
-
-        path_selected = selection.path_is_selected(path)
-        mod_active = event.get_state() & (
-            gtk.gdk.CONTROL_MASK | gtk.gdk.SHIFT_MASK)
+        self.grab_focus()
 
         if event.button == 1:
-            # The __pending variable is used to signal to the button release
-            # event handler that a normal button press event (no modifier)
-            # occured on an already selected path. This is the situation at the
-            # beginning of a DND operation. In this case we have to disallow
-            # that the default button press handler selects the clicked path,
-            # hence the negation of __pending when calling __allow_selection().
-            self.__pending = path_selected and not mod_active
-            self.__allow_selection(not self.__pending)
-
+            if (selection.path_is_selected(path) and
+                not event.get_state() & (gtk.gdk.CONTROL_MASK |
+                                         gtk.gdk.SHIFT_MASK)):
+                self.__pending_event = (x, y)
+                self.__allow_selection(False)
+            elif event.type == gtk.gdk.BUTTON_PRESS:
+                self.__pending_event = None
+                self.__allow_selection(True)
         elif event.button == 3:
-            self.__allow_selection(True)
-            if not path_selected:
-                self.set_cursor(path, column, 0)
+            if selection.path_is_selected(path):
+                column.focus_cell(column.get_cells()[0])
             else:
-                column.focus_cell(column.get_cell_renderers()[0])
+                self.set_cursor(path, column)
             self.emit("popup", event)
             return True
 
         return False
 
     def __button_release_event(self, event):
-        if event.button not in [1, 2, 3]:
+        if event.button not in (1, 2, 3):
             return True
 
-        self.__allow_selection(True)
-
-        if (not self.__pending or self.__dragging or
-            self.is_rubber_banding_active()):
-            return False
-
-        # Ignore button release events after aborted DND operations.
-        if self.__drag_aborted:
-            self.__drag_aborted = False
-            return False
-        try:
-            path, column = self.get_path_at_pos(
-                *map(int, [event.x, event.y]))[:2]
+        if self.__pending_event is not None:
+            self.__allow_selection(True)
+            x_old, y_old = self.__pending_event
+            self.__pending_event = None
+            x, y = map(int, [event.x, event.y])
+            threshold = gtk.settings_get_default().get_property(
+                "gtk_dnd_drag_threshold")
+            # This check is necessary because we use the generic
+            # `drag_source_set' method family of gtk.Widget instead of the
+            # gtk.TreeView-specific `enable_model_drag_source'. Without it,
+            # double- and triple-click events may initiate DND operations even
+            # though the user is not holding a mouse button.
+            if abs(x_old-x) > threshold or abs(y_old-y) > threshold:
+                return True
+            try:
+                path, column = self.get_path_at_pos(x, y)[:2]
+            except TypeError:
+                return True
             self.set_cursor(path, column, 0)
-        except TypeError:
-            pass
-
-        self.__pending = False
-
-        return False
 
