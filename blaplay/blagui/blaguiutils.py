@@ -92,6 +92,8 @@ def set_visible(state):
     map(f, BlaWindow.instances)
 
 
+# TODO: Call `set_default_response()' on these dialogs with a suitable response
+#       id.
 class BlaDialog(gtk.Dialog):
     def __init__(self, *args, **kwargs):
         kwargs["parent"] = kwargs.get("parent", None) or blaplay.bla.window

@@ -683,10 +683,11 @@ class BlaListItem(object):
         BlaPlaylistManager.play_item(self)
 
     def select(self):
-        if self.playlist:
-            if BlaPlaylistManager.get_current_playlist() != self.playlist:
-                BlaPlaylistManager.focus_playlist(self.playlist)
-            self.playlist.set_row(self.playlist.get_path_from_item(self))
+        if not self.playlist:
+            return
+        if BlaPlaylistManager.get_current_playlist() != self.playlist:
+            BlaPlaylistManager.focus_playlist(self.playlist)
+        self.playlist.set_row(self.playlist.get_path_from_item(self))
 
     def clear_icon(self):
         if self.playlist:
@@ -1297,8 +1298,7 @@ class BlaPlaylist(gtk.VBox):
 
         path = self.get_path_from_item(scroll_item)
         if path and model.get_iter_first():
-            self.set_row(path, row_align=row_align, keep_selection=True,
-                         set_cursor=False)
+            self.__scroll_to_cell(path, row_align=row_align)
 
         # Set sort indicators if necessary.
         try:
@@ -1490,6 +1490,15 @@ class BlaPlaylist(gtk.VBox):
                 callback()
                 break
         return False
+
+    def __scroll_to_cell(self, path, row_align):
+        try:
+            low, high = self.__treeview.get_visible_range()
+        except TypeError:
+            low = high = None
+        if low is None or not (low <= path <= high):
+            self.__treeview.scroll_to_cell(
+                path, use_align=True, row_align=row_align)
 
     def get_header_box(self):
         return self.__header_box
@@ -1739,9 +1748,9 @@ class BlaPlaylist(gtk.VBox):
         if select_rows:
             selection = self.__treeview.get_selection()
             selection.unselect_all()
-            selection.select_range(path, (path[0] + len(items) - 1,))
-            self.set_row(self.get_path_from_item(scroll_item), row_align=1.0,
-                         keep_selection=True)
+            paths = [(p,) for p in xrange(path[0], path[0]+len(items))]
+            self.set_row(self.get_path_from_item(scroll_item), paths,
+                         row_align=1.0)
 
         self.__thaw_treeview()
         BlaPlaylistManager.update_statusbar()
@@ -2154,43 +2163,19 @@ class BlaPlaylist(gtk.VBox):
             return
         self.set_row(self.get_path_from_item(current))
 
-    def set_row(self, path, row_align=0.5, keep_selection=False,
-                set_cursor=True):
-        # FIXME: There's a serious issue here. This method often gets called
-        #        with keep_selection=True after a set of paths has been
-        #        selected. Since the call to gtk.TreeView.set_cursor unsets
-        #        the selection, we save the selected paths, set the cursor and
-        #        then select the remaining paths again. Long story short, we
-        #        often select rows just to unselect and select them again in
-        #        this method. Since this method doesn't mutate the model we
-        #        can drop the `keep_selection' argument for a new paths=[]
-        #        kwarg.
-
+    def set_row(self, path, paths=[], row_align=0.5):
         # Wrap the actual heavy lifting in gobject.idle_add. If we decorate the
         # instance method itself we can't use kwargs anymore which is rather
-        # annoying for this particular method due to the number of arguments.
-        @blautil.idle(priority=gobject.PRIORITY_HIGH)
+        # annoying for this particular method.
+        @blautil.idle
         def set_row():
-            try:
-                low, high = self.__treeview.get_visible_range()
-            except TypeError:
-                low, high = None, None
-            if low is None or not (low <= path <= high):
-                self.__treeview.scroll_to_cell(
-                    path, use_align=True, row_align=row_align)
-
-            if keep_selection:
-                paths = self.get_selected_paths()
-            else:
-                paths = []
-            if set_cursor:
+            if path is not None:
+                self.__scroll_to_cell(path, row_align)
                 self.__treeview.set_cursor(path)
             if paths:
                 select_path = self.__treeview.get_selection().select_path
                 map(select_path, paths)
-
-        if path:
-            set_row()
+        set_row()
 
     def get_selected_uris(self):
         paths = self.get_selected_paths()
