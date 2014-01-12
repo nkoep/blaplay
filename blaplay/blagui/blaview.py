@@ -635,6 +635,9 @@ class BlaView(gtk.HPaned):
 
         for view in self.__views:
             view.connect("count_changed", self.__side_pane.update_count)
+        # We have to defer initialization until all count_changed signal
+        # handlers have been hooked up.
+        for view in self.__views:
             view.init()
 
         self.show()
