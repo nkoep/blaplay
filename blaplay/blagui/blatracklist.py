@@ -197,11 +197,12 @@ def update_columns(treeview, view_id):
 def popup(treeview, event, view_id, target):
     from blaplaylist import BlaPlaylistManager
     from blaqueue import BlaQueue
+    queue = BlaQueue()
 
     if view_id == blaconst.VIEW_PLAYLISTS:
         element = BlaPlaylistManager
     elif view_id == blaconst.VIEW_QUEUE:
-        element = BlaQueue
+        element = queue
 
     accel_group = ui_manager.get_accel_group()
 
@@ -604,12 +605,14 @@ class BlaColumn(gtk.TreeViewColumn):
 
     def __cell_data_func(self, column, renderer, model, iterator, column_id):
         item = model[iterator][0]
-        from blaqueue import BlaQueue
 
         if column_id == COLUMN_QUEUE_POSITION:
             text = "%02d" % int(model[iterator][1])
         elif column_id == COLUMN_PLAYING:
-            pos = BlaQueue.get_queue_positions(item)
+            # FIXME: Get rid of the import overhead.
+            from blaqueue import BlaQueue
+            queue = BlaQueue()
+            pos = queue.get_queue_positions(item)
             text = "(%s)" % (", ".join(pos)) if pos else ""
         else:
             text = self.__cb(item.track)

@@ -42,6 +42,7 @@ class BlaUIManager(gtk.UIManager):
     def update_menu(self, view):
         from blaplaylist import BlaPlaylistManager
         from blaqueue import BlaQueue
+        queue = BlaQueue()
 
         state = view == blaconst.VIEW_PLAYLISTS
         for entry in blaconst.MENU_PLAYLISTS:
@@ -53,7 +54,7 @@ class BlaUIManager(gtk.UIManager):
                 clipboard = BlaPlaylistManager.clipboard
                 label = "playlist"
             else:
-                clipboard = BlaQueue.clipboard
+                clipboard = queue.clipboard
                 label = "queue"
 
             self.get_widget("/Menu/Edit/Clear").set_label("Clear %s" % label)

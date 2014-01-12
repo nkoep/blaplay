@@ -141,7 +141,7 @@ class BlaTreeView(blaguiutils.BlaTreeViewBase):
         self.connect_object("popup", BlaTreeView.__popup_menu, self)
 
     def __send_to_queue(self):
-        count = blaconst.QUEUE_MAX_ITEMS - queue.queue_n_items()
+        count = blaconst.QUEUE_MAX_ITEMS - queue.n_items
         tracks = self.get_tracks(count=count)
         queue.queue_items(tracks)
 

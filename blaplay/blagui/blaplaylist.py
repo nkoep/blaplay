@@ -38,10 +38,10 @@ from blatracklist import (
     COLUMN_ALBUM_ARTIST, COLUMN_YEAR, COLUMN_GENRE, COLUMN_FORMAT,
     COLUMN_ARTIST, COLUMN_ALBUM, update_columns, parse_track_list_stats, popup,
     BlaTreeView, BlaEval, BlaTrackListItem)
-from blaqueue import BlaQueue
 from blaplay.blautil import blafm
 from blastatusbar import BlaStatusbar
 import blaview
+import blaqueue
 import blaguiutils
 
 MODE_NORMAL, MODE_SORTED, MODE_FILTERED = 1 << 0, 1 << 1, 1 << 2
@@ -1175,17 +1175,17 @@ class BlaPlaylist(gtk.VBox):
         BlaPlaylistManager.focus_playlist(playlist)
 
     def send_to_queue(self):
-        queue_n_items = BlaQueue.queue_n_items()
+        queue_n_items = queue.n_items
         if queue_n_items >= blaconst.QUEUE_MAX_ITEMS:
             return
 
         count = blaconst.QUEUE_MAX_ITEMS - queue_n_items
         model, selection = self.__treeview.get_selection().get_selected_rows()
-        BlaQueue.queue_items([model[path][0] for path in selection[:count]])
+        queue.queue_items([model[path][0] for path in selection[:count]])
 
     def remove_from_queue(self, treeview):
         model, selection = treeview.get_selection().get_selected_rows()
-        BlaQueue.remove_items([model[path][0] for path in selection])
+        queue.remove_items([model[path][0] for path in selection])
 
     def jump_to_playing_track(self):
         current = BlaPlaylistManager.current
@@ -1691,7 +1691,7 @@ class BlaPlaylistManager(gtk.Notebook):
                 uris.update(playlist.get_uris(all_=True))
             library.save_ool_tracks(uris)
             blautil.serialize_to_file(
-                (playlists, active_playlist, current, BlaQueue.get_queue()),
+                (playlists, active_playlist, current, queue.get_queue()),
                 blaconst.PLAYLISTS_PATH)
         else:
             save(path, type_)
@@ -1700,7 +1700,7 @@ class BlaPlaylistManager(gtk.Notebook):
         print_i("Restoring playlists")
 
         try:
-            playlists, active_playlist, current, queue = (
+            playlists, active_playlist, current, queued_items = (
                 blautil.deserialize_from_file(blaconst.PLAYLISTS_PATH))
         except (TypeError, ValueError):
             playlists = []
@@ -1715,7 +1715,7 @@ class BlaPlaylistManager(gtk.Notebook):
             if current is not None:
                 type(self).current = playlist.get_item_from_path(current)
                 self.current.select()
-            BlaQueue.restore(queue)
+            queue.restore(queued_items)
         else:
             self.add_playlist()
 
@@ -1954,7 +1954,7 @@ class BlaPlaylistManager(gtk.Notebook):
 
         item = None
         if choice not in [blaconst.TRACK_PREVIOUS, blaconst.TRACK_RANDOM]:
-            item = BlaQueue.get_item()
+            item = queue.get_item()
 
         if item is None:
             playlist = self.get_active_playlist()
@@ -1996,4 +1996,9 @@ class BlaPlaylistManager(gtk.Notebook):
         if (blacfg.getint("general", "view") == blaconst.VIEW_PLAYLISTS and
             playlist == cls.get_current_playlist()):
             playlist.jump_to_playing_track()
+
+# Defer constructing the queue instance until the BlaPlaylistManager class
+# object has been defined. This is necessary right now because the queue in
+# turn requires an instance of the playlist manager in its c'tor.
+queue = blaqueue.BlaQueue()
 

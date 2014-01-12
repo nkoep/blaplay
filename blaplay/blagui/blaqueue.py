@@ -32,6 +32,7 @@ from blatracklist import (
     update_columns, parse_track_list_stats, BlaTreeView, BlaTrackListItem)
 from blastatusbar import BlaStatusbar
 from blaview import BlaViewMeta
+import blaplaylist
 
 
 class BlaQueue(BlaScrolledWindow):
@@ -41,20 +42,17 @@ class BlaQueue(BlaScrolledWindow):
         gobject.TYPE_PYOBJECT,  # An instance of BlaTrackListItem
         gobject.TYPE_STRING     # Position in the queue
     )
-    __instance = None
-    __size = 0
-    __length = 0
-
-    clipboard = []
 
     def __init__(self):
         super(BlaQueue, self).__init__()
-        type(self).__instance = self
 
-        from blaplaylist import BlaPlaylistManager
-        type(self).__playlist_manager = BlaPlaylistManager()
+        self.__size = 0
+        self.__length = 0
+        self.clipboard = []
 
-        type(self).__treeview = BlaTreeView(view_id=blaconst.VIEW_QUEUE)
+        self.__playlist_manager = blaplaylist.BlaPlaylistManager()
+
+        self.__treeview = BlaTreeView(view_id=blaconst.VIEW_QUEUE)
         self.__treeview.set_model(gtk.ListStore(*self.__layout))
         self.__treeview.set_enable_search(False)
         self.__treeview.set_property("rules_hint", True)
@@ -136,9 +134,8 @@ class BlaQueue(BlaScrolledWindow):
         map(move_func, iterators)
         self.update_queue_positions()
 
-    @classmethod
-    def __add_items(cls, items, path=None, select_rows=False):
-        treeview = cls.__treeview
+    def __add_items(self, items, path=None, select_rows=False):
+        treeview = self.__treeview
         model = treeview.get_model()
         iterator = None
 
@@ -147,7 +144,7 @@ class BlaQueue(BlaScrolledWindow):
                 path == -1):
                 raise TypeError
             if not path:
-                path, column = cls.__treeview.get_cursor()
+                path, column = treeview.get_cursor()
         except TypeError:
             path = (len(model),)
             append = model.append
@@ -162,18 +159,17 @@ class BlaQueue(BlaScrolledWindow):
             iterator = insert_func(iterator, [item, None])
 
         if select_rows:
-            cls.__treeview.freeze_notify()
-            selection = cls.__treeview.get_selection()
+            treeview.freeze_notify()
+            selection = treeview.get_selection()
             selection.unselect_all()
             select_path = selection.select_path
             map(select_path, xrange(path[0], path[0] + len(items)))
-            cls.__treeview.thaw_notify()
+            treeview.thaw_notify()
 
-        cls.update_queue_positions()
+        self.update_queue_positions()
 
-    @classmethod
-    def __get_items(cls, remove=True):
-        treeview = cls.__treeview
+    def __get_items(self, remove=True):
+        treeview = self.__treeview
         model, selections = treeview.get_selection().get_selected_rows()
         if selections:
             get_iter = model.get_iter
@@ -182,7 +178,7 @@ class BlaQueue(BlaScrolledWindow):
             if remove:
                 remove = model.remove
                 map(remove, iterators)
-                cls.update_queue_positions()
+                self.update_queue_positions()
             return items
         return []
 
@@ -203,9 +199,8 @@ class BlaQueue(BlaScrolledWindow):
             info = parse_track_list_stats(count, self.__size, self.__length)
         BlaStatusbar.set_view_info(blaconst.VIEW_QUEUE, info)
 
-    @classmethod
-    def select(cls, type_):
-        treeview = cls.__treeview
+    def select(self, type_):
+        treeview = self.__treeview
         selection = treeview.get_selection()
         model, selected_paths = selection.get_selected_rows()
 
@@ -244,9 +239,8 @@ class BlaQueue(BlaScrolledWindow):
         select_path = selection.select_path
         map(select_path, paths)
 
-    @classmethod
-    def update_queue_positions(cls):
-        model = cls.__treeview.get_model()
+    def update_queue_positions(self):
+        model = self.__treeview.get_model()
 
         # Update the position labels for our own treeview.
         for idx, row in enumerate(model):
@@ -254,26 +248,24 @@ class BlaQueue(BlaScrolledWindow):
 
         # Invalidate the visible rows of the current playlists so the
         # position labels also get updated in playlists.
-        playlist = cls.__playlist_manager.get_current_playlist()
+        playlist = self.__playlist_manager.get_current_playlist()
         playlist.invalidate_visible_rows()
 
         # Calculate size and length of the queue and update the statusbar.
-        cls.__size = cls.__length = 0
+        size = length = 0
         for row in model:
             track = row[0].track
-            cls.__size += track[FILESIZE]
-            cls.__length += track[LENGTH]
-        cls.__instance.emit("count_changed", blaconst.VIEW_QUEUE,
-                            cls.queue_n_items())
-        cls.__instance.update_statusbar()
+            size += track[FILESIZE]
+            length += track[LENGTH]
+        self.__size, self.__length = size, length
+        self.emit("count_changed", blaconst.VIEW_QUEUE, self.n_items)
+        self.update_statusbar()
 
-    @classmethod
-    def get_queue_positions(cls, item):
-        model = cls.__treeview.get_model()
+    def get_queue_positions(self, item):
+        model = self.__treeview.get_model()
         return [row[1] for row in model if row[0] == item]
 
-    @classmethod
-    def queue_items(cls, items):
+    def queue_items(self, items):
         if not items:
             return
 
@@ -283,25 +275,23 @@ class BlaQueue(BlaScrolledWindow):
         if not isinstance(items[0], BlaTrackListItem):
             items = map(BlaTrackListItem, items)
 
-        count = blaconst.QUEUE_MAX_ITEMS - cls.queue_n_items()
-        cls.__add_items(items[:count], path=-1)
+        count = blaconst.QUEUE_MAX_ITEMS - self.n_items
+        self.__add_items(items[:count], path=-1)
 
-    @classmethod
-    def remove_items(cls, items):
+    def remove_items(self, items):
         # This is invoked by playlists who want to remove tracks from the
         # queue.
-        model = cls.__treeview.get_model()
+        model = self.__treeview.get_model()
         for row in model:
             if row[0] in items:
                 model.remove(row.iter)
-        cls.update_queue_positions()
+        self.update_queue_positions()
 
-    @classmethod
-    def get_queue(cls):
+    def get_queue(self):
         queue = []
-        playlists = cls.__playlist_manager.get_playlists()
+        playlists = self.__playlist_manager.get_playlists()
 
-        for row in cls.__treeview.get_model():
+        for row in self.__treeview.get_model():
             item = row[0]
             playlist = item.playlist
 
@@ -317,14 +307,13 @@ class BlaQueue(BlaScrolledWindow):
 
         return queue
 
-    @classmethod
-    def restore(cls, items):
+    def restore(self, items):
         print_i("Restoring the play queue")
 
         if not items:
             return
 
-        playlists = cls.__playlist_manager.get_playlists()
+        playlists = self.__playlist_manager.get_playlists()
 
         for idx, item in enumerate(items):
             try:
@@ -336,70 +325,62 @@ class BlaQueue(BlaScrolledWindow):
                 item = playlists[playlist_idx].get_item_from_path(path)
             items[idx] = item
 
-        cls.queue_items(items)
+        self.queue_items(items)
 
-    @classmethod
-    def cut(cls, *args):
-        cls.clipboard = cls.__get_items(remove=True)
+    def cut(self, *args):
+        self.clipboard = self.__get_items(remove=True)
         ui_manager.update_menu(blaconst.VIEW_QUEUE)
 
-    @classmethod
-    def copy(cls, *args):
+    def copy(self, *args):
         # We specifically don't create actual copies of items here as it's not
         # desired to have unique ones in the queue. Copied and pasted tracks
         # should still refer to the same BlaTrackListItem instances which are
         # possibly part of a playlist.
-        cls.clipboard = cls.__get_items(remove=False)
+        self.clipboard = self.__get_items(remove=False)
         ui_manager.update_menu(blaconst.VIEW_QUEUE)
 
-    @classmethod
-    def paste(cls, *args, **kwargs):
-        cls.__add_items(items=cls.clipboard, select_rows=True)
+    def paste(self, *args, **kwargs):
+        self.__add_items(items=self.clipboard, select_rows=True)
 
-    @classmethod
-    def remove(cls, *args):
-        cls.__get_items(remove=True)
+    def remove(self, *args):
+        self.__get_items(remove=True)
 
-    @classmethod
-    def remove_duplicates(cls):
+    def remove_duplicates(self):
         unique = set()
-        model = cls.__treeview.get_model()
+        model = self.__treeview.get_model()
         for row in model:
             uri = row[0].uri
             if uri not in unique:
                 unique.add(uri)
             else:
                 model.remove(row.iter)
-        cls.update_queue_positions()
+        self.update_queue_positions()
 
-    @classmethod
-    def remove_invalid_tracks(cls):
-        model = cls.__treeview.get_model()
+    def remove_invalid_tracks(self):
+        model = self.__treeview.get_model()
         isfile = os.path.isfile
 
         for row in model:
             uri = row[0].uri
             if not isfile(uri):
                 model.remove(row.iter)
-        cls.update_queue_positions()
+        self.update_queue_positions()
 
-    @classmethod
-    def clear(cls):
-        cls.__treeview.get_model().clear()
-        cls.update_queue_positions()
+    def clear(self):
+        self.__treeview.get_model().clear()
+        self.update_queue_positions()
 
-    @classmethod
-    def get_item(cls):
-        model = cls.__treeview.get_model()
+    def get_item(self):
+        model = self.__treeview.get_model()
         iterator = model.get_iter_first()
         if iterator:
             item = model[iterator][0]
             model.remove(iterator)
-            cls.update_queue_positions()
+            self.update_queue_positions()
             return item
         return None
 
-    @classmethod
-    def queue_n_items(cls):
-        return len(cls.__treeview.get_model())
+    @property
+    def n_items(self):
+        return len(self.__treeview.get_model())
 
