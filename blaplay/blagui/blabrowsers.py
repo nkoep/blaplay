@@ -34,6 +34,7 @@ from blaplay.formats._identifiers import *
 from blawindows import BlaScrolledWindow
 from blaplaylist import BlaPlaylistManager
 from blaqueue import BlaQueue
+queue = BlaQueue()
 import blaguiutils
 
 
@@ -140,9 +141,9 @@ class BlaTreeView(blaguiutils.BlaTreeViewBase):
         self.connect_object("popup", BlaTreeView.__popup_menu, self)
 
     def __send_to_queue(self):
-        count = blaconst.QUEUE_MAX_ITEMS - BlaQueue.queue_n_items()
+        count = blaconst.QUEUE_MAX_ITEMS - queue.queue_n_items()
         tracks = self.get_tracks(count=count)
-        BlaQueue.queue_items(tracks)
+        queue.queue_items(tracks)
 
     def get_tracks(self, count=-1):
         def get_children(model, iterator):

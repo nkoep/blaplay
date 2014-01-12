@@ -1675,6 +1675,7 @@ class BlaPlaylistManager(gtk.Notebook):
                 cls.__save_m3u(uris, path, relative)
 
         if path is None:
+            # TODO: Save the queue individually.
             print_i("Saving playlists")
             playlists = cls.get_playlists()
 

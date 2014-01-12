@@ -43,20 +43,21 @@ class BlaUIManager(gtk.UIManager):
         from blaplaylist import BlaPlaylistManager
         from blaqueue import BlaQueue
 
-        state = False
-        if view == blaconst.VIEW_PLAYLISTS:
-            state = True
-
-        # TODO: Update the "Clear" label for the playlist or queue.
+        state = view == blaconst.VIEW_PLAYLISTS
         for entry in blaconst.MENU_PLAYLISTS:
             self.get_widget(entry).set_visible(state)
 
-        if view in [blaconst.VIEW_PLAYLISTS, blaconst.VIEW_QUEUE]:
-            clipboard = (BlaPlaylistManager.clipboard
-                         if view == blaconst.VIEW_PLAYLISTS
-                         else BlaQueue.clipboard)
+        state = True
+        if view in (blaconst.VIEW_PLAYLISTS, blaconst.VIEW_QUEUE):
+            if view == blaconst.VIEW_PLAYLISTS:
+                clipboard = BlaPlaylistManager.clipboard
+                label = "playlist"
+            else:
+                clipboard = BlaQueue.clipboard
+                label = "queue"
+
+            self.get_widget("/Menu/Edit/Clear").set_label("Clear %s" % label)
             self.get_widget("/Menu/Edit/Paste").set_sensitive(bool(clipboard))
-            state = True
         else:
             state = False
 

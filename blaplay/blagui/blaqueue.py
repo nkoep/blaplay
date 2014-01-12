@@ -324,10 +324,9 @@ class BlaQueue(BlaScrolledWindow):
         if not items:
             return
 
-        items_ = []
         playlists = cls.__playlist_manager.get_playlists()
 
-        for item in items:
+        for idx, item in enumerate(items):
             try:
                 playlist_idx, path = item
             except ValueError:
@@ -335,10 +334,9 @@ class BlaQueue(BlaScrolledWindow):
                 item = BlaTrackListItem(item)
             else:
                 item = playlists[playlist_idx].get_item_from_path(path)
+            items[idx] = item
 
-            items_.append(item)
-
-        cls.queue_items(items_)
+        cls.queue_items(items)
 
     @classmethod
     def cut(cls, *args):
