@@ -14,6 +14,7 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
+import os
 import cPickle as pickle
 import re
 
@@ -26,6 +27,9 @@ from blaplay.blacore import blaconst, blacfg
 from blaplay import blagui
 from blaplay.formats._identifiers import *
 from blawindows import BlaScrolledWindow
+from blatracklist import (
+    COLUMN_ARTIST, COLUMN_ALBUM, COLUMN_ALBUM_ARTIST, COLUMN_GENRE, popup,
+    update_columns, parse_track_list_stats, BlaTreeView, BlaTrackListItem)
 from blastatusbar import BlaStatusbar
 from blaview import BlaViewMeta
 
@@ -34,7 +38,7 @@ class BlaQueue(BlaScrolledWindow):
     __metaclass__ = BlaViewMeta("Queue")
 
     __layout = (
-        gobject.TYPE_PYOBJECT,  # An instance of BlaListItem
+        gobject.TYPE_PYOBJECT,  # An instance of BlaTrackListItem
         gobject.TYPE_STRING     # Position in the queue
     )
     __instance = None
@@ -47,8 +51,7 @@ class BlaQueue(BlaScrolledWindow):
         super(BlaQueue, self).__init__()
         type(self).__instance = self
 
-        from blaplaylist import (BlaPlaylistManager, BlaTreeView, popup,
-                                 update_columns)
+        from blaplaylist import BlaPlaylistManager
         type(self).__playlist_manager = BlaPlaylistManager()
 
         type(self).__treeview = BlaTreeView(view_id=blaconst.VIEW_QUEUE)
@@ -197,15 +200,11 @@ class BlaQueue(BlaScrolledWindow):
         if count == 0:
             info = ""
         else:
-            from blaplaylist import parse_playlist_stats
-            info = parse_playlist_stats(count, self.__size, self.__length)
+            info = parse_track_list_stats(count, self.__size, self.__length)
         BlaStatusbar.set_view_info(blaconst.VIEW_QUEUE, info)
 
     @classmethod
     def select(cls, type_):
-        from blaplaylist import (COLUMN_ARTIST, COLUMN_ALBUM,
-                                 COLUMN_ALBUM_ARTIST, COLUMN_GENRE)
-
         treeview = cls.__treeview
         selection = treeview.get_selection()
         model, selected_paths = selection.get_selected_rows()
@@ -278,13 +277,11 @@ class BlaQueue(BlaScrolledWindow):
         if not items:
             return
 
-        from blaplaylist import BlaListItem
-
-        # If any of the items is not an instance of BlaListItem it means all of
-        # the items are actually just URIs which stem from the library browser
-        # and are not part of a playlist.
-        if not isinstance(items[0], BlaListItem):
-            items = map(BlaListItem, items)
+        # If any of the items is not an instance of BlaTrackListItem it means
+        # all of the items are actually just URIs which stem from the library
+        # browser and are not part of a playlist.
+        if not isinstance(items[0], BlaTrackListItem):
+            items = map(BlaTrackListItem, items)
 
         count = blaconst.QUEUE_MAX_ITEMS - cls.queue_n_items()
         cls.__add_items(items[:count], path=-1)
@@ -327,8 +324,6 @@ class BlaQueue(BlaScrolledWindow):
         if not items:
             return
 
-        from blaplaylist import BlaListItem
-
         items_ = []
         playlists = cls.__playlist_manager.get_playlists()
 
@@ -337,7 +332,7 @@ class BlaQueue(BlaScrolledWindow):
                 playlist_idx, path = item
             except ValueError:
                 # Library tracks that are not part of a playlist.
-                item = BlaListItem(item)
+                item = BlaTrackListItem(item)
             else:
                 item = playlists[playlist_idx].get_item_from_path(path)
 
@@ -354,7 +349,7 @@ class BlaQueue(BlaScrolledWindow):
     def copy(cls, *args):
         # We specifically don't create actual copies of items here as it's not
         # desired to have unique ones in the queue. Copied and pasted tracks
-        # should still refer to the same BlaListItem instances which are
+        # should still refer to the same BlaTrackListItem instances which are
         # possibly part of a playlist.
         cls.clipboard = cls.__get_items(remove=False)
         ui_manager.update_menu(blaconst.VIEW_QUEUE)
