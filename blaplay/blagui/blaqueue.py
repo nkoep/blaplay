@@ -1,0 +1,412 @@
+# blaplay, Copyright (C) 2014  Niklas Koep
+
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License
+# as published by the Free Software Foundation; either version 2
+# of the License, or (at your option) any later version.
+
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+
+import cPickle as pickle
+import re
+
+import gobject
+import gtk
+
+import blaplay
+ui_manager = blaplay.bla.ui_manager
+from blaplay.blacore import blaconst, blacfg
+from blaplay import blagui
+from blaplay.formats._identifiers import *
+from blawindows import BlaScrolledWindow
+from blastatusbar import BlaStatusbar
+from blaview import BlaViewMeta
+
+
+class BlaQueue(BlaScrolledWindow):
+    __metaclass__ = BlaViewMeta("Queue")
+
+    __layout = (
+        gobject.TYPE_PYOBJECT,  # An instance of BlaListItem
+        gobject.TYPE_STRING     # Position in the queue
+    )
+    __instance = None
+    __size = 0
+    __length = 0
+
+    clipboard = []
+
+    def __init__(self):
+        super(BlaQueue, self).__init__()
+        type(self).__instance = self
+
+        from blaplaylist import (BlaPlaylistManager, BlaTreeView, popup,
+                                 update_columns)
+        type(self).__playlist_manager = BlaPlaylistManager()
+
+        type(self).__treeview = BlaTreeView(view_id=blaconst.VIEW_QUEUE)
+        self.__treeview.set_model(gtk.ListStore(*self.__layout))
+        self.__treeview.set_enable_search(False)
+        self.__treeview.set_property("rules_hint", True)
+
+        self.set_shadow_type(gtk.SHADOW_IN)
+        self.add(self.__treeview)
+
+        self.__treeview.enable_model_drag_dest(
+            [("queue", gtk.TARGET_SAME_WIDGET, 3)], gtk.gdk.ACTION_COPY)
+        self.__treeview.enable_model_drag_source(
+            gtk.gdk.BUTTON1_MASK,
+            [("queue", gtk.TARGET_SAME_WIDGET, 3)],
+            gtk.gdk.ACTION_COPY)
+
+        self.__treeview.connect("popup", popup, blaconst.VIEW_QUEUE, self)
+        self.__treeview.connect("row_activated", self.play_item)
+        self.__treeview.connect(
+            "button_press_event", self.__button_press_event)
+        self.__treeview.connect("key_press_event", self.__key_press_event)
+        self.__treeview.connect("drag_data_get", self.__drag_data_get)
+        self.__treeview.connect("drag_data_received", self.__drag_data_recv)
+
+        update_columns(self.__treeview, view_id=blaconst.VIEW_QUEUE)
+        self.show_all()
+
+    def __button_press_event(self, treeview, event):
+        if (event.button == 2 and
+            event.type not in [gtk.gdk._2BUTTON_PRESS,
+                               gtk.gdk._3BUTTON_PRESS]):
+            self.paste()
+            return True
+
+    def __key_press_event(self, treeview, event):
+        if blagui.is_accel(event, "<Ctrl>X"):
+            self.cut()
+        elif blagui.is_accel(event, "<Ctrl>C"):
+            self.copy()
+        elif blagui.is_accel(event, "<Ctrl>V"):
+            self.paste()
+        elif blagui.is_accel(event, "Delete"):
+            self.remove()
+        return False
+
+    def __drag_data_get(self, treeview, drag_context, selection_data, info,
+                        time):
+        data = pickle.dumps(treeview.get_selection().get_selected_rows()[-1],
+                            pickle.HIGHEST_PROTOCOL)
+        selection_data.set("", 8, data)
+
+    def __drag_data_recv(self, treeview, drag_context, x, y, selection_data,
+                         info, time):
+        drop_info = treeview.get_dest_row_at_pos(x, y)
+        model = self.__treeview.get_model()
+        paths = pickle.loads(selection_data.data)
+
+        # TODO: factor this out so we can use the same for the playlist
+        if drop_info:
+            path, pos = drop_info
+            iterator = model.get_iter(path)
+
+            if (pos == gtk.TREE_VIEW_DROP_BEFORE or
+                pos == gtk.TREE_VIEW_DROP_INTO_OR_BEFORE):
+                move_before = model.move_before
+                def move_func(it):
+                    move_before(it, iterator)
+            else:
+                move_after = model.move_after
+                def move_func(it):
+                    move_after(it, iterator)
+                paths.reverse()
+        else:
+            iterator = None
+            move_before = model.move_before
+            def move_func(it):
+                move_before(it, iterator)
+
+        get_iter = model.get_iter
+        iterators = map(get_iter, paths)
+        map(move_func, iterators)
+        self.update_queue_positions()
+
+    @classmethod
+    def __add_items(cls, items, path=None, select_rows=False):
+        treeview = cls.__treeview
+        model = treeview.get_model()
+        iterator = None
+
+        try:
+            if (not treeview.get_selection().get_selected_rows()[-1] or
+                path == -1):
+                raise TypeError
+            if not path:
+                path, column = cls.__treeview.get_cursor()
+        except TypeError:
+            path = (len(model),)
+            append = model.append
+            def insert_func(iterator, item):
+                append(item)
+        else:
+            iterator = model.get_iter(path)
+            insert_func = model.insert_before
+            items.reverse()
+
+        for item in items:
+            iterator = insert_func(iterator, [item, None])
+
+        if select_rows:
+            cls.__treeview.freeze_notify()
+            selection = cls.__treeview.get_selection()
+            selection.unselect_all()
+            select_path = selection.select_path
+            map(select_path, xrange(path[0], path[0] + len(items)))
+            cls.__treeview.thaw_notify()
+
+        cls.update_queue_positions()
+
+    @classmethod
+    def __get_items(cls, remove=True):
+        treeview = cls.__treeview
+        model, selections = treeview.get_selection().get_selected_rows()
+        if selections:
+            get_iter = model.get_iter
+            iterators = map(get_iter, selections)
+            items = [model[iterator][0] for iterator in iterators]
+            if remove:
+                remove = model.remove
+                map(remove, iterators)
+                cls.update_queue_positions()
+            return items
+        return []
+
+    def play_item(self, treeview, path, column=None):
+        model = treeview.get_model()
+        iterator = model.get_iter(path)
+        model[iterator][0].play()
+        if blacfg.getboolean("general", "queue.remove.when.activated"):
+            model.remove(iterator)
+            self.update_queue_positions()
+
+    def update_statusbar(self):
+        model = self.__treeview.get_model()
+        count = len(model)
+        if count == 0:
+            info = ""
+        else:
+            from blaplaylist import parse_playlist_stats
+            info = parse_playlist_stats(count, self.__size, self.__length)
+        BlaStatusbar.set_view_info(blaconst.VIEW_QUEUE, info)
+
+    @classmethod
+    def select(cls, type_):
+        from blaplaylist import (COLUMN_ARTIST, COLUMN_ALBUM,
+                                 COLUMN_ALBUM_ARTIST, COLUMN_GENRE)
+
+        treeview = cls.__treeview
+        selection = treeview.get_selection()
+        model, selected_paths = selection.get_selected_rows()
+
+        if type_ == blaconst.SELECT_ALL:
+            selection.select_all()
+            return
+        elif type_ == blaconst.SELECT_COMPLEMENT:
+            selected_paths = set(selected_paths)
+            paths = set([(p,) for p in xrange(len(model))])
+            paths.difference_update(selected_paths)
+            selection.unselect_all()
+            select_path = selection.select_path
+            map(select_path, paths)
+            return
+        elif type_ == blaconst.SELECT_BY_ARTISTS:
+            column_id = COLUMN_ARTIST
+        elif type_ == blaconst.SELECT_BY_ALBUMS:
+            column_id = COLUMN_ALBUM
+        elif type_ == blaconst.SELECT_BY_ALBUM_ARTISTS:
+            column_id = COLUMN_ALBUM_ARTIST
+        else:
+            column_id = COLUMN_GENRE
+
+        items = [model[path][0] for path in selected_paths]
+        eval_ = BlaEval(column_id).eval
+        values = set()
+        for item in items:
+            values.add(eval_(item.track).lower())
+        if not values:
+            return
+        r = re.compile(
+            r"^(%s)$" % "|".join(values), re.UNICODE | re.IGNORECASE)
+        items = [row[0] for row in model if r.match(eval_(row[0].track))]
+        paths = [row.path for row in model if row[0] in items]
+        selection.unselect_all()
+        select_path = selection.select_path
+        map(select_path, paths)
+
+    @classmethod
+    def update_queue_positions(cls):
+        model = cls.__treeview.get_model()
+
+        # Update the position labels for our own treeview.
+        for idx, row in enumerate(model):
+            model[row.path][1] = idx+1
+
+        # Invalidate the visible rows of the current playlists so the
+        # position labels also get updated in playlists.
+        playlist = cls.__playlist_manager.get_current_playlist()
+        playlist.invalidate_visible_rows()
+
+        # Calculate size and length of the queue and update the statusbar.
+        cls.__size = cls.__length = 0
+        for row in model:
+            track = row[0].track
+            cls.__size += track[FILESIZE]
+            cls.__length += track[LENGTH]
+        cls.__instance.emit("count_changed", blaconst.VIEW_QUEUE,
+                            cls.queue_n_items())
+        cls.__instance.update_statusbar()
+
+    @classmethod
+    def get_queue_positions(cls, item):
+        model = cls.__treeview.get_model()
+        return [row[1] for row in model if row[0] == item]
+
+    @classmethod
+    def queue_items(cls, items):
+        if not items:
+            return
+
+        from blaplaylist import BlaListItem
+
+        # If any of the items is not an instance of BlaListItem it means all of
+        # the items are actually just URIs which stem from the library browser
+        # and are not part of a playlist.
+        if not isinstance(items[0], BlaListItem):
+            items = map(BlaListItem, items)
+
+        count = blaconst.QUEUE_MAX_ITEMS - cls.queue_n_items()
+        cls.__add_items(items[:count], path=-1)
+
+    @classmethod
+    def remove_items(cls, items):
+        # This is invoked by playlists who want to remove tracks from the
+        # queue.
+        model = cls.__treeview.get_model()
+        for row in model:
+            if row[0] in items:
+                model.remove(row.iter)
+        cls.update_queue_positions()
+
+    @classmethod
+    def get_queue(cls):
+        queue = []
+        playlists = cls.__playlist_manager.get_playlists()
+
+        for row in cls.__treeview.get_model():
+            item = row[0]
+            playlist = item.playlist
+
+            try:
+                playlist_idx = playlists.index(playlist)
+            except ValueError:
+                item = (item.uri,)
+            else:
+                item = (playlist_idx,
+                        playlist.get_path_from_item(item, all_=True))
+
+            queue.append(item)
+
+        return queue
+
+    @classmethod
+    def restore(cls, items):
+        print_i("Restoring the play queue")
+
+        if not items:
+            return
+
+        from blaplaylist import BlaListItem
+
+        items_ = []
+        playlists = cls.__playlist_manager.get_playlists()
+
+        for item in items:
+            try:
+                playlist_idx, path = item
+            except ValueError:
+                # Library tracks that are not part of a playlist.
+                item = BlaListItem(item)
+            else:
+                item = playlists[playlist_idx].get_item_from_path(path)
+
+            items_.append(item)
+
+        cls.queue_items(items_)
+
+    @classmethod
+    def cut(cls, *args):
+        cls.clipboard = cls.__get_items(remove=True)
+        ui_manager.update_menu(blaconst.VIEW_QUEUE)
+
+    @classmethod
+    def copy(cls, *args):
+        # We specifically don't create actual copies of items here as it's not
+        # desired to have unique ones in the queue. Copied and pasted tracks
+        # should still refer to the same BlaListItem instances which are
+        # possibly part of a playlist.
+        cls.clipboard = cls.__get_items(remove=False)
+        ui_manager.update_menu(blaconst.VIEW_QUEUE)
+
+    @classmethod
+    def paste(cls, *args, **kwargs):
+        cls.__add_items(items=cls.clipboard, select_rows=True)
+
+    @classmethod
+    def remove(cls, *args):
+        cls.__get_items(remove=True)
+
+    @classmethod
+    def remove_duplicates(cls):
+        unique = set()
+        model = cls.__treeview.get_model()
+        for row in model:
+            uri = row[0].uri
+            if uri not in unique:
+                unique.add(uri)
+            else:
+                model.remove(row.iter)
+        cls.update_queue_positions()
+
+    @classmethod
+    def remove_invalid_tracks(cls):
+        model = cls.__treeview.get_model()
+        isfile = os.path.isfile
+
+        for row in model:
+            uri = row[0].uri
+            if not isfile(uri):
+                model.remove(row.iter)
+        cls.update_queue_positions()
+
+    @classmethod
+    def clear(cls):
+        cls.__treeview.get_model().clear()
+        cls.update_queue_positions()
+
+    @classmethod
+    def get_item(cls):
+        model = cls.__treeview.get_model()
+        iterator = model.get_iter_first()
+        if iterator:
+            item = model[iterator][0]
+            model.remove(iterator)
+            cls.update_queue_positions()
+            return item
+        return None
+
+    @classmethod
+    def queue_n_items(cls):
+        return len(cls.__treeview.get_model())
+

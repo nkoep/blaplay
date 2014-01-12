@@ -40,7 +40,8 @@ class BlaUIManager(gtk.UIManager):
             radio_actions, value=value, on_change=on_change)
 
     def update_menu(self, view):
-        from blaplaylist import BlaPlaylistManager, BlaQueue
+        from blaplaylist import BlaPlaylistManager
+        from blaqueue import BlaQueue
 
         state = False
         if view == blaconst.VIEW_PLAYLISTS:

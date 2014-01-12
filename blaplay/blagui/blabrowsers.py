@@ -32,7 +32,8 @@ from blaplay.blacore import blaconst, blacfg
 from blaplay import blautil, blagui
 from blaplay.formats._identifiers import *
 from blawindows import BlaScrolledWindow
-from blaplaylist import BlaPlaylistManager, BlaQueue
+from blaplaylist import BlaPlaylistManager
+from blaqueue import BlaQueue
 import blaguiutils
 
 

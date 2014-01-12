@@ -601,7 +601,8 @@ class BlaView(gtk.HPaned):
             on_change=lambda *x: self.set_view(
             x[-1].get_current_value()))
 
-        from blaplaylist import BlaPlaylistManager, BlaQueue
+        from blaplaylist import BlaPlaylistManager
+        from blaqueue import BlaQueue
         from blavideo import BlaVideo
         from blaradio import BlaRadio
         from blaeventbrowser import BlaEventBrowser
