@@ -39,7 +39,6 @@ EVENT_CREATED, EVENT_DELETED, EVENT_MOVED, EVENT_CHANGED = xrange(4)
 
 # TODO: Move `pending_save' or a similar variable into BlaLibrary.
 pending_save = False
-BlaPlaylistManager = None
 
 
 def init():
@@ -47,17 +46,10 @@ def init():
     return library
 
 def update_library():
-    global pending_save, BlaPlaylistManager
+    global pending_save
 
     library.sync()
     pending_save = False
-
-    # TODO: Hook the BlaPlaylistManager singleton up to the `library_changed'
-    #       signal. The library logic should be fully decoupled from UI code
-    #       so importing anything from blaplay.blagui in here is ugly.
-    if BlaPlaylistManager is None:
-        from blaplay.blagui.blaplaylist import BlaPlaylistManager
-    BlaPlaylistManager().invalidate_visible_rows()
 
     return False
 
@@ -160,7 +152,6 @@ class BlaLibraryMonitor(gobject.GObject):
             EVENT_MOVED: "EVENT_MOVED"
         }
 
-        global BlaPlaylistManager
         tid = -1
 
         while True:
@@ -171,9 +162,6 @@ class BlaLibraryMonitor(gobject.GObject):
             update_track = library.update_track
             update = True
             gobject.source_remove(tid)
-
-            if BlaPlaylistManager is None:
-                from blaplay.blagui.blaplaylist import BlaPlaylistManager
 
             if event == EVENT_CREATED:
                 if path_from in BlaLibraryMonitor.ignore:
@@ -241,6 +229,7 @@ class BlaLibraryMonitor(gobject.GObject):
                     self.add_directory(path_to)
                 # TODO: Add a `library_entries_moved' signal for this so we
                 #       don't need to call methods on the playlist manager.
+                from blaplay.blagui.blaplaylist import BlaPlaylistManager
                 BlaPlaylistManager().update_uris(uris)
 
             # Schedule an update for the library browser, etc. The timeout
@@ -333,7 +322,7 @@ class BlaLibraryMonitor(gobject.GObject):
 class BlaLibrary(gobject.GObject):
     __gsignals__ = {
         "progress": blautil.signal(1),
-        "library_changed": blautil.signal(0)
+        "library_updated": blautil.signal(0)
     }
 
     __monitored_directories = []
@@ -602,10 +591,10 @@ class BlaLibrary(gobject.GObject):
             del self.__tracks[uri]
 
     def sync(self):
-        self.emit("library_changed")
         self.__save_library()
         self.__monitored_directories = map(
             os.path.realpath, blacfg.getdotliststr("library", "directories"))
+        self.emit("library_updated")
         return False
 
     def save_ool_tracks(self, uris):

@@ -632,7 +632,7 @@ class BlaLibraryBrowser(gtk.VBox):
 
         def queue_model_update(*args):
             self.__queue_model_update(blacfg.getint("library", "organize.by"))
-        library.connect("library_changed", queue_model_update)
+        library.connect("library_updated", queue_model_update)
         queue_model_update()
 
     def __queue_model_update(self, view):

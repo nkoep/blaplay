@@ -1304,6 +1304,10 @@ class BlaPlaylistManager(gtk.Notebook):
         player.connect("state_changed", state_changed)
         player.connect_object("get_track", BlaPlaylistManager.get_track, self)
 
+        def library_updated(*args):
+            self.get_current_playlist().invalidate_visible_rows()
+        library.connect("library_updated", library_updated)
+
         self.show_all()
 
         blaplay.bla.register_for_cleanup(self)
@@ -1888,9 +1892,6 @@ class BlaPlaylistManager(gtk.Notebook):
     def update_uris(self, uris):
         for playlist in self.get_playlists():
             playlist.update_uris(uris)
-
-    def invalidate_visible_rows(self):
-        self.get_current_playlist().invalidate_visible_rows()
 
     def get_track(self, choice, force_advance):
         # This is called in response to BlaPlayer's get_track signal.
