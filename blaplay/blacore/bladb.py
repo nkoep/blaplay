@@ -37,18 +37,13 @@ from blaplay.formats._identifiers import *
 
 EVENT_CREATED, EVENT_DELETED, EVENT_MOVED, EVENT_CHANGED = xrange(4)
 
-library = None
 # TODO: Move `pending_save' or a similar variable into BlaLibrary.
 pending_save = False
 BlaPlaylistManager = None
 
 
 def init():
-    print_i("Initializing the database")
-
-    global library
-
-    library = BlaLibrary()
+    library.init()
     return library
 
 def update_library():
@@ -355,39 +350,6 @@ class BlaLibrary(gobject.GObject):
         self.__extension_filter = re.compile(
             r".*\.(%s)$" % "|".join(formats.formats.keys())).match
 
-        # Restore the library.
-        tracks = blautil.deserialize_from_file(blaconst.LIBRARY_PATH)
-        if tracks is None:
-            blacfg.set("library", "directories", "")
-        else:
-            self.__tracks = tracks
-
-        # Restore out-of-library tracks.
-        tracks = blautil.deserialize_from_file(blaconst.OOL_PATH)
-        if tracks is not None:
-            self.__tracks_ool = tracks
-
-        print_d("Restoring library: %d tracks in the library, %d additional "
-                "tracks" % (len(self.__tracks), len(self.__tracks_ool)))
-
-        self.__monitored_directories = map(os.path.realpath,
-                blacfg.getdotliststr("library", "directories"))
-
-        @blautil.idle
-        def initialized(library_monitor, directories):
-            if blacfg.getboolean("library", "update.on.startup"):
-                p = self.__detect_changes(directories)
-                gobject.idle_add(p.next)
-                # TODO: this seems more efficient
-#                for md in self.__monitored_directories:
-#                    self.scan_directory(md)
-            self.__library_monitor.disconnect(cid)
-        self.__library_monitor = BlaLibraryMonitor()
-        cid = self.__library_monitor.connect("initialized", initialized)
-        self.__library_monitor.update_directories()
-
-        blaplay.bla.register_for_cleanup(self)
-
     def __call__(self):
         print_i("Saving pending library changes")
 
@@ -506,6 +468,42 @@ class BlaLibrary(gobject.GObject):
             update_library()
         yield False
 
+    def init(self):
+        print_i("Initializing the database")
+
+        # Restore the library.
+        tracks = blautil.deserialize_from_file(blaconst.LIBRARY_PATH)
+        if tracks is None:
+            blacfg.set("library", "directories", "")
+        else:
+            self.__tracks = tracks
+
+        # Restore out-of-library tracks.
+        tracks = blautil.deserialize_from_file(blaconst.OOL_PATH)
+        if tracks is not None:
+            self.__tracks_ool = tracks
+
+        print_d("Restoring library: %d tracks in the library, %d additional "
+                "tracks" % (len(self.__tracks), len(self.__tracks_ool)))
+
+        self.__monitored_directories = map(os.path.realpath,
+                blacfg.getdotliststr("library", "directories"))
+
+        @blautil.idle
+        def initialized(library_monitor, directories):
+            if blacfg.getboolean("library", "update.on.startup"):
+                p = self.__detect_changes(directories)
+                gobject.idle_add(p.next)
+                # TODO: this seems more efficient
+#                for md in self.__monitored_directories:
+#                    self.scan_directory(md)
+            self.__library_monitor.disconnect(cid)
+        self.__library_monitor = BlaLibraryMonitor()
+        cid = self.__library_monitor.connect("initialized", initialized)
+        self.__library_monitor.update_directories()
+
+        blaplay.bla.register_for_cleanup(self)
+
     def add_tracks(self, uris):
         count = 0
         filt = self.__extension_filter
@@ -543,6 +541,9 @@ class BlaLibrary(gobject.GObject):
                     updated = True
         return track if return_track else updated
 
+    # This method exclusively inserts tracks into the library. The form
+    # `self[uri] = track', on the other hand, inserts it into the library only
+    # if the key is already present and otherwise adds it to the ool dict.
     def add(self, track):
         self.__tracks[track.uri] = track
         try:
@@ -812,3 +813,6 @@ class BlaLibrary(gobject.GObject):
             map(remove_track, self.__tracks.iterkeys())
         self.sync()
         self.__library_monitor.remove_directories(directory)
+
+library = BlaLibrary()
+
