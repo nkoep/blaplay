@@ -520,34 +520,34 @@ class BlaLibrary(gobject.GObject):
             count += 1
         return count
 
-    def update_track(self, uri, return_track=False):
-        # This returns whether a track was updated or not or alternatively the
-        # (possibly) updated track. In case a track was missing we just return
-        # None no matter what.
+    def update_track(self, uri):
         track = self[uri]
-        updated = False
 
         try:
             mtime = os.path.getmtime(uri)
         except OSError:
-            pass
+            return None
         else:
-            if track[MTIME] != mtime:
+            if track[MTIME] == mtime:
+                track_updated = False
+            else:
                 md = track[MONITORED_DIRECTORY]
                 track = get_track(uri)
-                if track:
-                    track[MONITORED_DIRECTORY] = md
-                    library[uri] = track
-                    updated = True
-        return track if return_track else updated
+                if track is None:
+                    return None
+                track[MONITORED_DIRECTORY] = md
+                self[uri] = track
+                track_updated = True
+        return track_updated
 
     # This method exclusively inserts tracks into the library. The form
     # `self[uri] = track', on the other hand, inserts it into the library only
     # if the key is already present and otherwise adds it to the ool dict.
     def add(self, track):
-        self.__tracks[track.uri] = track
+        uri = track.uri
+        self.__tracks[uri] = track
         try:
-            del self.__tracks_ool[track.uri]
+            del self.__tracks_ool[uri]
         except KeyError:
             pass
 
@@ -723,6 +723,8 @@ class BlaLibrary(gobject.GObject):
             except ZeroDivisionError:
                 pass
 
+            update_track = self.update_track
+            add = self.add
             for idx, path in enumerate(files):
                 self.emit("progress", c * (idx+1))
 
@@ -742,11 +744,12 @@ class BlaLibrary(gobject.GObject):
                     except KeyError:
                         track = get_track(path)
                     else:
-                        track = self.update_track(path, return_track=True)
+                        if update_track(path):
+                            track = self[path]
 
                 if track and not track[MONITORED_DIRECTORY]:
                     track[MONITORED_DIRECTORY] = directory
-                    self.add(track)
+                    add(track)
                 yield True
 
             self.sync()

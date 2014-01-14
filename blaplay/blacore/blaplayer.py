@@ -337,9 +337,9 @@ class BlaPlayer(gobject.GObject):
                                      "Resource \"%s\" unavailable." % uri)
             return
 
-        # If update returns None it means the track needed updating, but
-        # failed to be parsed properly so request another song.
-        if not blaplay.bla.library.update_track(self.__uri, return_track=True):
+        # If `update_track' returns None it means the track needed updating,
+        # but failed to be parsed properly so request another song.
+        if library.update_track(self.__uri) is None:
             self.emit("get_track", blaconst.TRACK_PLAY, True)
 
         if (self.__state == blaconst.STATE_STOPPED and
