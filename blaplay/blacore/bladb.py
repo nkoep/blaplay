@@ -27,12 +27,12 @@ import multiprocessing
 import gobject
 import gtk
 import gio
-import pango
 
 import blaplay
 from blaplay.blacore import blacfg, blaconst
 from blaplay import blautil, formats
 get_track = formats.get_track
+from blaplay.blagui import blaguiutils
 from blaplay.formats._identifiers import *
 
 EVENT_CREATED, EVENT_DELETED, EVENT_MOVED, EVENT_CHANGED = xrange(4)
@@ -53,54 +53,6 @@ def update_library():
 
     return False
 
-
-class BlaProgress(gtk.Window):
-    def __init__(self, title=""):
-        super(BlaProgress, self).__init__()
-
-        hbox = gtk.HBox(spacing=10)
-        self.__pb = gtk.ProgressBar()
-        button = gtk.Button()
-        button.add(gtk.image_new_from_stock(
-                gtk.STOCK_CANCEL, gtk.ICON_SIZE_BUTTON))
-        button.connect("clicked", lambda *x: self.destroy())
-        hbox.pack_start(self.__pb, expand=True)
-        hbox.pack_start(button, expand=False)
-
-        self.__text = gtk.Label("Working...")
-        self.__text.set_alignment(0.0, 0.5)
-
-        vbox = gtk.VBox(spacing=5)
-        vbox.pack_start(self.__text, expand=False, fill=False)
-        vbox.pack_start(hbox, expand=True, fill=False)
-
-        self.set_title(title)
-        self.add(vbox)
-        self.set_border_width(10)
-        self.set_type_hint(gtk.gdk.WINDOW_TYPE_HINT_DIALOG)
-        self.set_destroy_with_parent(True)
-        self.set_position(gtk.WIN_POS_CENTER)
-        self.set_resizable(False)
-
-        self.show_all()
-
-    def pulse(self, *args):
-        self.__pb.pulse()
-        return True
-
-    def switch_mode(self):
-        width = 550
-        self.__text.set_size_request(width, -1)
-        self.__text.set_ellipsize(pango.ELLIPSIZE_MIDDLE)
-        self.set_size_request(width, -1)
-        self.set_position(gtk.WIN_POS_CENTER)
-
-    def set_fraction(self, fraction):
-        self.__pb.set_fraction(fraction)
-        self.__pb.set_text("%d %%" % (fraction * 100))
-
-    def set_text(self, text):
-        self.__text.set_text(text)
 
 class BlaLibraryMonitor(gobject.GObject):
     __gsignals__ = {
@@ -669,7 +621,7 @@ class BlaLibrary(gobject.GObject):
         # FIXME: get rid of `namespace'
         def cancel(namespace):
             namespace["wait"] = False
-        pb = BlaProgress(title="Scanning files...")
+        pb = blaguiutils.BlaProgressBar(title="Scanning files...")
         pb.connect("destroy", lambda *x: cancel(namespace))
         namespace = {"uris": [], "wait": True, "done": False}
         p = process(namespace, uris, pb)
