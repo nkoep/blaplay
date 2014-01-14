@@ -158,8 +158,6 @@ class BlaMainWindow(BlaBaseWindow):
         self.__view = BlaView()
         self.__statusbar = BlaStatusbar()
 
-        player.connect("state_changed", self.update_title)
-
         # Group browsers and visualization widget.
         self.__vbox_left = gtk.VBox(spacing=blaconst.WIDGET_SPACING)
         self.__vbox_left.pack_start(self.__browsers, expand=True)
@@ -199,33 +197,11 @@ class BlaMainWindow(BlaBaseWindow):
 
         self.__tray = BlaTray()
 
-        self.update_title()
-
-    def update_title(self, *args):
-        track = player.get_track()
-        state = player.get_state()
-
-        if state == blaconst.STATE_STOPPED or not track:
-            title = "%s %s" % (blaconst.APPNAME, blaconst.VERSION)
-            tooltip = "Stopped"
-        else:
-            if player.radio:
-                title = track[TITLE] or "%s - %s" % (
-                    blaconst.APPNAME, track["organization"])
-            else:
-                artist = track[ARTIST]
-                title = track[TITLE] or "?"
-                if artist and title:
-                    title = "%s - %s" % (artist, title)
-                else:
-                    title = track.basename
-
-            tooltip = title
-
-        self.set_title(title)
-        self.__tray.set_tooltip(tooltip)
-        if not blacfg.getboolean("general", "tray.show.tooltip"):
-            self.__tray.set_has_tooltip(False)
+        def update_title(*args):
+            self.__update_title()
+        player.connect("state_changed", update_title)
+        library.connect("library_updated", update_title)
+        self.__update_title()
 
     def set_fullscreen(self, da, parent):
         # TODO: when minimizing to tray during fullscreen, reparent the da so
@@ -257,6 +233,32 @@ class BlaMainWindow(BlaBaseWindow):
         self.__tray.set_visible(False)
         self.hide()
         self.__fullscreen_window.hide()
+
+    def __update_title(self):
+        track = player.get_track()
+        state = player.get_state()
+
+        if state == blaconst.STATE_STOPPED or not track:
+            title = "%s %s" % (blaconst.APPNAME, blaconst.VERSION)
+            tooltip = "Stopped"
+        else:
+            if player.radio:
+                title = track[TITLE] or "%s - %s" % (
+                    blaconst.APPNAME, track["organization"])
+            else:
+                artist = track[ARTIST]
+                title = track[TITLE] or "?"
+                if artist and title:
+                    title = "%s - %s" % (artist, title)
+                else:
+                    title = track.basename
+
+            tooltip = title
+
+        self.set_title(title)
+        self.__tray.set_tooltip(tooltip)
+        if not blacfg.getboolean("general", "tray.show.tooltip"):
+            self.__tray.set_has_tooltip(False)
 
     def __hide_windows(self, yes):
         blaguiutils.set_visible(not yes)
