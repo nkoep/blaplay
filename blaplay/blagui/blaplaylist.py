@@ -41,7 +41,6 @@ from blatracklist import (
 from blaplay.blautil import blafm
 from blastatusbar import BlaStatusbar
 import blaview
-import blaqueue
 import blaguiutils
 
 MODE_NORMAL, MODE_SORTED, MODE_FILTERED = 1 << 0, 1 << 1, 1 << 2
@@ -213,14 +212,11 @@ class BlaPlaylist(gtk.VBox):
         def selection_changed(selection):
             # FIXME: This gets called for each newly selected item in
             #        `add_items'.
-            if BlaPlaylistManager.get_current_playlist() != self:
+            if playlist_manager.get_current_playlist() != self:
                 return False
             paths = selection.get_selected_rows()[-1]
             uris = [item.uri for item in self.get_items_from_paths(paths)]
-            # FIXME: Ugly hack. Can be removed once we made the playlist
-            #        manager a singleton.
-            BlaPlaylistManager._BlaPlaylistManager__instance.emit(
-                "selection_changed", uris)
+            playlist_manager.emit("selection_changed", uris)
         self.__treeview.get_selection().connect("changed", selection_changed)
         self.__treeview.connect_object(
             "sort_column", BlaPlaylist.sort, self)
@@ -349,7 +345,7 @@ class BlaPlaylist(gtk.VBox):
 
         # Update the statusbar and the state icon in the playlist.
         self.update_icon()
-        BlaPlaylistManager.update_statusbar()
+        playlist_manager.update_statusbar()
 
     def __get_selection_and_row(self):
         row_align = 0.0
@@ -451,7 +447,7 @@ class BlaPlaylist(gtk.VBox):
         self.__populate_model(scroll_item, row_align, selected_items)
 
     def __drag_data_get(self, drag_context, selection_data, info, time):
-        idx = BlaPlaylistManager.get_playlist_index(self)
+        idx = playlist_manager.get_playlist_index(self)
         paths = self.get_selected_paths()
         if info == blagui.DND_PLAYLIST:
             data = pickle.dumps((paths, idx), pickle.HIGHEST_PROTOCOL)
@@ -482,10 +478,10 @@ class BlaPlaylist(gtk.VBox):
                 path, pos = drop_info
                 item = self.get_item_from_path(path)
                 if (path in paths and
-                    idx == BlaPlaylistManager.get_playlist_index(self)):
+                    idx == playlist_manager.get_playlist_index(self)):
                     return
 
-            playlist = BlaPlaylistManager.get_nth_playlist(idx)
+            playlist = playlist_manager.get_nth_playlist(idx)
             # FIXME: what happens to the current track?
             items = playlist.get_items(paths=paths, remove=True)
             if drop_info:
@@ -506,8 +502,8 @@ class BlaPlaylist(gtk.VBox):
         def delete():
             paths = self.get_selected_paths()
             items = self.get_items(paths, remove=True)
-            if BlaPlaylistManager.current in items:
-                BlaPlaylistManager.current = None
+            if playlist_manager.current in items:
+                playlist_manager.current = None
 
         is_accel = blagui.is_accel
         accels = [
@@ -680,7 +676,7 @@ class BlaPlaylist(gtk.VBox):
         select_path = selection.select_path
         map(select_path, paths)
 
-    def new_playlist(self, type_):
+    def new_playlist_from_type(self, type_):
         paths = self.get_selected_paths()
         items = self.get_items_from_paths(paths)
 
@@ -706,7 +702,7 @@ class BlaPlaylist(gtk.VBox):
             items = [copy(item) for item in self.__get_current_items()
                      if r.match(eval_(item.track))]
 
-        playlist = BlaPlaylistManager.add_playlist(focus=True)
+        playlist = playlist_manager.add_playlist(focus=True)
         playlist.add_items(items=items)
 
     def add_items(self, items, drop_info=None, select_rows=False):
@@ -784,7 +780,7 @@ class BlaPlaylist(gtk.VBox):
                          row_align=1.0)
 
         self.__thaw_treeview()
-        BlaPlaylistManager.update_statusbar()
+        playlist_manager.update_statusbar()
         self.update_icon()
 
     def insert(self, items, drop_info):
@@ -864,7 +860,7 @@ class BlaPlaylist(gtk.VBox):
                 remove = list_.remove
                 map(remove, items)
 
-            BlaPlaylistManager.update_statusbar()
+            playlist_manager.update_statusbar()
         return items
 
     def remove_duplicates(self):
@@ -963,7 +959,7 @@ class BlaPlaylist(gtk.VBox):
             self.__header_box.pack_start(image)
             self.__header_box.show_all()
 
-        BlaPlaylistManager.update_playlist_lock_state()
+        playlist_manager.update_playlist_lock_state()
 
     def locked(self):
         return self.__lock.locked()
@@ -1064,7 +1060,7 @@ class BlaPlaylist(gtk.VBox):
         model = self.__treeview.get_model()
 
         # Remove the playing icon from the old row.
-        current = BlaPlaylistManager.current
+        current = playlist_manager.current
         path = self.get_path_from_item(current)
         if path is not None:
             model[path][1] = None
@@ -1125,7 +1121,7 @@ class BlaPlaylist(gtk.VBox):
 
     def update_icon(self, clear=False):
         model = self.__treeview.get_model()
-        path = self.get_path_from_item(BlaPlaylistManager.current)
+        path = self.get_path_from_item(playlist_manager.current)
         state = player.get_state()
 
         if clear or state == blaconst.STATE_STOPPED:
@@ -1153,13 +1149,13 @@ class BlaPlaylist(gtk.VBox):
 
     def play_item(self, treeview, path, column=None):
         model = self.__treeview.get_model()
-        current = BlaPlaylistManager.current
+        current = playlist_manager.current
         item = self.get_item_from_path(path)
         order = blacfg.getint("general", "play.order")
         if (order == blaconst.ORDER_SHUFFLE and
             current != item and current is not None):
             self.__history.add(item, blaconst.TRACK_NEXT)
-        BlaPlaylistManager.play_item(item)
+        playlist_manager.play_item(item)
 
     def add_selection_to_playlist(self, playlist, move):
         if not playlist.modification_allowed():
@@ -1172,7 +1168,7 @@ class BlaPlaylist(gtk.VBox):
         if not move:
             items = map(copy, items)
         playlist.add_items(items=items, select_rows=True)
-        BlaPlaylistManager.focus_playlist(playlist)
+        playlist_manager.focus_playlist(playlist)
 
     def send_to_queue(self):
         queue_n_items = queue.n_items
@@ -1188,7 +1184,7 @@ class BlaPlaylist(gtk.VBox):
         queue.remove_items([model[path][0] for path in selection])
 
     def jump_to_playing_track(self):
-        current = BlaPlaylistManager.current
+        current = playlist_manager.current
         track = player.get_track()
         if current is None or track is None or current.uri != track.uri:
             return
@@ -1220,41 +1216,37 @@ class BlaPlaylistManager(gtk.Notebook):
         "selection_changed": blautil.signal(1)
     }
 
-    __instance = None   # Instance of BlaPlaylist needed for classmethods
-    current = None      # Reference to the currently active playlist
-    clipboard = []      # List of items after a cut/copy operation
-
     def __init__(self):
         super(BlaPlaylistManager, self).__init__()
 
-        type(self).__instance = self
+        self.current = None # Reference to the currently active playlist
+        self.clipboard = [] # List of items after a cut/copy operation
 
+        def new_playlist(type_):
+            def wrapper(*args):
+                self.new_playlist_from_type(type_)
+            return wrapper
         actions = [
             ("AddNewPlaylist", None, "Add new playlist", "<Ctrl>T", "",
-             lambda *x: BlaPlaylistManager.add_playlist(focus=True)),
+             lambda *x: self.add_playlist(focus=True)),
             ("RemovePlaylist", None, "Remove playlist", "<Ctrl>W", "",
-             lambda *x: BlaPlaylistManager.remove_playlist()),
+             lambda *x: self.remove_playlist()),
             ("LockUnlockPlaylist", None, "Lock/Unlock playlist", None, "",
-             BlaPlaylistManager.toggle_lock_playlist),
+             self.toggle_lock_playlist),
             ("PlaylistFromSelection", None, "Selection", None, "",
-             lambda *x: BlaPlaylistManager.new_playlist(
-             blaconst.PLAYLIST_FROM_SELECTION)),
+             new_playlist(blaconst.PLAYLIST_FROM_SELECTION)),
             ("PlaylistFromArtists", None, "Selected artist(s)", None, "",
-             lambda *x: BlaPlaylistManager.new_playlist(
-             blaconst.PLAYLIST_FROM_ARTISTS)),
+             new_playlist(blaconst.PLAYLIST_FROM_ARTISTS)),
             ("PlaylistFromAlbums", None, "Selected album(s)", None, "",
-             lambda *x: BlaPlaylistManager.new_playlist(
-             blaconst.PLAYLIST_FROM_ALBUMS)),
+             new_playlist(blaconst.PLAYLIST_FROM_ALBUMS)),
             ("PlaylistFromAlbumArtists", None, "Selected album artist(s)",
-             None, "", lambda *x: BlaPlaylistManager.new_playlist(
-             blaconst.PLAYLIST_FROM_ALBUM_ARTISTS)),
+             None, "", new_playlist(blaconst.PLAYLIST_FROM_ALBUM_ARTISTS)),
             ("PlaylistFromGenre", None, "Selected genre(s)", None, "",
-             lambda *x: BlaPlaylistManager.new_playlist(
-             blaconst.PLAYLIST_FROM_GENRE)),
+             new_playlist(blaconst.PLAYLIST_FROM_GENRE)),
             ("Search", None, "_Search...", "<Ctrl>F", "",
-             lambda *x: BlaPlaylistManager.enable_search()),
+             lambda *x: self.enable_search()),
             ("JumpToPlayingTrack", None, "_Jump to playing track", "<Ctrl>J",
-             "", lambda *x: BlaPlaylistManager.jump_to_playing_track())
+             "", lambda *x: self.jump_to_playing_track())
         ]
         ui_manager.add_actions(actions)
 
@@ -1304,11 +1296,11 @@ class BlaPlaylistManager(gtk.Notebook):
                 playlist.update_icon()
             # If the state changed to STATE_STOPPED and we just played a song
             # that was in the queue but which was not part of a playlist,
-            # overwrite cls.current so we'll try to get a new song from a
+            # overwrite self.current so we'll try to get a new song from a
             # playlist or the queue when we request to start playing again.
             if (state == blaconst.STATE_STOPPED and self.current and
                 self.current.playlist is None):
-                type(self).current = None
+                self.current = None
         player.connect("state_changed", state_changed)
         player.connect_object("get_track", BlaPlaylistManager.get_track, self)
 
@@ -1600,46 +1592,40 @@ class BlaPlaylistManager(gtk.Notebook):
 
         return name, uris
 
-    @classmethod
-    def update_playlist_lock_state(cls):
-        playlist = cls.get_current_playlist()
+    def update_playlist_lock_state(self):
+        playlist = self.get_current_playlist()
         try:
             label = "%s playlist" % ("Unlock" if playlist.locked() else "Lock")
         except AttributeError:
             return
-        cls.__instance.__lock_button.set_tooltip_text(label)
+        self.__lock_button.set_tooltip_text(label)
 
         ui_manager.get_widget("/Menu/Edit/LockUnlockPlaylist").set_label(label)
 
-    @classmethod
-    def get_active_playlist(cls):
+    def get_active_playlist(self):
         try:
-            playlist = cls.current.playlist
+            playlist = self.current.playlist
         except AttributeError:
             playlist = None
         return playlist
 
-    @classmethod
-    def get_current_playlist(cls):
-        self_ = cls.__instance
-        return self_.get_nth_page(self_.get_current_page())
+    def get_current_playlist(self):
+        return self.get_nth_page(self.get_current_page())
 
-    @classmethod
-    def enable_search(cls):
+    def enable_search(self):
         if blacfg.getint("general", "view") == blaconst.VIEW_PLAYLISTS:
-            cls.get_current_playlist().enable_search()
+            self.get_current_playlist().enable_search()
 
-    @classmethod
-    def open_playlist(cls, path):
+    def open_playlist(self, path):
         name = os.path.basename(blautil.toss_extension(path))
         ext = blautil.get_extension(path).lower()
 
         if ext == "m3u":
-            uris = cls.__instance.__parse_m3u(path)
+            uris = self.__parse_m3u(path)
         elif ext == "pls":
-            uris = cls.__instance.__parse_pls(path)
+            uris = self.__parse_pls(path)
         elif ext == "xspf":
-            name, uris = cls.__instance.__parse_xspf(path)
+            name, uris = self.__parse_xspf(path)
         else:
             blaguiutils.error_dialog(
                 "Failed to open playlist \"%s\"" % path,
@@ -1651,38 +1637,36 @@ class BlaPlaylistManager(gtk.Notebook):
         uris = library.parse_ool_uris(blautil.resolve_uris(uris))
         if uris is None:
             return False
-        playlist = cls.__instance.add_playlist(focus=True, name=name)
+        playlist = self.add_playlist(focus=True, name=name)
         playlist.add_items(create_items_from_uris(uris))
         return True
 
-    @classmethod
-    def save(cls, path=None, type_="m3u", relative=False):
+    def save(self, path=None, type_="m3u", relative=False):
         @blautil.thread
         def save(path, type_):
-            name = cls.__instance.get_tab_label_text(
-                cls.get_current_playlist())
-            uris = cls.get_current_playlist().get_uris()
+            name = self.get_tab_label_text(self.get_current_playlist())
+            uris = self.get_current_playlist().get_uris()
 
             ext = blautil.get_extension(path)
             if ext.lower() != type_:
                 path = "%s.%s" % (path, type_)
 
             if type_.lower() == "pls":
-                cls.__save_pls(uris, path, relative)
+                self.__save_pls(uris, path, relative)
             elif type_.lower() == "xspf":
-                cls.__save_xspf(uris, path, name)
+                self.__save_xspf(uris, path, name)
             else:
-                cls.__save_m3u(uris, path, relative)
+                self.__save_m3u(uris, path, relative)
 
         if path is None:
             # TODO: Save the queue individually.
             print_i("Saving playlists")
-            playlists = cls.get_playlists()
+            playlists = self.get_playlists()
 
-            active_playlist = cls.get_active_playlist()
+            active_playlist = self.get_active_playlist()
             if active_playlist:
-                current = active_playlist.get_path_from_item(cls.current)
-                active_playlist = cls.__instance.page_num(active_playlist)
+                current = active_playlist.get_path_from_item(self.current)
+                active_playlist = self.page_num(active_playlist)
             else:
                 active_playlist = current = None
 
@@ -1713,31 +1697,15 @@ class BlaPlaylistManager(gtk.Notebook):
                 self.set_current_page(active_playlist)
                 playlist = self.get_nth_page(active_playlist)
             if current is not None:
-                type(self).current = playlist.get_item_from_path(current)
+                self.current = playlist.get_item_from_path(current)
                 self.current.select()
             queue.restore(queued_items)
         else:
             self.add_playlist()
 
-        # FIXME: Strange to handle this here. Do it with a pipe or via DBus
-        #        instead.
-#        try:
-#            action, uris = blaplay.cli_queue
-#            blaplay.cli_queue = None
-#        except TypeError:
-#            pass
-#        else:
-#            if action == "append":
-#                BlaPlaylistManager.add_to_current_playlist(uris, resolve=True)
-#            elif action == "new":
-#                BlaPlaylistManager.send_to_new_playlist(uris, resolve=True)
-#            else:
-#                BlaPlaylistManager.send_to_current_playlist(uris, resolve=True)
-
-    @classmethod
-    def add_playlist(cls, name=None, query_name=False, focus=False):
+    def add_playlist(self, name=None, query_name=False, focus=False):
         if query_name:
-            list_name = cls.__instance.__query_name("Playlist name")
+            list_name = self.__query_name("Playlist name")
             if not list_name:
                 return
         elif name:
@@ -1745,7 +1713,7 @@ class BlaPlaylistManager(gtk.Notebook):
         else:
             indices = set()
             r = re.compile(r"(^bla \()([0-9]+)\)")
-            for playlist in cls.__instance:
+            for playlist in self:
                 label = playlist.get_name()
 
                 if label == "bla":
@@ -1771,103 +1739,83 @@ class BlaPlaylistManager(gtk.Notebook):
                 list_name += " (%d)" % idx
 
         playlist = BlaPlaylist(list_name)
-        cls.__instance.append_page(playlist, playlist.get_header_box())
-        cls.__instance.set_tab_reorderable(playlist, True)
+        self.append_page(playlist, playlist.get_header_box())
+        self.set_tab_reorderable(playlist, True)
 
         if focus:
-            cls.focus_playlist(playlist)
+            self.focus_playlist(playlist)
 
         return playlist
 
-    @classmethod
-    def focus_playlist(cls, playlist):
-        self_ = cls.__instance
-        self_.set_current_page(self_.page_num(playlist))
+    def focus_playlist(self, playlist):
+        self.set_current_page(self.page_num(playlist))
 
-    @classmethod
-    def get_playlist_index(cls, playlist):
-        idx = cls.__instance.page_num(playlist)
+    def get_playlist_index(self, playlist):
+        idx = self.page_num(playlist)
         if idx == -1:
             idx = None
         return idx
 
-    @classmethod
-    def get_nth_playlist(cls, idx):
-        return cls.__instance.get_nth_page(idx)
-
-    @classmethod
-    def remove_playlist(cls, playlist=None):
+    def remove_playlist(self, playlist=None):
         if playlist is None:
-            playlist = cls.get_current_playlist()
+            playlist = self.get_current_playlist()
         if not playlist.modification_allowed(check_filter_state=False):
             return
 
-        if cls.get_active_playlist() == playlist:
+        if self.get_active_playlist() == playlist:
             try:
-                cls.current.playlist = None
+                self.current.playlist = None
             except AttributeError:
                 pass
         playlist.clear()
-        page_num = cls.__instance.page_num(playlist)
+        page_num = self.page_num(playlist)
         if page_num != -1:
-            cls.__instance.remove_page(page_num)
+            self.remove_page(page_num)
 
-        if cls.__instance.get_n_pages() < 1:
-            cls.__instance.add_playlist()
+        if self.get_n_pages() < 1:
+            self.add_playlist()
 
-    @classmethod
-    def select(cls, type_):
-        cls.get_current_playlist().select(type_)
+    def select(self, type_):
+        self.get_current_playlist().select(type_)
 
-    @classmethod
-    def cut(cls, *args):
-        cls.clipboard = cls.remove()
+    def cut(self, *args):
+        self.clipboard = self.remove()
         ui_manager.update_menu(blaconst.VIEW_PLAYLISTS)
 
-    @classmethod
-    def copy(cls, *args):
-        playlist = cls.get_current_playlist()
+    def copy(self, *args):
+        playlist = self.get_current_playlist()
         paths = playlist.get_selected_paths()
-        cls.clipboard = map(copy, playlist.get_items(paths))
+        self.clipboard = map(copy, playlist.get_items(paths))
         ui_manager.update_menu(blaconst.VIEW_PLAYLISTS)
 
-    @classmethod
-    def paste(cls, *args, **kwargs):
-        playlist = cls.get_current_playlist()
+    def paste(self, *args, **kwargs):
+        playlist = self.get_current_playlist()
         if not playlist.modification_allowed():
             return
-        playlist.add_items(items=cls.clipboard, drop_info=-1, select_rows=True)
+        playlist.add_items(items=self.clipboard, drop_info=-1, select_rows=True)
 
-    @classmethod
-    def remove(cls, *args):
-        playlist = cls.get_current_playlist()
+    def remove(self, *args):
+        playlist = self.get_current_playlist()
         paths = playlist.get_selected_paths()
         return playlist.get_items(paths, remove=True)
 
-    @classmethod
-    def clear(cls, *args):
-        cls.get_current_playlist().clear()
+    def clear(self, *args):
+        self.get_current_playlist().clear()
 
-    @classmethod
-    def toggle_lock_playlist(cls, *args):
-        playlist = cls.get_current_playlist()
-        playlist.toggle_lock()
+    def toggle_lock_playlist(self, *args):
+        self.get_current_playlist().toggle_lock()
 
-    @classmethod
-    def new_playlist(cls, type_):
-        cls.get_current_playlist().new_playlist(type_)
+    def new_playlist_from_type(self, type_):
+        self.get_current_playlist().new_playlist_from_type(type_)
 
-    @classmethod
-    def remove_duplicates(cls):
-        cls.get_current_playlist().remove_duplicates()
+    def remove_duplicates(self):
+        self.get_current_playlist().remove_duplicates()
 
-    @classmethod
-    def remove_invalid_tracks(cls):
-        cls.get_current_playlist().remove_invalid_tracks()
+    def remove_invalid_tracks(self):
+        self.get_current_playlist().remove_invalid_tracks()
 
-    @classmethod
-    def send_to_current_playlist(cls, uris, resolve=False):
-        playlist = cls.get_current_playlist()
+    def send_to_current_playlist(self, uris, resolve=False):
+        playlist = self.get_current_playlist()
         if not playlist.modification_allowed():
             return
 
@@ -1877,20 +1825,19 @@ class BlaPlaylistManager(gtk.Notebook):
             return
 
         try:
-            cls.current.clear_icon()
+            self.current.clear_icon()
         except AttributeError:
             pass
-        # Reset cls.current to make sure the get_track() method will try to
+        # Reset self.current to make sure the get_track() method will try to
         # request the next track from the currently visible playlist.
-        cls.current = None
+        self.current = None
         playlist.clear()
         playlist.add_items(create_items_from_uris(uris))
-        cls.__instance.get_track(blaconst.TRACK_NEXT, False)
+        self.get_track(blaconst.TRACK_NEXT, False)
         blaview.set_view(blaconst.VIEW_PLAYLISTS)
 
-    @classmethod
-    def add_to_current_playlist(cls, uris, resolve=False):
-        playlist = cls.get_current_playlist()
+    def add_to_current_playlist(self, uris, resolve=False):
+        playlist = self.get_current_playlist()
         if not playlist.modification_allowed():
             return
 
@@ -1902,8 +1849,7 @@ class BlaPlaylistManager(gtk.Notebook):
         playlist.add_items(create_items_from_uris(uris), select_rows=True)
         blaview.set_view(blaconst.VIEW_PLAYLISTS)
 
-    @classmethod
-    def send_to_new_playlist(cls, items, name="", resolve=False, select=False):
+    def send_to_new_playlist(self, items, name="", resolve=False, select=False):
         # This is also invoked as response to DND operations on the notebook
         # tab strip. In this case we get BlaTrackListItem instances instead of
         # URIs which we need to preserve in order for their id()'s to remain
@@ -1919,16 +1865,15 @@ class BlaPlaylistManager(gtk.Notebook):
         else:
             items = items
 
-        playlist = cls.__instance.add_playlist(name=name, focus=True)
+        playlist = self.add_playlist(name=name, focus=True)
         playlist.add_items(items, select_rows=select)
         blaview.set_view(blaconst.VIEW_PLAYLISTS)
 
-    @classmethod
-    def update_statusbar(cls, playlist=None):
+    def update_statusbar(self, playlist=None):
         # This is called by BlaPlaylist instances to update the statusbar.
 
         if playlist is None:
-            playlist = cls.get_current_playlist()
+            playlist = self.get_current_playlist()
         try:
             count, size, length_seconds = playlist.get_playlist_stats()
         except AttributeError:
@@ -1940,14 +1885,12 @@ class BlaPlaylistManager(gtk.Notebook):
             info = parse_track_list_stats(count, size, length_seconds)
         BlaStatusbar.set_view_info(blaconst.VIEW_PLAYLISTS, info)
 
-    @classmethod
-    def update_uris(cls, uris):
-        for playlist in cls.get_playlists():
+    def update_uris(self, uris):
+        for playlist in self.get_playlists():
             playlist.update_uris(uris)
 
-    @classmethod
-    def invalidate_visible_rows(cls):
-        cls.get_current_playlist().invalidate_visible_rows()
+    def invalidate_visible_rows(self):
+        self.get_current_playlist().invalidate_visible_rows()
 
     def get_track(self, choice, force_advance):
         # This is called in response to BlaPlayer's get_track signal.
@@ -1964,14 +1907,13 @@ class BlaPlaylistManager(gtk.Notebook):
 
         self.play_item(item)
 
-    @classmethod
-    def play_item(cls, item):
+    def play_item(self, item):
         try:
-            cls.current.clear_icon()
+            self.current.clear_icon()
         except AttributeError:
             pass
 
-        cls.current = item
+        self.current = item
         try:
             uri = item.uri
         except AttributeError:
@@ -1979,26 +1921,25 @@ class BlaPlaylistManager(gtk.Notebook):
         else:
             if blacfg.getboolean("general", "cursor.follows.playback"):
                 item.select()
-        cls.__instance.emit("play_track", uri)
+        self.emit("play_track", uri)
 
-    @classmethod
-    def get_playlists(cls):
-        return map(None, cls.__instance)
+    def get_playlists(self):
+        return map(None, self)
 
-    @classmethod
-    def next(cls):
-        for playlist in cls.__instance:
+    def next(self):
+        for playlist in self:
             yield playlist
 
-    @classmethod
-    def jump_to_playing_track(cls):
-        playlist = cls.get_active_playlist()
+    def jump_to_playing_track(self):
+        playlist = self.get_active_playlist()
         if (blacfg.getint("general", "view") == blaconst.VIEW_PLAYLISTS and
-            playlist == cls.get_current_playlist()):
+            playlist == self.get_current_playlist()):
             playlist.jump_to_playing_track()
 
-# Defer constructing the queue instance until the BlaPlaylistManager class
+playlist_manager = BlaPlaylistManager()
+
+# Defer importing the queue instance until the BlaPlaylistManager class
 # object has been defined. This is necessary right now because the queue in
 # turn requires an instance of the playlist manager in its c'tor.
-queue = blaqueue.BlaQueue()
+from blaqueue import queue
 

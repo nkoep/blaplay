@@ -601,14 +601,14 @@ class BlaView(gtk.HPaned):
             on_change=lambda *x: self.set_view(
             x[-1].get_current_value()))
 
-        from blaplaylist import BlaPlaylistManager
-        from blaqueue import BlaQueue
+        from blaplaylist import playlist_manager
+        from blaqueue import queue
         from blavideo import BlaVideo
         from blaradio import BlaRadio
         from blaeventbrowser import BlaEventBrowser
         from blareleasebrowser import BlaReleaseBrowser
-        self.__views = [BlaPlaylistManager(), BlaQueue(), BlaRadio(),
-                        BlaVideo(), BlaEventBrowser(), BlaReleaseBrowser()]
+        self.__views = [playlist_manager, queue, BlaRadio(), BlaVideo(),
+                        BlaEventBrowser(), BlaReleaseBrowser()]
 
         self.__container = gtk.Viewport()
         self.__container.set_shadow_type(gtk.SHADOW_NONE)

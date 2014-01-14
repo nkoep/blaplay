@@ -28,7 +28,7 @@ from blaplay.formats._identifiers import *
 from blawindows import BlaBaseWindow
 from blatoolbar import BlaToolbar
 from blabrowsers import BlaBrowsers
-from blaplaylist import BlaPlaylistManager
+from blaplaylist import playlist_manager
 from blavisualization import BlaVisualization
 from blaview import BlaView
 from blastatusbar import BlaStatusbar
@@ -314,7 +314,7 @@ class BlaMainWindow(BlaBaseWindow):
 
         if response == gtk.RESPONSE_OK and path:
             path = path.strip()
-            if BlaPlaylistManager.open_playlist(path):
+            if playlist_manager.open_playlist(path):
                 self.__view.set_view(blaconst.VIEW_PLAYLISTS)
                 blacfg.set("general", "filechooser.directory",
                            os.path.dirname(path))
@@ -338,7 +338,7 @@ class BlaMainWindow(BlaBaseWindow):
 
         if response == gtk.RESPONSE_OK and filenames:
             filenames = map(str.strip, filenames)
-            BlaPlaylistManager.add_to_current_playlist(filenames, resolve=True)
+            playlist_manager.add_to_current_playlist(filenames, resolve=True)
             blacfg.set("general", "filechooser.directory",
                        os.path.dirname(filenames[0]))
 
@@ -393,7 +393,7 @@ class BlaMainWindow(BlaBaseWindow):
             path = path.strip()
             if type_ is None:
                 type_ = blautil.get_extension(path)
-            BlaPlaylistManager.save(path, type_, cb.get_active() == 0)
+            playlist_manager.save(path, type_, cb.get_active() == 0)
             blacfg.set("general", "filechooser.directory",
                        os.path.dirname(path))
 

@@ -384,8 +384,8 @@ class BlaTagEditor(BlaMetadataViewer):
         # TODO: Emit a "metadata_changed" signal so the window can listen for
         #       the signal and change its title itself.
         blaplay.bla.window.update_title()
-        from blaplay.blagui.blaplaylist import BlaPlaylistManager
-        BlaPlaylistManager.invalidate_visible_rows()
+        from blaplay.blagui.blaplaylist import playlist_manager
+        playlist_manager.invalidate_visible_rows()
         library.sync()
 
         self._update_model(self._uris)

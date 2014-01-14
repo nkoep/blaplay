@@ -32,9 +32,8 @@ from blaplay.blacore import blaconst, blacfg
 from blaplay import blautil, blagui
 from blaplay.formats._identifiers import *
 from blawindows import BlaScrolledWindow
-from blaplaylist import BlaPlaylistManager
-from blaqueue import BlaQueue
-queue = BlaQueue()
+from blaplaylist import playlist_manager
+from blaqueue import queue
 import blaguiutils
 
 
@@ -194,11 +193,11 @@ class BlaTreeView(blaguiutils.BlaTreeViewBase):
             tracks = self.get_tracks()
 
             if action == blaconst.ACTION_SEND_TO_CURRENT:
-                BlaPlaylistManager.send_to_current_playlist(tracks)
+                playlist_manager.send_to_current_playlist(tracks)
             elif action == blaconst.ACTION_ADD_TO_CURRENT:
-                BlaPlaylistManager.add_to_current_playlist(tracks)
+                playlist_manager.add_to_current_playlist(tracks)
             elif action == blaconst.ACTION_SEND_TO_NEW:
-                BlaPlaylistManager.send_to_new_playlist(tracks, name)
+                playlist_manager.send_to_new_playlist(tracks, name)
 
         return False
 
@@ -283,11 +282,11 @@ class BlaTreeView(blaguiutils.BlaTreeViewBase):
         tracks = self.get_tracks()
 
         if action == blaconst.ACTION_SEND_TO_CURRENT:
-            BlaPlaylistManager.send_to_current_playlist(tracks)
+            playlist_manager.send_to_current_playlist(tracks)
         elif action == blaconst.ACTION_ADD_TO_CURRENT:
-            BlaPlaylistManager.add_to_current_playlist(tracks)
+            playlist_manager.add_to_current_playlist(tracks)
         elif action == blaconst.ACTION_SEND_TO_NEW:
-            BlaPlaylistManager.send_to_new_playlist(tracks, name)
+            playlist_manager.send_to_new_playlist(tracks, name)
 
         return False
 
@@ -318,13 +317,13 @@ class BlaTreeView(blaguiutils.BlaTreeViewBase):
 
         items = [
             ("Send to current playlist", None,
-             lambda *x: BlaPlaylistManager.send_to_current_playlist(
+             lambda *x: playlist_manager.send_to_current_playlist(
              tracks, resolve), True),
             ("Add to current playlist", None,
-             lambda *x: BlaPlaylistManager.add_to_current_playlist(
+             lambda *x: playlist_manager.add_to_current_playlist(
              tracks, resolve), True),
             ("Send to new playlist", None,
-             lambda *x: BlaPlaylistManager.send_to_new_playlist(
+             lambda *x: playlist_manager.send_to_new_playlist(
              tracks, name, resolve), True),
             None,
             ("Open directory", None, lambda *x:

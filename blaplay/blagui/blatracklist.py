@@ -195,12 +195,11 @@ def update_columns(treeview, view_id):
     treeview.connect_changed_signal()
 
 def popup(treeview, event, view_id, target):
-    from blaplaylist import BlaPlaylistManager
-    from blaqueue import BlaQueue
-    queue = BlaQueue()
+    from blaplaylist import playlist_manager
+    from blaqueue import queue
 
     if view_id == blaconst.VIEW_PLAYLISTS:
-        element = BlaPlaylistManager
+        element = playlist_manager
     elif view_id == blaconst.VIEW_QUEUE:
         element = queue
 
@@ -286,19 +285,20 @@ def popup(treeview, event, view_id, target):
         ]
         for label, type_ in items:
             m = gtk.MenuItem(label)
-            m.connect("activate",
-                      lambda x, t=type_: BlaPlaylistManager.new_playlist(t))
+            m.connect(
+                "activate",
+                lambda x, t=type_: playlist_manager.new_playlist_from_type(t))
             submenu.append(m)
 
         m = gtk.MenuItem("New playlist from")
         m.set_submenu(submenu)
         menu.append(m)
 
-        playlists = BlaPlaylistManager.get_playlists()
+        playlists = playlist_manager.get_playlists()
         if len(playlists) > 1:
             # Move to playlist
             submenu = gtk.Menu()
-            current_playlist = BlaPlaylistManager.get_current_playlist()
+            current_playlist = playlist_manager.get_current_playlist()
             for playlist in playlists:
                 if playlist == current_playlist:
                     continue
@@ -313,7 +313,7 @@ def popup(treeview, event, view_id, target):
 
             # Add to playlist
             submenu = gtk.Menu()
-            current_playlist = BlaPlaylistManager.get_current_playlist()
+            current_playlist = playlist_manager.get_current_playlist()
             for playlist in playlists:
                 if playlist == current_playlist:
                     continue
@@ -610,8 +610,7 @@ class BlaColumn(gtk.TreeViewColumn):
             text = "%02d" % int(model[iterator][1])
         elif column_id == COLUMN_PLAYING:
             # FIXME: Get rid of the import overhead.
-            from blaqueue import BlaQueue
-            queue = BlaQueue()
+            from blaqueue import queue
             pos = queue.get_queue_positions(item)
             text = "(%s)" % (", ".join(pos)) if pos else ""
         else:
@@ -629,15 +628,15 @@ class BlaTrackListItem(object):
         return library[self.uri]
 
     def play(self):
-        from blaplaylist import BlaPlaylistManager
-        BlaPlaylistManager.play_item(self)
+        from blaplaylist import playlist_manager
+        playlist_manager.play_item(self)
 
     def select(self):
         if not self.playlist:
             return
-        from blaplaylist import BlaPlaylistManager
-        if BlaPlaylistManager.get_current_playlist() != self.playlist:
-            BlaPlaylistManager.focus_playlist(self.playlist)
+        from blaplaylist import playlist_manager
+        if playlist_manager.get_current_playlist() != self.playlist:
+            playlist_manager.focus_playlist(self.playlist)
         self.playlist.set_row(self.playlist.get_path_from_item(self))
 
     def clear_icon(self):

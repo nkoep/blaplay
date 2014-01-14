@@ -32,7 +32,7 @@ from blatracklist import (
     update_columns, parse_track_list_stats, BlaTreeView, BlaTrackListItem)
 from blastatusbar import BlaStatusbar
 from blaview import BlaViewMeta
-import blaplaylist
+from blaplaylist import playlist_manager
 
 
 class BlaQueue(BlaScrolledWindow):
@@ -49,8 +49,6 @@ class BlaQueue(BlaScrolledWindow):
         self.__size = 0
         self.__length = 0
         self.clipboard = []
-
-        self.__playlist_manager = blaplaylist.BlaPlaylistManager()
 
         self.__treeview = BlaTreeView(view_id=blaconst.VIEW_QUEUE)
         self.__treeview.set_model(gtk.ListStore(*self.__layout))
@@ -248,7 +246,7 @@ class BlaQueue(BlaScrolledWindow):
 
         # Invalidate the visible rows of the current playlists so the
         # position labels also get updated in playlists.
-        playlist = self.__playlist_manager.get_current_playlist()
+        playlist = playlist_manager.get_current_playlist()
         playlist.invalidate_visible_rows()
 
         # Calculate size and length of the queue and update the statusbar.
@@ -289,7 +287,7 @@ class BlaQueue(BlaScrolledWindow):
 
     def get_queue(self):
         queue = []
-        playlists = self.__playlist_manager.get_playlists()
+        playlists = playlist_manager.get_playlists()
 
         for row in self.__treeview.get_model():
             item = row[0]
@@ -313,7 +311,7 @@ class BlaQueue(BlaScrolledWindow):
         if not items:
             return
 
-        playlists = self.__playlist_manager.get_playlists()
+        playlists = playlist_manager.get_playlists()
 
         for idx, item in enumerate(items):
             try:
@@ -383,4 +381,6 @@ class BlaQueue(BlaScrolledWindow):
     @property
     def n_items(self):
         return len(self.__treeview.get_model())
+
+queue = BlaQueue()
 

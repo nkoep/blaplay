@@ -155,11 +155,11 @@ class BlaDBus(dbus.service.Object):
         dbus_interface=INTERFACE, in_signature="sas", out_signature="")
     def parse_uris(self, action, uris):
         # TODO: do this via pipe
-        from blaplay.blagui.blaplaylist import BlaPlaylistManager
+        from blaplay.blagui.blaplaylist import playlist_manager
         if action == "append":
-            BlaPlaylistManager.add_to_current_playlist(uris, resolve=True)
+            playlist_manager.add_to_current_playlist(uris, resolve=True)
         elif action == "new":
-            BlaPlaylistManager.send_to_new_playlist(uris, resolve=True)
+            playlist_manager.send_to_new_playlist(uris, resolve=True)
         else:
-            f = BlaPlaylistManager.send_to_current_playlist(uris, resolve=True)
+            f = playlist_manager.send_to_current_playlist(uris, resolve=True)
 

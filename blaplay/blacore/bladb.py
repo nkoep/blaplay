@@ -38,6 +38,7 @@ from blaplay.formats._identifiers import *
 EVENT_CREATED, EVENT_DELETED, EVENT_MOVED, EVENT_CHANGED = xrange(4)
 
 library = None
+# TODO: Move `pending_save' or a similar variable into BlaLibrary.
 pending_save = False
 BlaPlaylistManager = None
 
@@ -46,6 +47,7 @@ def init():
     print_i("Initializing the database")
 
     global library
+
     library = BlaLibrary()
     return library
 
@@ -55,9 +57,12 @@ def update_library():
     library.sync()
     pending_save = False
 
+    # TODO: Hook the BlaPlaylistManager singleton up to the `library_changed'
+    #       signal. The library logic should be fully decoupled from UI code
+    #       so importing anything from blaplay.blagui in here is ugly.
     if BlaPlaylistManager is None:
         from blaplay.blagui.blaplaylist import BlaPlaylistManager
-    BlaPlaylistManager.invalidate_visible_rows()
+    BlaPlaylistManager().invalidate_visible_rows()
 
     return False
 
@@ -239,7 +244,9 @@ class BlaLibraryMonitor(gobject.GObject):
 
                     self.remove_directories(path_from)
                     self.add_directory(path_to)
-                BlaPlaylistManager.update_uris(uris)
+                # TODO: Add a `library_entries_moved' signal for this so we
+                #       don't need to call methods on the playlist manager.
+                BlaPlaylistManager().update_uris(uris)
 
             # Schedule an update for the library browser, etc. The timeout
             # might be removed immediately at the beginning of this loop if
@@ -327,6 +334,7 @@ class BlaLibraryMonitor(gobject.GObject):
                 (len(self.__monitors), monitored_directories))
         self.emit("initialized", directories)
 
+# TODO: Make this a singleton.
 class BlaLibrary(gobject.GObject):
     __gsignals__ = {
         "progress": blautil.signal(1),
@@ -382,6 +390,7 @@ class BlaLibrary(gobject.GObject):
 
     def __call__(self):
         print_i("Saving pending library changes")
+
         if pending_save:
             self.__save_library()
 

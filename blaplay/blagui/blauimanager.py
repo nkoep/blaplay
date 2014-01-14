@@ -40,9 +40,8 @@ class BlaUIManager(gtk.UIManager):
             radio_actions, value=value, on_change=on_change)
 
     def update_menu(self, view):
-        from blaplaylist import BlaPlaylistManager
-        from blaqueue import BlaQueue
-        queue = BlaQueue()
+        from blaplaylist import playlist_manager
+        from blaqueue import queue
 
         state = view == blaconst.VIEW_PLAYLISTS
         for entry in blaconst.MENU_PLAYLISTS:
@@ -50,8 +49,10 @@ class BlaUIManager(gtk.UIManager):
 
         state = True
         if view in (blaconst.VIEW_PLAYLISTS, blaconst.VIEW_QUEUE):
+            # TODO: Add a BlaClipboard mixin to the playlist manager and the
+            #       queue.
             if view == blaconst.VIEW_PLAYLISTS:
-                clipboard = BlaPlaylistManager.clipboard
+                clipboard = playlist_manager.clipboard
                 label = "playlist"
             else:
                 clipboard = queue.clipboard

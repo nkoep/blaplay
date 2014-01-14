@@ -79,8 +79,7 @@ class BlaStatusbar(gtk.Table):
         table.attach(self.__order, 1, 2, 0, 1)
         button = gtk.Button()
         button.set_tooltip_text("Clear queue")
-        from blaqueue import BlaQueue
-        queue = BlaQueue()
+        from blaqueue import queue
         button.connect("clicked", lambda *x: queue.clear())
         queue.connect("count_changed",
                       lambda *x: button.set_sensitive(x[-1] > 0))
