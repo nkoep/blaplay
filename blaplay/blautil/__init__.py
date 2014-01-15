@@ -84,7 +84,7 @@ def idle(func=None, **kwargs):
     @functools.wraps(func)
     def wrapper(*args):
         priority = kwargs.get("priority", gobject.PRIORITY_DEFAULT_IDLE)
-        gobject.idle_add(func, *args, priority=priority)
+        return gobject.idle_add(func, *args, priority=priority)
     return wrapper
 
 def lock(lock_):

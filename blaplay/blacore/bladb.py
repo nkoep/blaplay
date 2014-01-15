@@ -433,7 +433,7 @@ class BlaLibrary(gobject.GObject):
         def initialized(library_monitor, directories):
             if blacfg.getboolean("library", "update.on.startup"):
                 p = self.__detect_changes(directories)
-                gobject.idle_add(p.next)
+                gobject.idle_add(p.next, priority=gobject.PRIORITY_LOW)
                 # TODO: this seems more efficient
 #                for md in self.__monitored_directories:
 #                    self.scan_directory(md)
