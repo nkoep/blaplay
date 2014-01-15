@@ -173,7 +173,7 @@ class BlaLibraryMonitor(gobject.GObject):
                     for uri in library:
                         if uri.startswith(path_from):
                             new_path = os.path.join(
-                                    path_to, uri[len(path_from)+1:])
+                                path_to, uri[len(path_from)+1:])
                             library.move_track(uri, new_path)
                             uris[uri] = new_path
 
@@ -206,14 +206,14 @@ class BlaLibraryMonitor(gobject.GObject):
             try:
                 discover = blautil.discover
                 directories = list(
-                        discover(directories, directories_only=True))
+                    discover(directories, directories_only=True))
                 conn.send(directories)
             except KeyboardInterrupt:
                 pass
 
         conn1, conn2 = multiprocessing.Pipe(duplex=False)
         p = multiprocessing.Process(
-                target=get_subdirectories, args=(conn2, directories))
+            target=get_subdirectories, args=(conn2, directories))
         p.daemon = True
         p.start()
         directories = conn1.recv()
@@ -338,9 +338,8 @@ class BlaLibrary(gobject.GObject):
         join()
 
     def __detect_changes(self, directories):
-        # FIXME: this is insanely slow
-
-        # TODO: looks like it's faster to just rescan all monitored directories
+        # FIXME: This is insanely slow. Looks like it's faster to just rescan
+        #        all monitored directories.
 
         # This method does not perform any write operations on files. It
         # merely updates our metadata of tracks in directories we're
@@ -571,7 +570,7 @@ class BlaLibrary(gobject.GObject):
         join()
 
     def parse_ool_uris(self, uris):
-        # FIXME: move this to a separate process maybe?
+        # TODO: Test if it is faster to move this to a separate process.
 
         def process(namespace, uris, pb):
             # Update every 40 ms (25 fps).
@@ -618,7 +617,7 @@ class BlaLibrary(gobject.GObject):
             namespace["done"] = True
             yield False
 
-        # FIXME: get rid of `namespace'
+        # FIXME: Get rid of `namespace'
         def cancel(namespace):
             namespace["wait"] = False
         pb = blaguiutils.BlaProgressBar(title="Scanning files...")
