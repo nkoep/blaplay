@@ -36,6 +36,8 @@ from blaplaylist import playlist_manager
 from blaqueue import queue
 import blaguiutils
 
+PADDING_X, PADDING_Y, PADDING_WIDTH, PADDING_HEIGHT = -2, 0, 4, 0
+
 
 class BlaCellRenderer(blaguiutils.BlaCellRendererBase):
     __gproperties__ = {
@@ -103,10 +105,8 @@ class BlaCellRenderer(blaguiutils.BlaCellRendererBase):
             color = gtk.gdk.color_parse(background_color)
         cr.set_source_color(color)
         pc_context.rectangle(
-            cell_area.x + blaguiutils.PADDING_X,
-            cell_area.y + blaguiutils.PADDING_Y,
-            width + blaguiutils.PADDING_WIDTH,
-            cell_area.height + blaguiutils.PADDING_HEIGHT)
+             cell_area.x + PADDING_X, cell_area.y + PADDING_Y,
+             width + PADDING_WIDTH, cell_area.height + PADDING_HEIGHT)
         pc_context.fill()
 
         # Set font, font color and the text to render

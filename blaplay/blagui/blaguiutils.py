@@ -22,10 +22,6 @@ import blaplay
 from blaplay.blacore import blaconst, blacfg
 from blaplay import blautil
 
-# TODO: move these to blabrowsers.py once the required code was moved out of
-#       BlaTreeViewBase
-PADDING_X, PADDING_Y, PADDING_WIDTH, PADDING_HEIGHT = -2, 0, 4, 0
-
 
 def _generic_dialog(text, secondary_text, **kwargs):
     diag = BlaMessageDialog(**kwargs)
