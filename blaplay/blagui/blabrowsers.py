@@ -495,12 +495,7 @@ class BlaLibraryBrowser(gtk.VBox):
                 raise ValueError("Trying to include track in the library "
                                  "browser that has no monitored directory")
             directory = track.uri[len(md)+1:]
-            comps = directory.split("/")
-            if comps == [""]:
-                comps = ["bla"]
-            else:
-                comps.insert(0, "bla")
-            return tuple(comps)
+            return tuple(["bla"] + directory.split("/"))
 
         @classmethod
         def __organize_by_artist(cls, uri, track):
