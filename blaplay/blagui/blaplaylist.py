@@ -1759,6 +1759,10 @@ class BlaPlaylistManager(gtk.Notebook):
         if idx == -1:
             idx = None
         return idx
+        
+    def get_nth_playlist(self, idx):
+        # Convenience routine
+        return self.get_nth_page(idx)
 
     def remove_playlist(self, playlist=None):
         if playlist is None:
