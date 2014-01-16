@@ -631,15 +631,3 @@ class BlaTrackListItem(object):
         from blaplaylist import playlist_manager
         playlist_manager.play_item(self)
 
-    def select(self):
-        if not self.playlist:
-            return
-        from blaplaylist import playlist_manager
-        if playlist_manager.get_current_playlist() != self.playlist:
-            playlist_manager.focus_playlist(self.playlist)
-        self.playlist.set_row(self.playlist.get_path_from_item(self))
-
-    def clear_icon(self):
-        if self.playlist:
-            self.playlist.update_icon(clear=True)
-

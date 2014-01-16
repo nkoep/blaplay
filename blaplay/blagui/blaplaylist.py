@@ -827,10 +827,8 @@ class BlaPlaylist(gtk.VBox):
 
         items = self.get_items_from_paths(paths)
         if remove:
-            self.__length -= sum(
-                [item.track[LENGTH] for item in items])
-            self.__size -= sum(
-                [item.track[FILESIZE] for item in items])
+            self.__length -= sum([item.track[LENGTH] for item in items])
+            self.__size -= sum([item.track[FILESIZE] for item in items])
 
             # Remove the rows from the model.
             model = self.__freeze_treeview()
@@ -945,7 +943,7 @@ class BlaPlaylist(gtk.VBox):
             height = label.create_pango_layout(
                 label.get_text()).get_pixel_size()[-1]
             pixbuf = self.render_icon(
-                gtk.STOCK_DIALOG_AUTHENTICATION, gtk.ICON_SIZE_MENU)
+                gtk.STOCK_DIALOG_AUTHENTICATION, gtk.ICON_SIZE_BUTTON)
             pixbuf = pixbuf.scale_simple(
                 height, height, gtk.gdk.INTERP_BILINEAR)
             image = gtk.image_new_from_pixbuf(pixbuf)
@@ -1256,7 +1254,7 @@ class BlaPlaylistManager(gtk.Notebook):
         self.__lock_button.set_focus_on_click(False)
         self.__lock_button.add(
             gtk.image_new_from_stock(gtk.STOCK_DIALOG_AUTHENTICATION,
-                                     gtk.ICON_SIZE_MENU))
+                                     gtk.ICON_SIZE_BUTTON))
         style = gtk.RcStyle()
         style.xthickness = style.ythickness = 0
         self.__lock_button.modify_style(style)
@@ -1331,6 +1329,18 @@ class BlaPlaylistManager(gtk.Notebook):
             resolve = True
 
         self.send_to_new_playlist(items, resolve=resolve, select=select)
+
+    def __scroll_to_current_track(self):
+        if not self.current or not self.current.playlist:
+            return
+        playlist = self.current.playlist
+        if self.get_current_playlist() != playlist:
+            self.focus_playlist(playlist)
+        playlist.set_row(playlist.get_path_from_item(self.current))
+
+    def __clear_current_icon(self):
+        if self.current and self.current.playlist:
+            self.current.playlist.update_icon(clear=True)
 
     def __button_press_event(self, notebook, event):
         for child in notebook.get_children():
@@ -1695,7 +1705,7 @@ class BlaPlaylistManager(gtk.Notebook):
                 playlist = self.get_nth_page(active_playlist)
             if current is not None:
                 self.current = playlist.get_item_from_path(current)
-                self.current.select()
+                self.__scroll_to_current_track()
             queue.restore(queued_items)
         else:
             self.add_playlist()
@@ -1753,6 +1763,10 @@ class BlaPlaylistManager(gtk.Notebook):
             idx = None
         return idx
         
+    def get_nth_playlist(self, idx):
+        # Convenience routine
+        return self.get_nth_page(idx)
+
     def get_nth_playlist(self, idx):
         # Convenience routine
         return self.get_nth_page(idx)
@@ -1826,7 +1840,7 @@ class BlaPlaylistManager(gtk.Notebook):
             return
 
         try:
-            self.current.clear_icon()
+            self.__clear_current_icon()
         except AttributeError:
             pass
         # Reset self.current to make sure the get_track() method will try to
@@ -1907,7 +1921,7 @@ class BlaPlaylistManager(gtk.Notebook):
 
     def play_item(self, item):
         try:
-            self.current.clear_icon()
+            self.__clear_current_icon()
         except AttributeError:
             pass
 
@@ -1918,11 +1932,11 @@ class BlaPlaylistManager(gtk.Notebook):
             uri = None
         else:
             if blacfg.getboolean("general", "cursor.follows.playback"):
-                item.select()
+                self.__scroll_to_current_track()
         self.emit("play_track", uri)
 
     def get_playlists(self):
-        return map(None, self)
+        return list(self)
 
     def next(self):
         for playlist in self:
