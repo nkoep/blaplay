@@ -482,7 +482,6 @@ class BlaPlaylist(gtk.VBox):
                     return
 
             playlist = playlist_manager.get_nth_playlist(idx)
-            # FIXME: what happens to the current track?
             items = playlist.get_items(paths=paths, remove=True)
             if drop_info:
                 path = self.get_path_from_item(item)
@@ -710,14 +709,8 @@ class BlaPlaylist(gtk.VBox):
             return
 
         # Update the playlist reference of the new items.
-        all_items = self.__all_items
-        for idx, item in enumerate(items):
-            # When a copied item is pasted into the same playlist multiple
-            # times make sure it gets a new id by creating a shallow copy.
-            if item.playlist == self:
-                items[idx] = copy(item)
-            else:
-                item.playlist = self
+        for item in items:
+            item.playlist = self
 
         # If drop_info is -1 insert at the cursor or at the end of the playlist
         # if nothing is selected.
