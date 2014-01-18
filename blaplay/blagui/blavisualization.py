@@ -65,13 +65,14 @@ class BlaVisualization(gtk.Viewport):
         try:
             from blaspectrum import BlaSpectrum
         except ImportError as exc:
-            blaguiutils.error_dialog("Failed to enable spectrum visualization",
-                                     exc.message)
+            blaguiutils.error_dialog(
+                "Failed to enable spectrum visualization", exc.message)
             self.__disable()
             return
 
         self.__spectrum = BlaSpectrum()
         self.__spectrum.set_width(self.get_allocation().width)
+        self.__spectrum.update_colors(self.__drawing_area.get_style())
         self.set_size_request(-1, self.__spectrum.height)
         self.__set_visible(True)
         self.__cid = player.connect_object(
@@ -107,8 +108,8 @@ class BlaVisualization(gtk.Viewport):
         drawing_area = self.__drawing_area
         try:
             self.__spectrum.draw(drawing_area.window.cairo_create(),
-                                 drawing_area.get_pango_context(),
-                                 drawing_area.get_style())
+                                 drawing_area.get_pango_context())
+
         except AttributeError:
             pass
 
