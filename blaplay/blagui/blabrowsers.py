@@ -186,7 +186,7 @@ class BlaTreeView(blaguiutils.BlaTreeViewBase):
             selections = self.get_selection().get_selected_rows()[-1]
             if not selections:
                 return True
-            name = self.get_model()[selections[0]][1]
+            name = self.get_model()[selections[0]][-1]
             tracks = self.get_tracks()
 
             if action == blaconst.ACTION_SEND_TO_CURRENT:
@@ -275,7 +275,7 @@ class BlaTreeView(blaguiutils.BlaTreeViewBase):
             selection.select_path(path)
 
         model = self.get_model()
-        name = model[path][1]
+        name = model[path][-1]
         tracks = self.get_tracks()
 
         if action == blaconst.ACTION_SEND_TO_CURRENT:
@@ -302,7 +302,7 @@ class BlaTreeView(blaguiutils.BlaTreeViewBase):
             dirname = os.path.dirname
             resolve = False
 
-        name = model[path][1]
+        name = model[path][-1]
         # TODO: Defer calling get_tracks() until it's actually needed, i.e.
         #       when an "activate" callback is invoked.
         tracks = self.get_tracks()
@@ -315,13 +315,13 @@ class BlaTreeView(blaguiutils.BlaTreeViewBase):
         items = [
             ("Send to current playlist", None,
              lambda *x: playlist_manager.send_to_current_playlist(
-             tracks, resolve), True),
+                 tracks, resolve), True),
             ("Add to current playlist", None,
              lambda *x: playlist_manager.add_to_current_playlist(
-             tracks, resolve), True),
+                 tracks, resolve), True),
             ("Send to new playlist", None,
              lambda *x: playlist_manager.send_to_new_playlist(
-             tracks, name, resolve), True),
+                 tracks, name, resolve), True),
             None,
             ("Open directory", None, lambda *x:
              blautil.open_directory(directory), bool(directory)),
@@ -642,6 +642,8 @@ class BlaLibraryBrowser(gtk.VBox):
             self.__fid = gobject.timeout_add(500, activate)
 
     def __drag_data_get(self, drag_context, selection_data, info, timestamp):
+        # TODO: Send a name with the DND data for when we drop on the playlist
+        #       tab strip.
         data = self.__treeview.get_tracks()
         # TODO: We could use set_uris() here as well which would allow DND
         #       from the library to external applications like file managers.
