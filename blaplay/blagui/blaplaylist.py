@@ -99,6 +99,65 @@ class BlaPlaylist(gtk.VBox):
     __sort_parameters = None
     __fid = -1
 
+    class HeaderBox(gtk.HBox):
+        def __init__(self, name):
+            super(BlaPlaylist.HeaderBox, self).__init__(spacing=1)
+            self.__lock = blautil.BlaLock()
+
+            self.__play_image = gtk.Image()
+
+            # Create a lock image and resize it so it fits the text size.
+            self.__label = gtk.Label(name)
+            self.__height = int(self.__label.create_pango_layout(
+                self.__label.get_text()).get_pixel_size()[-1] * 3 / 4)
+
+            pixbuf = self.__create_pixbuf(gtk.STOCK_DIALOG_AUTHENTICATION)
+            self.__lock_image = gtk.image_new_from_pixbuf(pixbuf)
+
+            for widget in (self.__play_image, self.__label, self.__lock_image):
+                self.pack_start(widget)
+            self.__label.show()
+            self.show()
+
+            player.connect("state_changed", self.__state_changed)
+            self.__state_changed()
+
+        def __state_changed(self, *args):
+            state = player.get_state()
+            if state == blaconst.STATE_PLAYING:
+                stock = gtk.STOCK_MEDIA_PLAY
+            elif state == blaconst.STATE_PAUSED:
+                stock = gtk.STOCK_MEDIA_PAUSE
+            else:
+                stock = gtk.STOCK_MEDIA_STOP
+            self.__play_image.set_from_pixbuf(self.__create_pixbuf(stock))
+
+        def __create_pixbuf(self, stock):
+            return self.render_icon(stock, gtk.ICON_SIZE_BUTTON).scale_simple(
+                self.__height, self.__height, gtk.gdk.INTERP_HYPER)
+
+        def __set_lock_image_visible(self, yes):
+            self.__lock_image.set_visible(yes)
+
+        def set_play_state_active(self, yes):
+            self.__play_image.set_visible(yes)
+
+        def set_lock_state(self, state):
+            if state:
+                self.__lock.acquire()
+            else:
+                self.__lock.release()
+            self.__set_lock_image_visible(state)
+
+        def get_lock_state(self):
+            return self.__lock.locked()
+
+        def set_name(self, name):
+            self.__label.set_text(name)
+
+        def get_name(self):
+            return self.__label.get_text()
+
     class ListStoreSet(gtk.ListStore):
         def __init__(self, *args):
             super(BlaPlaylist.ListStoreSet, self).__init__(*args)
@@ -167,11 +226,7 @@ class BlaPlaylist(gtk.VBox):
         self.__history = BlaPlaylist.History(self)
         self.__mode = MODE_NORMAL
 
-        self.__lock = blautil.BlaLock()
-
-        self.__header_box = gtk.HBox()
-        self.__header_box.pack_start(gtk.Label(name))
-        self.__header_box.show_all()
+        self.__header_box = BlaPlaylist.HeaderBox(name)
 
         self.__entry = gtk.Entry()
         self.__entry.set_icon_from_stock(
@@ -261,8 +316,8 @@ class BlaPlaylist(gtk.VBox):
 
     def __getstate__(self):
         state = {
-            "name": self.__header_box.children()[0].get_text(),
-            "locked": self.__lock.locked(),
+            "name": self.get_name(),
+            "locked": self.locked(),
             "all_items": self.__all_items,
             "items": self.__items,
             "all_sorted": self.__all_sorted,
@@ -526,17 +581,20 @@ class BlaPlaylist(gtk.VBox):
             self.__treeview.scroll_to_cell(
                 path, use_align=True, row_align=row_align)
 
-    def get_header_box(self):
+    def get_label(self):
         return self.__header_box
 
     def get_name(self):
-        return self.__header_box.children()[0].get_text()
+        return self.__header_box.get_name()
 
     def set_name(self, name):
-        self.__header_box.children()[0].set_text(name)
+        self.__header_box.set_name(name)
+
+    def set_active(self, yes):
+        self.__header_box.set_play_state_active(yes)
 
     def modification_allowed(self, check_filter_state=True):
-        if self.__lock.locked():
+        if self.locked():
             text = "The playlist is locked"
             secondary_text = "Unlock it first to modify its contents."
         elif check_filter_state and self.__mode & MODE_FILTERED:
@@ -932,28 +990,13 @@ class BlaPlaylist(gtk.VBox):
         gobject.idle_add(p.next)
 
     def toggle_lock(self):
-        if self.__lock.locked():
-            self.__lock.release()
-            self.__header_box.remove(self.__header_box.children()[-1])
-        else:
-            self.__lock.acquire()
-
-            # Create a lock image and resize it so it fits the text size.
-            label = self.__header_box.children()[0]
-            height = label.create_pango_layout(
-                label.get_text()).get_pixel_size()[-1]
-            pixbuf = self.render_icon(
-                gtk.STOCK_DIALOG_AUTHENTICATION, gtk.ICON_SIZE_BUTTON)
-            pixbuf = pixbuf.scale_simple(
-                height, height, gtk.gdk.INTERP_BILINEAR)
-            image = gtk.image_new_from_pixbuf(pixbuf)
-            self.__header_box.pack_start(image)
-            self.__header_box.show_all()
-
+        self.__header_box.set_lock_state(
+            not self.__header_box.get_lock_state())
+        # TODO: Emit a signal instead.
         playlist_manager.update_playlist_lock_state()
 
     def locked(self):
-        return self.__lock.locked()
+        return self.__header_box.get_lock_state()
 
     def enable_search(self):
         self.__entry.grab_focus()
@@ -1339,8 +1382,10 @@ class BlaPlaylistManager(gtk.Notebook):
         playlist.set_row(playlist.get_path_from_item(self.current))
 
     def __clear_current_icon(self):
-        if self.current and self.current.playlist:
+        try:
             self.current.playlist.update_icon(clear=True)
+        except AttributeError:
+            pass
 
     def __button_press_event(self, notebook, event):
         for child in notebook.get_children():
@@ -1698,11 +1743,12 @@ class BlaPlaylistManager(gtk.Notebook):
 
         if playlists:
             for playlist in playlists:
-                self.append_page(playlist, playlist.get_header_box())
+                self.append_page(playlist, playlist.get_label())
 
             if active_playlist is not None:
                 self.set_current_page(active_playlist)
                 playlist = self.get_nth_page(active_playlist)
+                playlist.set_active(True)
             if current is not None:
                 self.current = playlist.get_item_from_path(current)
                 self.__scroll_to_current_track()
@@ -1746,7 +1792,7 @@ class BlaPlaylistManager(gtk.Notebook):
                 list_name += " (%d)" % idx
 
         playlist = BlaPlaylist(list_name)
-        self.append_page(playlist, playlist.get_header_box())
+        self.append_page(playlist, playlist.get_label())
         self.set_tab_reorderable(playlist, True)
 
         if focus:
@@ -1762,7 +1808,7 @@ class BlaPlaylistManager(gtk.Notebook):
         if idx == -1:
             idx = None
         return idx
-        
+
     def get_nth_playlist(self, idx):
         # Convenience routine
         return self.get_nth_page(idx)
@@ -1839,10 +1885,8 @@ class BlaPlaylistManager(gtk.Notebook):
         if not uris:
             return
 
-        try:
-            self.__clear_current_icon()
-        except AttributeError:
-            pass
+        self.__clear_current_icon()
+
         # Reset self.current to make sure the get_track() method will try to
         # request the next track from the currently visible playlist.
         self.current = None
@@ -1920,8 +1964,9 @@ class BlaPlaylistManager(gtk.Notebook):
         self.play_item(item)
 
     def play_item(self, item):
+        self.__clear_current_icon()
         try:
-            self.__clear_current_icon()
+            self.current.playlist.set_active(False)
         except AttributeError:
             pass
 
@@ -1933,6 +1978,10 @@ class BlaPlaylistManager(gtk.Notebook):
         else:
             if blacfg.getboolean("general", "cursor.follows.playback"):
                 self.__scroll_to_current_track()
+            try:
+                self.current.playlist.set_active(True)
+            except AttributeError:
+                pass
         self.emit("play_track", uri)
 
     def get_playlists(self):
