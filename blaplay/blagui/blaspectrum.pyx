@@ -133,7 +133,10 @@ cdef class BlaSpectrum(object):
     cdef fftwf_plan __plan
     cdef np.ndarray __window
     cdef np.ndarray __np_buf
-    cdef float *__in, *__buf, *__old, *__log_freq
+    cdef float *__in
+    cdef float *__buf
+    cdef float *__old
+    cdef float *__log_freq
     cdef fftwf_complex *__out
 
     # Variables needed for drawing
@@ -282,7 +285,9 @@ cdef class BlaSpectrum(object):
         # very slow. To remedy this we just assign everything to locals.
         cdef int i, l
         cdef int bands = self.__bands
-        cdef float *buf = self.__buf, *in_ = self.__in, *old_ = self.__old
+        cdef float *buf = self.__buf
+        cdef float *in_ = self.__in
+        cdef float *old_ = self.__old
         cdef float *_buf
         cdef fftwf_complex *out_ = self.__out
         cdef float *window = <float *>self.__window.data
