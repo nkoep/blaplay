@@ -252,7 +252,7 @@ if __name__ == "__main__":
     description = "Minimalist audio player for GNU/Linux written in Python"
 
     # Spectrum visualization
-    extra_compile_args = ["-std=gnu99"]
+    extra_compile_args = ["-std=gnu99", "-funroll-loops"]
     try:
         extra_compile_args.append("-I%s" % np.get_include())
     except AttributeError:
