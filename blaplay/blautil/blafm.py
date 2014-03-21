@@ -123,15 +123,17 @@ def post_message(params, key=None):
     try:
         response = conn.getresponse()
     except httplib.HTTPException as exc:
-        return ResponseError(exc.message)
-    finally:
         conn.close()
+        return ResponseError(exc.message)
 
     try:
         content = response.read()
+        conn.close()
         response = json.loads(content)
-    except (socket.timeout, ValueError):
+    except httplib.HTTPException:
         return ResponseError(response.reason)
+    except (socket.timeout, ValueError) as exc:
+        return ResponseError(exc)
 
     if key is not None:
         response = parse_response(response, key)
@@ -147,11 +149,11 @@ def get_response(url, key):
         return ResponseError(exc.message)
 
     try:
-        response = json.loads(f.read())
+        content = f.read()
+        f.close()
+        response = json.loads(content)
     except (socket.timeout, ValueError) as exc:
         return ResponseError(exc.message)
-    finally:
-        f.close()
 
     return parse_response(response, key)
 
