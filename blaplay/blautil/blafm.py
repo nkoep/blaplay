@@ -110,16 +110,23 @@ def parse_response(response, key):
     return response
 
 def post_message(params, key=None):
+    def parse_socket_error_exception(exc):
+        try:
+            errno, errmsg = exc
+            return ResponseError("%d: %s" % (errno, errmsg))
+        except TypeError:
+            pass
+        return ResponseError("%s" % exc)
+
     conn = httplib.HTTPConnection("ws.audioscrobbler.com")
     params.append(("format", "json"))
     header = {"Content-type": "application/x-www-form-urlencoded"}
     try:
         conn.request("POST", "/2.0/?", urllib.urlencode(dict(params)), header)
+    except socket.error as exc:
+        return parse_socket_error_exception(exc)
     except httplib.HTTPException as exc:
         return ResponseError(exc.message)
-    except socket.gaierror as (error, string):
-        return ResponseError("%d: %s" % (error, string))
-
     try:
         response = conn.getresponse()
     except httplib.HTTPException as exc:
@@ -130,9 +137,11 @@ def post_message(params, key=None):
         content = response.read()
         conn.close()
         response = json.loads(content)
+    except socket.error as exc:
+        return parse_socket_error_exception(exc)
     except httplib.HTTPException:
         return ResponseError(response.reason)
-    except (socket.timeout, ValueError) as exc:
+    except ValueError as exc:
         return ResponseError(exc)
 
     if key is not None:
@@ -332,6 +341,7 @@ class BlaScrobbler(object):
     __elapsed = 0
     __iterations = 0
 
+    # TODO: Replace this by a proper Queue.Queue-based implementation.
     class SubmissionQueue(list):
         __items = []
 
@@ -347,13 +357,8 @@ class BlaScrobbler(object):
             while True:
                 self.__not_empty.wait()
 
-                items = []
                 # The API allows submission of up to 50 scrobbles in one POST.
-                for idx in xrange(50):
-                    try:
-                        items.append(self.__items[idx])
-                    except IndexError:
-                        pass
+                items = self.__items[:50]
 
                 method = "track.scrobble"
                 session_key = BlaScrobbler.get_session_key()
@@ -381,6 +386,11 @@ class BlaScrobbler(object):
 
                 api_signature = sign_api_call(params)
                 params.append(("api_sig", api_signature))
+                # FIXME: This blocks the UI in case of timeouts! This is
+                #        because our `put' method tries to acquire the
+                #        __not_empty condition lock which is already acquired
+                #        in here. Since `post_message' uses a timeout, this
+                #        leads to temporary UI freezes.
                 response = post_message(params)
                 if isinstance(response, ResponseError):
                     print_d("Failed to submit %d scrobbles to last.fm: %s" % (
