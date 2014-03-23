@@ -218,27 +218,25 @@ class BlaFetcher(gobject.GObject):
 
         # TODO: wrap lyrics providers in their own class
         #       http://www.plyrics.com/lyrics/balanceandcomposure/reflection.html
+        #       http://www.songlyrics.com/born-of-osiris/exhilarate-lyrics/
         resources = [
             # TODO: - add option for passing dict of replacements to the __download_feed method
             #       - don't escape ß for wikia
             ("http://lyrics.wikia.com/api.php?action=query&prop=revisions&"
              "rvprop=content&format=json&titles={0}:{1}", "_", "", "",
-             "()!", self.__json_parser, "", "", ""
-            ),
+             "()!", self.__json_parser, "", "", ""),
 #            ("http://www.lyricsmania.com/{1}_lyrics_{0}.html", "_", ".", "",
-#                    self.__html_parser, "div", ("id", "songlyrics_h"), ""),
+#             self.__html_parser, "div", ("id", "songlyrics_h"), ""),
 #            ("http://www.lyricstime.com/{0}-{1}-lyrics.html", "-", ".", "",
-#                    self.__html_parser, "div", ("id", "songlyrics"), ""),
+#             self.__html_parser, "div", ("id", "songlyrics"), ""),
 #            ("http://megalyrics.ru/lyric/{0}/{1}.htm", "_", ".", "",
-#                    self.__html_parser, "pre", ("class", "lyric"),
-#                    "Текст песни".decode("utf-8")
-#            ),
+#             self.__html_parser, "pre", ("class", "lyric"),
+#             "Текст песни".decode("utf-8")),
 #            ("http://www.lyricscollege.com/{0}_{1}_lyrics", "-", ".", "",
-#                    self.__html_parser, "div", ("class", "lyrics"), ""),
+#             self.__html_parser, "div", ("class", "lyrics"), ""),
 #            ("http://www.songtextemania.com/{1}_songtext_{0}.html", "_", "'.",
-#                    "", self.__html_parser, "div", ("id", "songlyrics_h"),
-#                    "Songtext:"
-#            )
+#             "", self.__html_parser, "div", ("id", "songlyrics_h"),
+#             "Songtext:")
         ]
 
         artist = track[ARTIST]
@@ -325,7 +323,7 @@ class BlaFetcher(gobject.GObject):
 
     @blautil.thread
     def __fetch_biography(self, track, timestamp):
-        image, biography = None, None
+        image = biography = None
         if track[ARTIST]:
             # Look for a cached artist image first.
             image_base = os.path.join(
