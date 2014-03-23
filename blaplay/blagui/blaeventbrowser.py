@@ -363,7 +363,6 @@ class BlaEventBrowser(BlaScrolledWindow):
             country = blacfg.getstring("general", "events.country")
             city = blacfg.getstring("general", "events.city")
 
-            # FIXME: These don't always seem to timeout properly.
             events = (blafm.get_events(limit=limit, recommended=True),
                       blafm.get_events(limit=limit, recommended=False,
                                        country=country, city=city))

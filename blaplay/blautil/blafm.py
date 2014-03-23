@@ -37,6 +37,8 @@ from blaplay.blacore import blacfg, blaconst
 from blaplay import blautil
 from blaplay.formats._identifiers import *
 
+TIMEOUT = 5
+
 scrobbler = None
 
 
@@ -109,40 +111,55 @@ def parse_response(response, key):
         response = ResponseError(response["message"])
     return response
 
-def post_message(params, key=None):
-    def parse_socket_error_exception(exc):
-        try:
-            errno, errmsg = exc
-            return ResponseError("%d: %s" % (errno, errmsg))
-        except TypeError:
-            pass
+def parse_socket_error_exception(exc):
+    if not isinstance(exc, socket.error):
+        raise TypeError("Expected socket.error, got %s" % type(exc))
+    if isinstance(exc, socket.timeout):
         return ResponseError("%s" % exc)
+    errno, errmsg = exc
+    return ResponseError("%d: %s" % (errno, errmsg))
 
-    conn = httplib.HTTPConnection("ws.audioscrobbler.com")
+def post_message(params, key=None):
+    class HTTPConnection(httplib.HTTPConnection):
+        def __init__(self, *args, **kwargs):
+            kwargs.setdefault("timeout", TIMEOUT)
+            httplib.HTTPConnection.__init__(self, *args, **kwargs)
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            self.close()
+
+    def try_(func):
+        try:
+            return func()
+        except socket.error as exc:
+            return parse_socket_error_exception(exc)
+        except httplib.HTTPException as exc:
+            return ResponseError(exc)
+        except ValueError as exc:
+            # XXX: This could possibly catch errors in the BlaThread class'
+            #      d'tor. Something to look into...
+            return ResponseError(exc)
+
     params.append(("format", "json"))
     header = {"Content-type": "application/x-www-form-urlencoded"}
-    try:
-        conn.request("POST", "/2.0/?", urllib.urlencode(dict(params)), header)
-    except socket.error as exc:
-        return parse_socket_error_exception(exc)
-    except httplib.HTTPException as exc:
-        return ResponseError(exc.message)
-    try:
-        response = conn.getresponse()
-    except httplib.HTTPException as exc:
-        conn.close()
-        return ResponseError(exc.message)
 
-    try:
-        content = response.read()
-        conn.close()
-        response = json.loads(content)
-    except socket.error as exc:
-        return parse_socket_error_exception(exc)
-    except httplib.HTTPException:
-        return ResponseError(response.reason)
-    except ValueError as exc:
-        return ResponseError(exc)
+    with HTTPConnection("ws.audioscrobbler.com") as conn:
+        r = try_(
+            lambda: conn.request(
+                "POST", "/2.0/?", urllib.urlencode(dict(params)), header))
+        if isinstance(r, ResponseError):
+            return r
+
+        response = try_(lambda: conn.getresponse())
+        if isinstance(response, ResponseError):
+            return response
+
+        response = try_(lambda: json.loads(response.read()))
+        if isinstance(response, ResponseError):
+            return response
 
     if key is not None:
         response = parse_response(response, key)
@@ -153,9 +170,11 @@ def post_message(params, key=None):
 
 def get_response(url, key):
     try:
-        f = urllib2.urlopen(url, timeout=10)
-    except (socket.timeout, urllib2.URLError) as exc:
-        return ResponseError(exc.message)
+        f = urllib2.urlopen(url, timeout=TIMEOUT)
+    except socket.error as exc:
+        return parse_socket_error_exception(exc)
+    except urllib2.URLError as exc:
+        return ResponseError(exc.reason)
 
     try:
         content = f.read()
@@ -330,7 +349,7 @@ class Response(object):
 
 class ResponseError(Response):
     def __repr__(self):
-        return self.content
+        return str(self.content)
 
 class BlaScrobbler(object):
     __requested_authorization = False

@@ -278,7 +278,6 @@ class BlaReleaseBrowser(BlaScrolledWindow):
 
         with self.__lock:
             images = set()
-            # FIXME: These don't always seem to timeout properly.
             releases = (blafm.get_new_releases(),
                         blafm.get_new_releases(recommended=True))
             active = blacfg.getint("general", "releases.filter")
