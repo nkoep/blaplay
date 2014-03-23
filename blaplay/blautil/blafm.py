@@ -20,6 +20,7 @@ import re
 import json
 import time
 import threading
+import Queue
 import urllib
 import urllib2
 import httplib
@@ -360,24 +361,23 @@ class BlaScrobbler(object):
     __elapsed = 0
     __iterations = 0
 
-    # TODO: Replace this by a proper Queue.Queue-based implementation.
-    class SubmissionQueue(list):
-        __items = []
-
+    class SubmissionQueue(Queue.Queue):
         def __init__(self):
-            super(BlaScrobbler.SubmissionQueue, self).__init__()
-            self.__not_empty = threading.Condition(threading.Lock())
-            self.__not_empty.acquire()
-            self.__submitter()
+            Queue.Queue.__init__(self)
             self.__restore()
+            self.__submit_scrobbles()
 
         @blautil.thread
-        def __submitter(self):
+        def __submit_scrobbles(self):
             while True:
-                self.__not_empty.wait()
-
+                # Block until the first item arrives.
+                items = [self.get()]
                 # The API allows submission of up to 50 scrobbles in one POST.
-                items = self.__items[:50]
+                while len(items) <= 50:
+                    try:
+                        items.append(self.get_nowait())
+                    except Queue.Empty:
+                        break
 
                 method = "track.scrobble"
                 session_key = BlaScrobbler.get_session_key()
@@ -405,32 +405,37 @@ class BlaScrobbler(object):
 
                 api_signature = sign_api_call(params)
                 params.append(("api_sig", api_signature))
-                # FIXME: This blocks the UI in case of timeouts! This is
-                #        because our `put' method tries to acquire the
-                #        __not_empty condition lock which is already acquired
-                #        in here. Since `post_message' uses a timeout, this
-                #        leads to temporary UI freezes.
-                response = post_message(params)
-                if isinstance(response, ResponseError):
-                    print_d("Failed to submit %d scrobbles to last.fm: %s" % (
-                            len(item), response))
-                else:
-                    map(self.__items.remove, items)
+
+                @blautil.thread
+                def post(params, items):
+                    n_items = len(items)
+                    response = post_message(params)
+                    if isinstance(response, ResponseError):
+                        print_w(
+                            "Failed to submit %d scrobble(s) to last.fm: %s" %
+                            (n_items, response))
+                    else:
+                        print_d("Submitted %d scrobble(s) to last.fm" %
+                                n_items)
+                post(params, items)
 
         def __restore(self):
             items = blautil.deserialize_from_file(blaconst.SCROBBLES_PATH)
             if items:
-                print_d("Queuing %d unsubmitted scrobble(s)" % len(items))
-                self.put(items)
-
-        def put(self, items):
-            self.__not_empty.acquire()
-            self.__items.extend(items)
-            self.__not_empty.notify()
-            self.__not_empty.release()
+                print_d("Re-submitting %d queued scrobble(s)" % len(items))
+                for item in items:
+                    self.put_nowait(item)
 
         def save(self):
-            blautil.serialize_to_file(self.__items, blaconst.SCROBBLES_PATH)
+            items = []
+            while True:
+                try:
+                    items.append(self.get_nowait())
+                except Queue.Empty:
+                    break
+            if items:
+                print_d("Saving %d unsubmitted scrobble(s)" % len(items))
+            blautil.serialize_to_file(items, blaconst.SCROBBLES_PATH)
 
     def __init__(self):
         super(BlaScrobbler, self).__init__()
@@ -468,10 +473,7 @@ class BlaScrobbler(object):
         return True
 
     @blautil.thread
-    def __update_now_playing(self, delayed=False):
-        if delayed:
-            time.sleep(1)
-
+    def __update_now_playing(self):
         try:
             track = library[self.__uri]
         except KeyError:
@@ -496,7 +498,7 @@ class BlaScrobbler(object):
         if track[ALBUM_ARTIST]:
             params.append(("album_artist", track[ALBUM_ARTIST]))
 
-        # sign api call
+        # Sign API call.
         api_signature = sign_api_call(params)
         params.append(("api_sig", api_signature))
         response = post_message(params)
@@ -535,7 +537,7 @@ class BlaScrobbler(object):
                 blacfg.getboolean("lastfm", "scrobble") and
                 (self.__elapsed > track[LENGTH] / 2 or self.__elapsed > 240)):
                 print_d("Submitting track to scrobbler queue")
-                self.__queue.put([(self.__uri, self.__start_time)])
+                self.__queue.put_nowait((self.__uri, self.__start_time))
 
         self.__uri = None
         if shutdown:
@@ -576,7 +578,7 @@ class BlaScrobbler(object):
         api_signature = sign_api_call(params)
         string = "&".join(["%s=%s" % p for p in params])
         url = "%s&api_sig=%s&%s" % (
-              blaconst.LASTFM_BASEURL, api_signature, string)
+            blaconst.LASTFM_BASEURL, api_signature, string)
         response = get_response(url, "session")
         if isinstance(response, ResponseError):
             session_key = None
@@ -605,11 +607,6 @@ class BlaScrobbler(object):
 
         if self.__passes_ignore(track):
             self.__uri = track.uri
-            try:
-                self.__t.kill()
-            except AttributeError:
-                pass
-            self.__t = self.__update_now_playing(delayed=True)
             self.__start_time = int(time.time())
             self.__tid = gobject.timeout_add(1000, self.__query_status)
         else:
