@@ -28,7 +28,6 @@ import subprocess
 import functools
 from threading import Thread, ThreadError, Lock
 import collections
-import ctypes
 import time
 
 import gobject
@@ -303,8 +302,10 @@ class BlaThread(Thread):
     def __init__(self, *args, **kwargs):
         super(BlaThread, self).__init__(*args, **kwargs)
         self.__killed = False
-        BlaThread.__threads = filter(BlaThread.is_alive, BlaThread.__threads)
-        BlaThread.__threads.append(self)
+        self.__threads.append(self)
+        if len(self.__threads) > 25:
+            # Use slice notation to mutate the referent, not the reference.
+            self.__threads[:] = filter(BlaThread.is_alive, self.__threads)
 
     def run(self):
         sys.settrace(self.__globaltrace)
@@ -315,7 +316,7 @@ class BlaThread(Thread):
 
     @classmethod
     def kill_threads(cls):
-       map(cls.kill, cls.__threads)
+        map(cls.kill, cls.__threads)
 
     def __globaltrace(self, frame, event, arg):
         if event == "call":
@@ -326,7 +327,6 @@ class BlaThread(Thread):
 
     def __localtrace(self, frame, event, arg):
         if self.__killed and event == "line":
-            BlaThread.__threads.remove(self)
             raise SystemExit
         return self.__localtrace
 
