@@ -224,7 +224,7 @@ class VolumeControl(gtk.HBox):
         # Mute
         else:
             icon_name %= self.__states[0]
-        self.__image.set_from_icon_name(icon_name, gtk.ICON_SIZE_BUTTON)
+        self.__image.set_from_icon_name(icon_name, gtk.ICON_SIZE_SMALL_TOOLBAR)
 
     def __query_tooltip(self, *args):
         volume = self.__scale.get_value()
@@ -250,8 +250,7 @@ class BlaToolbar(gtk.Alignment):
         # The button box
         ctrlbar = gtk.Table(rows=1, columns=5, homogeneous=True)
         ctrlbar.set_name("ctrlbar")
-        gtk.rc_parse_string(
-            """
+        gtk.rc_parse_string("""
             style "blaplay-toolbar"
             {
                 xthickness = 0
@@ -262,7 +261,7 @@ class BlaToolbar(gtk.Alignment):
 
             widget "*.GtkHBox.ctrlbar.GtkButton" style :
                 highest "blaplay-toolbar"
-            """)
+        """)
 
         img = gtk.Image()
         play_pause = gtk.Button()
@@ -274,7 +273,7 @@ class BlaToolbar(gtk.Alignment):
         stop = gtk.Button()
         stop.add(
             gtk.image_new_from_stock(
-                gtk.STOCK_MEDIA_STOP, gtk.ICON_SIZE_BUTTON))
+                gtk.STOCK_MEDIA_STOP, gtk.ICON_SIZE_SMALL_TOOLBAR))
         stop.set_relief(gtk.RELIEF_NONE)
         stop.set_tooltip_text("Stop")
         stop.connect("clicked", self.__ctrl, CMD_STOP)
@@ -283,7 +282,7 @@ class BlaToolbar(gtk.Alignment):
         previous = gtk.Button()
         previous.add(
             gtk.image_new_from_stock(
-                gtk.STOCK_MEDIA_PREVIOUS, gtk.ICON_SIZE_BUTTON))
+                gtk.STOCK_MEDIA_PREVIOUS, gtk.ICON_SIZE_SMALL_TOOLBAR))
         previous.set_relief(gtk.RELIEF_NONE)
         previous.set_tooltip_text("Previous track")
         previous.connect("clicked", self.__ctrl, CMD_PREVIOUS)
@@ -292,7 +291,7 @@ class BlaToolbar(gtk.Alignment):
         next_ = gtk.Button()
         next_.add(
             gtk.image_new_from_stock(
-                gtk.STOCK_MEDIA_NEXT, gtk.ICON_SIZE_BUTTON))
+                gtk.STOCK_MEDIA_NEXT, gtk.ICON_SIZE_SMALL_TOOLBAR))
         next_.set_relief(gtk.RELIEF_NONE)
         next_.set_tooltip_text("Next track")
         next_.connect("clicked", self.__ctrl, CMD_NEXT)
@@ -300,7 +299,7 @@ class BlaToolbar(gtk.Alignment):
 
         random = gtk.Button()
         random.add(gtk.image_new_from_icon_name(
-                "stock_shuffle", gtk.ICON_SIZE_BUTTON))
+                "stock_shuffle", gtk.ICON_SIZE_SMALL_TOOLBAR))
         random.set_relief(gtk.RELIEF_NONE)
         random.set_tooltip_text("Random track")
         random.connect("clicked", self.__ctrl, CMD_NEXT_RANDOM)
@@ -335,7 +334,7 @@ class BlaToolbar(gtk.Alignment):
             stock = gtk.STOCK_MEDIA_PLAY
             tooltip = "Play"
 
-        img.set_from_stock(stock, gtk.ICON_SIZE_BUTTON)
+        img.set_from_stock(stock, gtk.ICON_SIZE_SMALL_TOOLBAR)
         img.show()
         play_pause.set_tooltip_text(tooltip)
 

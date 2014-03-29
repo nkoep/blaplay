@@ -84,7 +84,7 @@ class BlaStatusbar(gtk.Table):
         queue.connect("count_changed",
                       lambda *x: button.set_sensitive(x[-1] > 0))
         button.add(gtk.image_new_from_stock(gtk.STOCK_CLEAR,
-                                            gtk.ICON_SIZE_BUTTON))
+                                            gtk.ICON_SIZE_SMALL_TOOLBAR))
         button.set_relief(gtk.RELIEF_NONE)
         button.set_sensitive(False)
         table.attach(button, 2, 3, 0, 1),

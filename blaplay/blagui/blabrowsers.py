@@ -577,7 +577,8 @@ class BlaLibraryBrowser(gtk.VBox):
 
         button = gtk.Button()
         button.add(
-            gtk.image_new_from_stock(gtk.STOCK_FIND, gtk.ICON_SIZE_BUTTON))
+            gtk.image_new_from_stock(gtk.STOCK_FIND,
+                                     gtk.ICON_SIZE_SMALL_TOOLBAR))
         button.connect("clicked", queue_model_update)
 
         alignment = gtk.Alignment()
@@ -767,7 +768,8 @@ class BlaFileBrowser(gtk.VBox):
 
         def add_button(icon, callback, idx):
             button = gtk.Button()
-            button.add(gtk.image_new_from_stock(icon, gtk.ICON_SIZE_BUTTON))
+            button.add(
+                gtk.image_new_from_stock(icon, gtk.ICON_SIZE_SMALL_TOOLBAR))
             button.set_relief(gtk.RELIEF_NONE)
             button.connect("clicked", callback)
             table.attach(button, idx, idx+1, 0, 1, xoptions=not gtk.EXPAND)
@@ -889,7 +891,8 @@ class BlaFileBrowser(gtk.VBox):
 
         button = gtk.Button()
         button.add(
-            gtk.image_new_from_stock(gtk.STOCK_FIND, gtk.ICON_SIZE_BUTTON))
+            gtk.image_new_from_stock(gtk.STOCK_FIND,
+                                     gtk.ICON_SIZE_SMALL_TOOLBAR))
         button.connect("clicked", lambda *x: self.__filt.refilter())
         hbox.pack_start(button, expand=False)
         vbox.pack_start(hbox, expand=False)

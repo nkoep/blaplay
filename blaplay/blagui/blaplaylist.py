@@ -133,7 +133,8 @@ class BlaPlaylist(gtk.VBox):
             self.__play_image.set_from_pixbuf(self.__create_pixbuf(stock))
 
         def __create_pixbuf(self, stock):
-            return self.render_icon(stock, gtk.ICON_SIZE_BUTTON).scale_simple(
+            pixbuf = self.render_icon(stock, gtk.ICON_SIZE_SMALL_TOOLBAR)
+            return pixbuf.scale_simple(
                 self.__height, self.__height, gtk.gdk.INTERP_HYPER)
 
         def __set_lock_image_visible(self, yes):
@@ -253,7 +254,8 @@ class BlaPlaylist(gtk.VBox):
 
         button = gtk.Button()
         button.add(
-            gtk.image_new_from_stock(gtk.STOCK_FIND, gtk.ICON_SIZE_BUTTON))
+            gtk.image_new_from_stock(gtk.STOCK_FIND,
+                                     gtk.ICON_SIZE_SMALL_TOOLBAR))
         button.connect("clicked", self.__filter)
 
         self.__filter_box = gtk.HBox()
@@ -1297,7 +1299,7 @@ class BlaPlaylistManager(gtk.Notebook):
         self.__lock_button.set_focus_on_click(False)
         self.__lock_button.add(
             gtk.image_new_from_stock(gtk.STOCK_DIALOG_AUTHENTICATION,
-                                     gtk.ICON_SIZE_BUTTON))
+                                     gtk.ICON_SIZE_SMALL_TOOLBAR))
         style = gtk.RcStyle()
         style.xthickness = style.ythickness = 0
         self.__lock_button.modify_style(style)
