@@ -1,6 +1,6 @@
-# TODO
+### TODO
 
-## v0.2
+#### v0.2
 - Add acoustid support
 - Add (proper) video support
 - Add compact interface
@@ -21,7 +21,7 @@
 - Integrate radio streams into regular playlists
 - Replace radio streams view with a history view
 
-## v0.3+
+#### v0.3+
 - Restore closed playlists
 - Lower memory footprint
 - Improve startup speed/reduce import overhead

@@ -1,6 +1,6 @@
 ### blaplay
 
-blaplay is a media player for GNU/Linux with a clean and uncluttered user
+**blaplay** is a media player for GNU/Linux with a clean and uncluttered user
 interface. It is written in Python and uses PyGTK, PyGST and Mutagen to
 implement its core functionality. Notable features include a monitored media
 library, automatic cover art, lyrics and biography fetching, as well as support
