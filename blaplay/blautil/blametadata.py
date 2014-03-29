@@ -48,7 +48,7 @@ def init():
 class BlaMetadata(object):
     def __init__(self):
         metadata = blautil.deserialize_from_file(blaconst.METADATA_PATH)
-        self.__metadata = metadata or {"bio": {}, "lyrics": {}}
+        self.__metadata = metadata or {"lyrics": {}}
 
     def __call__(self):
         blautil.serialize_to_file(self.__metadata, blaconst.METADATA_PATH)
@@ -65,12 +65,11 @@ class BlaMetadata(object):
 class BlaFetcher(gobject.GObject):
     __gsignals__ = {
         "cover": blautil.signal(3),
-        "lyrics": blautil.signal(2),
-        "biography": blautil.signal(3)
+        "lyrics": blautil.signal(2)
     }
 
     __tid = -1
-    __thread_lyrics = __thread_biography = __thread_cover = None
+    __thread_lyrics = __thread_cover = None
 
     class JSONParser(object):
         def feed(self, feed, **kwargs):
@@ -320,35 +319,11 @@ class BlaFetcher(gobject.GObject):
         if cover is not None:
             emit(cover)
 
-    @blautil.thread
-    def __fetch_biography(self, track, timestamp):
-        image = biography = None
-        if track[ARTIST]:
-            # Look for a cached artist image first.
-            image_base = os.path.join(
-                blaconst.ARTISTS,
-                track[ARTIST].replace(" ", "_").replace("/", "_"))
-            if os.path.isfile("%s.jpg" % image_base):
-                image = "%s.jpg" % image_base
-            elif os.path.isfile("%s.png" % image_base):
-                image = "%s.png" % image_base
-
-            # Check if biography already exists.
-            biography = metadata.get("bio", track[ARTIST])
-
-            # If either does not exist try to get both from last.fm.
-            if not biography or not image:
-                image, biography = blafm.get_biography(track, image_base)
-                if biography:
-                    metadata.add("bio", track[ARTIST], biography)
-
-        self.emit("biography", timestamp, image, biography)
-
     def fetch_cover(self, track, timestamp, force_download=False):
         # This convenience method makes sure we keep a reference to the thread
         # that retrieves the cover so we're able to kill it once the method is
         # called again. Covers ought to be able to be fetched independently of
-        # the lyrics and biography so we wrap the thread creation here.
+        # the lyrics so we wrap the thread creation here.
         try:
             self.__thread_cover.kill()
         except AttributeError:
@@ -356,16 +331,14 @@ class BlaFetcher(gobject.GObject):
         self.__thread_cover = self.__fetch_cover(
             track, timestamp, force_download)
 
-    def fetch_lyrics_and_bio(self, track, timestamp):
-        for thread in [self.__thread_lyrics, self.__thread_biography,
-                       self.__thread_cover]:
+    def fetch_lyrics(self, track, timestamp):
+        for thread in [self.__thread_lyrics, self.__thread_cover]:
             try:
                 thread.kill()
             except AttributeError:
                 pass
 
         self.__thread_lyrics = self.__fetch_lyrics(track, timestamp)
-        self.__thread_biography = self.__fetch_biography(track, timestamp)
 
     def set_cover(self, timestamp, path=None):
         track = self.__track

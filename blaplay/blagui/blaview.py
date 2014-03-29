@@ -283,25 +283,6 @@ class BlaSidePane(gtk.VBox):
         self.__tb.create_tag("italic", style=pango.STYLE_ITALIC)
         self.__tag = self.__tb.create_tag("color")
 
-        # Set up the bio textview.
-        # TODO: give the textviews and textbuffers some more meaningful names
-        self.__tv2 = gtk.TextView()
-        self.__tv2.set_size_request(self.__MIN_WIDTH, -1)
-        self.__tv2.set_editable(False)
-        self.__tv2.set_cursor_visible(False)
-        self.__tv2.set_wrap_mode(gtk.WRAP_WORD)
-        self.__tv2.set_justification(gtk.JUSTIFY_CENTER)
-
-        sw2 = BlaScrolledWindow()
-        sw2.set_shadow_type(gtk.SHADOW_NONE)
-        sw2.add(self.__tv2)
-        sw2.show_all()
-
-        self.__tb2 = self.__tv2.get_buffer()
-        self.__tb2.create_tag("bold", weight=pango.WEIGHT_BOLD)
-        self.__tb2.create_tag("large", scale=pango.SCALE_LARGE)
-        self.__tag2 = self.__tb2.create_tag("color")
-
         # Set up the view selector.
         viewport = gtk.Viewport()
         viewport.set_shadow_type(gtk.SHADOW_IN)
@@ -344,7 +325,6 @@ class BlaSidePane(gtk.VBox):
         notebook.append_page(BlaProperties(views[blaconst.VIEW_PLAYLISTS]),
                              gtk.Label("Properties"))
         notebook.append_page(sw, gtk.Label("Lyrics"))
-        notebook.append_page(sw2, gtk.Label("Biography"))
 
         def switch_page(notebook, page, page_num):
             action_widget = notebook.get_action_widget(gtk.PACK_END)
@@ -399,8 +379,6 @@ class BlaSidePane(gtk.VBox):
         self.fetcher.connect_object(
             "lyrics", BlaSidePane.__update_lyrics, self)
         self.fetcher.connect_object(
-            "biography", BlaSidePane.__update_biography, self)
-        self.fetcher.connect_object(
             "cover", type(self.cover_display).update, self.cover_display)
 
         notebook.show()
@@ -431,10 +409,6 @@ class BlaSidePane(gtk.VBox):
             self.__tb.insert_with_tags_by_name(
                 iterator, "\n%s" % artist, "italic", "color")
 
-            iterator = self.__tb2.get_iter_at_mark(self.__tb2.get_insert())
-            self.__tb2.insert_with_tags_by_name(
-                iterator, "\n%s" % artist, "bold", "large", "color")
-
     @blautil.idle
     def __update_lyrics(self, timestamp, lyrics):
         if timestamp == self.__timestamp and lyrics:
@@ -442,40 +416,9 @@ class BlaSidePane(gtk.VBox):
                 self.__tb.get_insert()), "\n\n%s\n" % lyrics, "color")
 
     @blautil.idle
-    def __update_biography(self, timestamp, image, biography):
-        if timestamp != self.__timestamp:
-            return
-
-        iterator = self.__tb2.get_iter_at_mark(self.__tb2.get_insert())
-
-        if image:
-            try:
-                image = gtk.gdk.pixbuf_new_from_file(image)
-            except gobject.GError:
-                try:
-                    os.unlink(image)
-                except OSError:
-                    pass
-            else:
-                width = image.get_width()
-                if width > self.__MIN_WIDTH:
-                    height = int(image.get_height() *
-                                 (self.__MIN_WIDTH / float(width)))
-                    image = image.scale_simple(
-                        self.__MIN_WIDTH, height, gtk.gdk.INTERP_HYPER)
-                self.__tb2.insert(iterator, "\n\n")
-                self.__tb2.insert_pixbuf(iterator, image)
-
-        if biography:
-            self.__tb2.insert_with_tags_by_name(iterator,
-                "\n\n%s\n" % biography, "color")
-
-    @blautil.idle
     def __clear(self):
         self.__tb.delete(
             self.__tb.get_start_iter(), self.__tb.get_end_iter())
-        self.__tb2.delete(
-            self.__tb2.get_start_iter(), self.__tb2.get_end_iter())
 
     def set_active_view(self, view):
         path = self.__treeview.get_selection().get_selected_rows()[-1][0][0]
@@ -490,7 +433,7 @@ class BlaSidePane(gtk.VBox):
     def update_track(self):
         def worker(track):
             self.__update_track(track)
-            self.fetcher.fetch_lyrics_and_bio(track, self.__timestamp)
+            self.fetcher.fetch_lyrics(track, self.__timestamp)
             self.cover_display.fetch_cover()
             return False
 

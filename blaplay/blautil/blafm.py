@@ -225,39 +225,6 @@ def get_cover(track, image_base):
         return None
     return retrieve_image(image_base, image_urls)
 
-def get_biography(track, image_base):
-    url = quote_url("%s&method=artist.getinfo&artist=%s" % (
-                    blaconst.LASTFM_BASEURL, track[ARTIST]))
-    response = get_response(url, "artist")
-    if isinstance(response, ResponseError):
-        print_d("Failed to retrieve artist biography: %s" % response)
-        return None, None
-    response = response.content
-
-    image = biography = None
-
-    # Retrieve the artist image.
-    try:
-        image_urls = response["image"]
-    except (TypeError, KeyError):
-        pass
-    else:
-        image = retrieve_image(image_base, image_urls)
-
-    # Retrieve the biography.
-    try:
-        biography = response["bio"]["content"]
-    except (TypeError, KeyError):
-        pass
-    else:
-        legal_notice = str(
-            "User-contributed text is available under the Creative Commons "
-            "By-SA License and may also be available under the GNU FDL.")
-        biography = blautil.remove_html_tags(
-            biography.replace(legal_notice, "").strip())
-
-    return image, biography
-
 def get_events(limit, recommended, city="", country=""):
     if recommended:
         session_key = BlaScrobbler.get_session_key()
