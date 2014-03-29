@@ -63,7 +63,6 @@ class BlaMetadata(object):
             return None
 
 class BlaFetcher(gobject.GObject):
-    # TODO: add a payload class in which we wrap the timestamp, etc.
     __gsignals__ = {
         "cover": blautil.signal(3),
         "lyrics": blautil.signal(2),
@@ -161,7 +160,7 @@ class BlaFetcher(gobject.GObject):
             artist.replace(" ", separator).replace("&", "and"),
             title.replace(" ", separator).replace("&", "and"))
 
-        # Substitue composite letters and transliterate accents.
+        # Substitute composite letters and transliterate accents.
         DICT = {
             u"æ": "ae", u"ð": "d", u"ø": "o", u"þ": "th", u"œ": "oe", u"ƒ": "f"
         }
