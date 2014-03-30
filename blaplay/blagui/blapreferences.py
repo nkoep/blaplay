@@ -94,26 +94,15 @@ class BlaPreferences(BlaUniqueWindow):
         def __init__(self):
             super(BlaPreferences.LibrarySettings, self).__init__("Library")
 
-            # TODO: Drop the restrict-to option!
-            restrict_string = blacfg.getstring("library", "restrict.to")
-            exclude_string = blacfg.getstring("library", "exclude")
-            def destroy(*args):
-                if (restrict_string !=
-                    blacfg.getstring("library", "restrict.to") or
-                    exclude_string != blacfg.getstring("library", "exclude")):
-                    library.sync()
-            self.connect("destroy", destroy)
-
-            hbox = gtk.HBox(spacing=10)
+            hbox = gtk.HBox(spacing=ROW_SPACINGS)
 
             # Set up the directory selector.
             model = gtk.ListStore(gobject.TYPE_STRING)
             treeview = gtk.TreeView(model)
             treeview.set_size_request(500, -1)
             treeview.set_property("rules_hint", True)
-            r = gtk.CellRendererText()
             treeview.insert_column_with_attributes(
-                -1, "Directories", r, text=0)
+                -1, "Directories", gtk.CellRendererText(), text=0)
 
             viewport = gtk.Viewport()
             viewport.set_shadow_type(gtk.SHADOW_IN)

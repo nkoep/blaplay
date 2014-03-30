@@ -395,6 +395,16 @@ class BlaLibrary(gobject.GObject):
     def init(self):
         print_i("Initializing the database")
 
+        def config_changed(cfg, section, key):
+            if (section == "library" and
+                (key == "restrict.to" or key == "exclude")):
+                try:
+                    gobject.source_remove(self.__sync_tid)
+                except AttributeError:
+                    pass
+                self.__sync_tid = gobject.timeout_add(2500, self.sync)
+        blacfg.connect("changed", config_changed)
+
         # Restore the library.
         tracks = blautil.deserialize_from_file(blaconst.LIBRARY_PATH)
         if tracks is None:
