@@ -22,19 +22,32 @@ from blaplay import blautil
 
 class BlaBaseWindow(gtk.Window):
     """
-    The bare base for all of our windows. This tracks position, state and size,
-    and possibly saves the various values to the config if enable_tracking is
-    called with `is_main_window=True'.
+    The bare base for all of our windows. This tracks position, state, and
+    size. The `state_manager', if given, has to be an object that implements a
+    `size', `position', and `maximized' method. Called without arguments, these
+    methods should return the desired size, position, and maximized state of
+    the window. Otherwise, the methods are called with their respective values
+    to allow the state manager to keep track of modifications.
     """
 
-    __main_window = None
-
-    def __init__(self, *args, **kwargs):
+    def __init__(self, state_manager=None, *args, **kwargs):
         super(BlaBaseWindow, self).__init__(*args, **kwargs)
         self.__position = (-1, -1)
         self.__size = (-1, -1)
         self.__maximized = self.__was_maximized = False
-        self.__is_main_window = False
+
+        if state_manager is not None:
+            for meth in "size position maximized".split():
+                if (not hasattr(state_manager, meth) or
+                    not callable(getattr(state_manager, meth, None))):
+                    raise ValueError(
+                        "state_manager implements no proper '%s' method" %
+                        meth)
+        self.__state_manager = state_manager
+        self.connect("configure_event", self.__configure_event)
+        self.connect("window_state_event", self.__window_state_event)
+        self.connect("map", self.__map)
+        self.__restore_window_state()
 
     def present(self):
         # Set the proper window state before presenting the window to the user.
@@ -43,37 +56,26 @@ class BlaBaseWindow(gtk.Window):
         self.__restore_window_state()
         super(BlaBaseWindow, self).present()
 
-    def enable_tracking(self, is_main_window=False):
-        if self.__main_window is not None and is_main_window:
-            raise ValueError("There can only be one main window")
-        self.__is_main_window = is_main_window
-        if self.__is_main_window:
-            type(self).__main_window = self
-        self.connect("configure_event", self.__configure_event)
-        self.connect("window_state_event", self.__window_state_event)
-        self.connect("map", self.__map)
-        self.__restore_window_state()
-
     def __configure_event(self, window, event):
         if self.__maximized:
             return
         self.__size = (event.width, event.height)
-        if self.__is_main_window:
-            blacfg.set("general", "size", "%d, %d" % self.__size)
+        if self.__state_manager:
+            self.__state_manager.size(self.__size)
 
         if self.get_property("visible"):
             self.__position = self.get_position()
-            if self.__is_main_window:
-                blacfg.set("general", "position", "%d, %d" % self.__position)
+            if self.__state_manager:
+                self.__state_manager.position(self.__position)
 
     def __window_state_event(self, window, event):
         self.__maximized = bool(
             event.new_window_state & gtk.gdk.WINDOW_STATE_MAXIMIZED)
         if event.new_window_state & gtk.gdk.WINDOW_STATE_WITHDRAWN:
             return
-        if self.__is_main_window:
-            blacfg.setboolean("general", "maximized",
-                              self.__maximized and self.__was_maximized)
+        if self.__state_manager:
+            self.__state_manager.maximized(
+                self.__maximized and self.__was_maximized)
 
     def __map(self, *args):
         self.__restore_window_state()
@@ -84,8 +86,8 @@ class BlaBaseWindow(gtk.Window):
         self.__restore_position()
 
     def __restore_size(self):
-        if self.__is_main_window:
-            size = blacfg.getlistint("general", "size")
+        if self.__state_manager:
+            size = self.__state_manager.size()
             if size is not None:
                 self.__size = size
         w, h = self.__size
@@ -96,17 +98,18 @@ class BlaBaseWindow(gtk.Window):
             self.resize(w, h)
 
     def __restore_state(self):
-        if self.__is_main_window:
-            self.__maximized = self.__was_maximized = blacfg.getboolean(
-                "general", "maximized")
+        if self.__state_manager:
+            maximized = self.__state_manager.maximized()
+            self.__maximized = self.__was_maximized = maximized
+
         if self.__maximized:
             self.maximize()
         else:
             self.unmaximize()
 
     def __restore_position(self):
-        if self.__is_main_window:
-            position = blacfg.getlistint("general", "position")
+        if self.__state_manager:
+            position = self.__state_manager.position()
             if position is not None:
                 self.__position = position
         x, y = self.__position
@@ -119,7 +122,7 @@ class BlaBaseWindow(gtk.Window):
             self.maximize()
         elif not self.__was_maximized:
             # If the window was not already maximized before we maximized it
-            # restore the old state here, i.e. unmaximize the w/indow again.
+            # restore the old state here, i.e. unmaximize the window again.
             self.unmaximize()
 
 class BlaWindow(BlaBaseWindow):
@@ -176,7 +179,6 @@ class BlaWindow(BlaBaseWindow):
             self.vbox.pack_end(self.buttonbox, expand=False, fill=False)
 
         self.connect_object("destroy", self.__destroy, self)
-        self.enable_tracking()
 
     def __clicked(self, *args):
         if not self.emit("delete_event", gtk.gdk.Event(gtk.gdk.DELETE)):

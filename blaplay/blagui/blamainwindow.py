@@ -37,17 +37,37 @@ from blaabout import BlaAbout
 from blatray import BlaTray
 import blaguiutils
 
-
 class BlaMainWindow(BlaBaseWindow):
-    __is_fullscreen = False
+    class StateManager(object):
+        def size(self, *args):
+            if args:
+                (size,) = args
+                blacfg.set("general", "size", "%d, %d" % size)
+            else:
+                return blacfg.getlistint("general", "size")
+
+        def position(self, *args):
+            if args:
+                (position,) = args
+                blacfg.set("general", "position", "%d, %d" % position)
+            else:
+                return blacfg.getlistint("general", "position")
+
+        def maximized(self, *args):
+            if args:
+                (state,) = args
+                blacfg.setboolean("general", "maximized", state)
+            else:
+                return blacfg.getboolean("general", "maximized")
 
     def __init__(self):
-        super(BlaMainWindow, self).__init__(gtk.WINDOW_TOPLEVEL)
-        self.set_resizable(True)
+        super(BlaMainWindow, self).__init__(
+            BlaMainWindow.StateManager(), gtk.WINDOW_TOPLEVEL)
         self.connect("delete_event", self.__delete_event)
-        self.enable_tracking(is_main_window=True)
 
         # Set up the fullscreen window.
+        self.__is_fullscreen = False
+        # TODO: Derive this from BlaBaseWindow.
         self.__fullscreen_window = gtk.Window()
         def map_(window):
             pass
@@ -82,7 +102,7 @@ class BlaMainWindow(BlaBaseWindow):
                     player.previous()
                 elif event.button == 9:
                     player.next()
-            # This behaves like gobject.{timeout|idle}_add: if the callback
+            # This behaves like gobject.{timeout,idle}_add: if the callback
             # doesn't return True it's only called once. It does NOT prevent
             # signal callbacks from executing.
             return True
@@ -91,6 +111,7 @@ class BlaMainWindow(BlaBaseWindow):
                                   button_press_hook)
 
         # Main menu
+        # TODO: Pass the ui_manager on during construction instead.
         ui_manager = blaplay.bla.ui_manager
         self.add_accel_group(ui_manager.get_accel_group())
 
@@ -122,10 +143,10 @@ class BlaMainWindow(BlaBaseWindow):
         ui_manager.add_actions(actions)
 
         toggle_actions = [
-            ("Statusbar", None, "St_atusbar", None, "",
+            ("Statusbar", None, "_Statusbar", None, "",
              self.__toggle_statusbar, blacfg.getboolean("general",
                                                         "statusbar")),
-            ("Visualization", None, "Visualization", None, "",
+            ("Visualization", None, "_Visualization", None, "",
              self.__toggle_visualization,
              blacfg.getboolean("general", "show.visualization"))
         ]
@@ -153,19 +174,19 @@ class BlaMainWindow(BlaBaseWindow):
         self.__view = BlaView()
         self.__statusbar = BlaStatusbar()
 
-        # Group browsers and visualization widget.
+        # Group the browsers and the visualization widget.
         self.__vbox_left = gtk.VBox(spacing=blaconst.WIDGET_SPACING)
-        self.__vbox_left.pack_start(self.__browsers, expand=True)
+        self.__vbox_left.pack_start(self.__browsers)
         self.__vbox_left.pack_start(self.__visualization, expand=False)
         self.__vbox_left.show()
 
-        # Pack the browser + view-widget into a gtk.HPane instance.
+        # Pack the browser + view-widget into a paned widget.
         hpane = gtk.HPaned()
         hpane.pack1(self.__vbox_left, resize=False, shrink=False)
         hpane.pack2(self.__view, resize=True, shrink=True)
         hpane.show()
 
-        # Restore pane positions.
+        # Restore the pane positions.
         def notify(pane, propspec, key):
             blacfg.set("general", key, str(pane.get_position()))
         for pane, side in [(hpane, "left"), (self.__view, "right")]:
@@ -176,14 +197,16 @@ class BlaMainWindow(BlaBaseWindow):
                 pass
             pane.connect("notify", notify, key)
 
-        # Create a vbox hpane and the statusbar. This allows for setting a
-        # border around those items which excludes the menubar and the toolbar.
+        # Create a vbox for the hpane and the statusbar. This allows for
+        # setting a border around those items which excludes the menubar and
+        # the toolbar.
         vbox = gtk.VBox(spacing=blaconst.BORDER_PADDING)
         vbox.set_border_width(blaconst.BORDER_PADDING)
         vbox.pack_start(hpane)
         vbox.pack_start(self.__statusbar, expand=False)
         vbox.show()
 
+        # Pack everything up together in the main window's vbox.
         self.child.pack_start(ui_manager.get_widget("/Menu"), expand=False)
         self.child.pack_start(self.__toolbar, expand=False)
         self.child.pack_start(vbox)
@@ -200,7 +223,7 @@ class BlaMainWindow(BlaBaseWindow):
     def set_fullscreen(self, da, parent):
         # TODO: when minimizing to tray during fullscreen, reparent the da so
         #       that when we call raise_window() again we won't be in
-        #       fullscreen anymore
+        #       fullscreen anymore.
 
         # When parent is None we want to go into fullscreen mode.
         go_to_fullscreen = parent is None
