@@ -88,10 +88,9 @@ class BlaPreferences(BlaUniqueWindow):
                 cb.connect("toggled", tray_changed, key)
                 self.pack_start(cb)
 
-    class LibraryBrowsersSettings(Page):
+    class LibrarySettings(Page):
         def __init__(self):
-            super(BlaPreferences.LibraryBrowsersSettings, self).__init__(
-                "Library/Browsers")
+            super(BlaPreferences.LibrarySettings, self).__init__("Library")
 
             restrict_string = blacfg.getstring("library", "restrict.to")
             exclude_string = blacfg.getstring("library", "exclude")
@@ -104,6 +103,7 @@ class BlaPreferences(BlaUniqueWindow):
 
             hbox = gtk.HBox(spacing=10)
 
+            # Set up the directory selector.
             model = gtk.ListStore(gobject.TYPE_STRING)
             treeview = gtk.TreeView(model)
             treeview.set_property("rules_hint", True)
@@ -116,8 +116,8 @@ class BlaPreferences(BlaUniqueWindow):
             viewport.add(treeview)
 
             directories = blacfg.getdotliststr("library", "directories")
-            for f in directories:
-                model.append([f])
+            for d in directories:
+                model.append([d])
 
             table = gtk.Table(rows=2, columns=1)
             items = [
@@ -134,96 +134,40 @@ class BlaPreferences(BlaUniqueWindow):
             hbox.pack_start(table, expand=False, fill=False)
 
             # Update library checkbutton
-            update_library = gtk.CheckButton("Update library on startup")
-            update_library.set_active(
-                blacfg.getboolean("library", "update.on.startup"))
-            update_library.connect(
+            cb = gtk.CheckButton("Update library on startup")
+            cb.set_active(blacfg.getboolean("library", "update.on.startup"))
+            cb.connect(
                 "toggled",
                 lambda cb: blacfg.setboolean("library", "update.on.startup",
                                              cb.get_active()))
 
-            # The file types
-            restrict_to_entry = gtk.Entry()
-            restrict_to_entry.set_tooltip_text(
-                "Comma-separated list, works on filenames")
-            restrict_to_entry.set_text(
-                blacfg.getstring("library", "restrict.to"))
-            restrict_to_entry.connect(
-                "changed",
-                lambda entry: blacfg.set("library", "restrict.to",
-                                         entry.get_text()))
-
-            exclude_entry = gtk.Entry()
-            exclude_entry.set_tooltip_text(
-                "Comma-separated list, works on filenames")
-            exclude_entry.set_text(
-                blacfg.getstring("library", "exclude"))
-            exclude_entry.connect(
-                "changed",
-                lambda entry: blacfg.set("library", "exclude",
-                                         entry.get_text()))
-
-            pairs = [
-                (blaconst.ACTION_SEND_TO_CURRENT, "send to current playlist"),
-                (blaconst.ACTION_ADD_TO_CURRENT, "add to current playlist"),
-                (blaconst.ACTION_SEND_TO_NEW, "send to new playlist"),
-                (blaconst.ACTION_EXPAND_COLLAPSE, "expand/collapse")
+            # Set up file restriction and exclusion options.
+            def changed(entry, key):
+                blacfg.set("library", key, entry.get_text())
+            options = [
+                ("Restrict to", "Comma-separated list, works on filenames",
+                 "restrict.to"),
+                ("Exclude", "Comma-separated list, works on filenames",
+                 "exclude")
             ]
-            # FIXME: Ugly!!
-            actions = [""] * 4
-            for idx, label in pairs:
-                actions[idx] = label
-            comboboxes = []
-
-            def cb_changed(combobox, key):
-                blacfg.set("library", "%s.action" % key, combobox.get_active())
-            for key in ["doubleclick", "middleclick", "return"]:
-                # FIXME: These grab focus during scrolling.
-                cb = gtk.combo_box_new_text()
-                map(cb.append_text, actions)
-                if key == "return":
-                    cb.remove_text(3)
-                cb.set_active(blacfg.getint("library", "%s.action" % key))
-                cb.connect("changed", cb_changed, key)
-                comboboxes.append(cb)
-
-            widgets = [restrict_to_entry, exclude_entry] + comboboxes
-            labels = ["Restrict to", "Exclude", "Double-click", "Middle-click",
-                      "Return"]
-
-            action_table = gtk.Table(rows=len(labels), columns=2,
-                                     homogeneous=False)
-
-            count = 0
-            for label, widget in zip(labels, widgets):
+            table = gtk.Table(rows=len(options), columns=2, homogeneous=False)
+            for idx, (label, tooltip, key) in enumerate(options):
+                # Add the label.
                 label = gtk.Label("%s:" % label)
                 label.set_alignment(xalign=0.0, yalign=0.5)
-                action_table.attach(label, 0, 1, count, count+1,
-                                    xoptions=gtk.FILL, xpadding=5)
-                action_table.attach(widget, 1, 2, count, count+1)
-                count += 1
+                table.attach(label, 0, 1, idx, idx+1, xoptions=gtk.FILL,
+                             xpadding=5)
 
-            hbox2 = gtk.HBox(spacing=10)
-
-            draw_tree_lines = gtk.CheckButton("Draw tree lines in browsers")
-            draw_tree_lines.set_active(
-                blacfg.getboolean("library", "draw.tree.lines"))
-            draw_tree_lines.connect("toggled", self.__tree_lines_changed)
-
-            custom_library_browser = gtk.CheckButton(
-                "Use custom treeview as library browser")
-            custom_library_browser.set_active(
-                blacfg.getboolean("library", "custom.browser"))
-            custom_library_browser.connect(
-                "toggled", self.__custom_library_browser_changed)
-
-            hbox2.pack_start(draw_tree_lines)
-            hbox2.pack_start(custom_library_browser)
+                # Add the input field.
+                entry = gtk.Entry()
+                entry.set_tooltip_text(tooltip)
+                entry.set_text(blacfg.getstring("library", key))
+                entry.connect("changed", changed, key)
+                table.attach(entry, 1, 2, idx, idx+1)
 
             self.pack_start(hbox, expand=False, fill=False)
-            self.pack_start(update_library, expand=False)
-            self.pack_start(action_table, expand=False)
-            self.pack_start(hbox2, expand=False)
+            self.pack_start(cb)
+            self.pack_start(table)
 
         def __add_directory(self, button, treeview):
             filediag = gtk.FileChooserDialog(
@@ -275,6 +219,60 @@ class BlaPreferences(BlaUniqueWindow):
         def __rescan_all(self, button, treeview):
             for row in treeview.get_model():
                 library.scan_directory(row[0])
+
+    class BrowserSettings(Page):
+        def __init__(self):
+            super(BlaPreferences.BrowserSettings, self).__init__("Browsers")
+
+            # Add the action selectors.
+            from collections import OrderedDict
+            actions = OrderedDict([
+                ("send to current playlist", blaconst.ACTION_SEND_TO_CURRENT),
+                ("add to current playlist", blaconst.ACTION_ADD_TO_CURRENT),
+                ("send to new playlist", blaconst.ACTION_SEND_TO_NEW),
+                ("expand/collapse", blaconst.ACTION_EXPAND_COLLAPSE)
+            ])
+            def changed(combobox, key):
+                action = actions[combobox.get_active_text()]
+                blacfg.set("library", "%s.action" % key, action)
+            options = [("Double-click", "doubleclick"),
+                       ("Middle-click", "middleclick"), ("Return", "return")]
+            table = gtk.Table(rows=len(options), columns=2, homogeneous=False)
+            for idx, (label, key) in enumerate(options):
+                # Add the label.
+                label = gtk.Label("%s:" % label)
+                label.set_alignment(xalign=0.0, yalign=0.5)
+                table.attach(label, 0, 1, idx, idx+1, xoptions=gtk.FILL,
+                             xpadding=5)
+
+                # Add the combobox.
+                # FIXME: These grab focus during scrolling.
+                cb = gtk.combo_box_new_text()
+                map(cb.append_text, actions.keys())
+                cb.set_active(blacfg.getint("library", "%s.action" % key))
+                cb.connect("changed", changed, key)
+                table.attach(cb, 1, 2, idx, idx+1)
+
+            # Add miscellaneous browser options.
+            hbox = gtk.HBox(spacing=10)
+
+            draw_tree_lines = gtk.CheckButton("Draw tree lines in browsers")
+            draw_tree_lines.set_active(
+                blacfg.getboolean("library", "draw.tree.lines"))
+            draw_tree_lines.connect("toggled", self.__tree_lines_changed)
+
+            custom_library_browser = gtk.CheckButton(
+                "Use custom treeview as library browser")
+            custom_library_browser.set_active(
+                blacfg.getboolean("library", "custom.browser"))
+            custom_library_browser.connect(
+                "toggled", self.__custom_library_browser_changed)
+
+            hbox.pack_start(draw_tree_lines)
+            hbox.pack_start(custom_library_browser)
+
+            self.pack_start(table)
+            self.pack_start(hbox)
 
         def __tree_lines_changed(self, checkbutton):
             blacfg.setboolean(
@@ -617,13 +615,10 @@ class BlaPreferences(BlaUniqueWindow):
         vbox = gtk.VBox()
         vbox.set_border_width(10)
         for page in [self.GeneralSettings, self.TraySettings,
-                     self.LibraryBrowsersSettings, self.PlayerSettings,
-                     self.Keybindings, self.LastfmSettings]:
-            try:
-                page = page()
-            except Exception as exc:
-                print_d(exc)
-                continue
+                     self.LibrarySettings, self.BrowserSettings,
+                     self.PlayerSettings, self.Keybindings,
+                     self.LastfmSettings]:
+            page = page()
             label = gtk.Label()
             label.set_markup("<b>%s</b>" % page.name)
             alignment = gtk.Alignment(xalign=0.0, yalign=0.5)
