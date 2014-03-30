@@ -305,20 +305,20 @@ class BlaPreferences(BlaUniqueWindow):
             button_table.attach(delete_profile_button, 1, 2, 0, 1, xpadding=2)
             button_table.attach(reset_profile_button, 2, 3, 0, 1, xpadding=2)
 
-            self.__button_box = gtk.HBox()
-            self.__button_box.pack_start(
-                gtk.Label("Profiles:"), expand=False, padding=10)
-            self.__button_box.pack_start(self.__profiles_box, expand=False)
-            self.__button_box.pack_start(
-                button_table, expand=False, padding=16)
+            button_box = gtk.HBox()
+            button_box.pack_start(
+                gtk.Label("Profile:"), expand=False, padding=10)
+            button_box.pack_start(self.__profiles_box, expand=False)
+            button_box.pack_start(button_table, expand=False, padding=16)
 
-            table = gtk.Table(rows=2, columns=2, homogeneous=False)
+            table = gtk.Table(rows=2, columns=1, homogeneous=False)
             table.set_row_spacings(2)
             table.attach(logarithmic_volume_scale, 0, 2, 0, 1, xpadding=2)
             table.attach(use_equalizer, 0, 1, 1, 2, xpadding=2)
-            table.attach(self.__button_box, 1, 2, 1, 2, xpadding=2)
+            # table.attach(button_box, 1, 2, 1, 2, xpadding=2)
 
             self.__scale_box = gtk.HBox(homogeneous=True)
+            self.__scale_box.set_size_request(-1, 200)
 
             bands = [29, 59, 119, 237, 474, 947, 1889, 3770, 7523, 15011]
             values = blacfg.getlistfloat("equalizer.profiles", old_profile)
@@ -343,8 +343,9 @@ class BlaPreferences(BlaUniqueWindow):
                 box.pack_start(scale, expand=True)
                 self.__scale_box.pack_start(box)
 
-            self.pack_start(table, expand=False, padding=10)
-            self.pack_start(self.__scale_box, expand=True)
+            self.pack_start(table, expand=False)
+            self.pack_start(button_box, expand=False)
+            self.pack_start(self.__scale_box, expand=True, padding=10)
 
             self.__use_equalizer_changed(use_equalizer)
 
@@ -357,7 +358,6 @@ class BlaPreferences(BlaUniqueWindow):
             state = checkbutton.get_active()
             blacfg.setboolean("player", "use.equalizer", state)
             player.enable_equalizer(state)
-            self.__button_box.set_sensitive(state)
 
             if state and not self.__profiles_box.get_model().get_iter_first():
                 self.__scale_box.set_sensitive(False)
@@ -365,8 +365,8 @@ class BlaPreferences(BlaUniqueWindow):
                 self.__scale_box.set_sensitive(state)
 
         def __reset_profile(self):
-            for s in self.__scales:
-                s.set_value(0)
+            for scale in self.__scales:
+                scale.set_value(0)
 
         def __equalizer_value_changed(self, scale, band, combobox):
             profile_name = combobox.get_active_text()
