@@ -130,7 +130,6 @@ MENU = """
             <menuitem action="NewReleases"/>
             <separator/>
             <menuitem action="Visualization"/>
-            <menuitem action="SidePane"/>
             <menuitem action="Statusbar"/>
             <separator/>
             <menuitem action="JumpToPlayingTrack"/>
