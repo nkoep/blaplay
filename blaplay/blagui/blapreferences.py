@@ -135,15 +135,13 @@ class BlaPreferences(BlaUniqueWindow):
             model = gtk.ListStore(gobject.TYPE_STRING)
             treeview = gtk.TreeView(model)
             treeview.set_property("rules_hint", True)
-            treeview.set_size_request(400, -1)
             r = gtk.CellRendererText()
             treeview.insert_column_with_attributes(
                 -1, "Directories", r, text=0)
 
-            sw = BlaScrolledWindow()
-            sw.set_shadow_type(gtk.SHADOW_IN)
-            # sw.set_size_request(-1, 140)
-            sw.add(treeview)
+            viewport = gtk.Viewport()
+            viewport.set_shadow_type(gtk.SHADOW_IN)
+            viewport.add(treeview)
 
             directories = blacfg.getdotliststr("library", "directories")
             for f in directories:
@@ -160,7 +158,7 @@ class BlaPreferences(BlaUniqueWindow):
                 button.connect("clicked", callback, treeview)
                 table.attach(button, 0, 1, idx, idx+1, yoptions=not gtk.EXPAND)
 
-            hbox.pack_start(sw, expand=True)
+            hbox.pack_start(viewport, expand=True)
             hbox.pack_start(table, expand=False, fill=False)
 
             # Update library checkbutton
@@ -573,11 +571,10 @@ class BlaPreferences(BlaUniqueWindow):
                 -1, "Binding", renderer, text=1)
             treeview.set_model(bindings)
 
-            sw = BlaScrolledWindow()
-            sw.set_shadow_type(gtk.SHADOW_IN)
-            sw.add(treeview)
-
-            self.pack_start(sw, expand=True)
+            viewport = gtk.Viewport()
+            viewport.set_shadow_type(gtk.SHADOW_IN)
+            viewport.add(treeview)
+            self.pack_start(viewport, expand=True)
             if not blakeys.can_bind():
                 label = gtk.Label()
                 label.set_markup(
