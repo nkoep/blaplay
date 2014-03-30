@@ -108,6 +108,7 @@ class BlaPreferences(BlaUniqueWindow):
             # Set up the directory selector.
             model = gtk.ListStore(gobject.TYPE_STRING)
             treeview = gtk.TreeView(model)
+            treeview.set_size_request(500, -1)
             treeview.set_property("rules_hint", True)
             r = gtk.CellRendererText()
             treeview.insert_column_with_attributes(
@@ -131,10 +132,10 @@ class BlaPreferences(BlaUniqueWindow):
             for idx, (label, callback) in enumerate(items):
                 button = gtk.Button(label)
                 button.connect("clicked", callback, treeview)
-                table.attach(button, 0, 1, idx, idx+1, yoptions=not gtk.EXPAND)
+                table.attach(button, 0, 1, idx, idx+1)
 
-            hbox.pack_start(viewport, expand=True)
-            hbox.pack_start(table, expand=False, fill=False)
+            hbox.pack_start(viewport, expand=False)
+            hbox.pack_start(table, expand=False)
 
             # Update library checkbutton
             cb = gtk.CheckButton("Update library on startup")
@@ -164,12 +165,13 @@ class BlaPreferences(BlaUniqueWindow):
 
                 # Add the input field.
                 entry = gtk.Entry()
+                entry.set_size_request(250, -1)
                 entry.set_tooltip_text(tooltip)
                 entry.set_text(blacfg.getstring("library", key))
                 entry.connect("changed", changed, key)
-                table.attach(entry, 1, 2, idx, idx+1)
+                table.attach(entry, 1, 2, idx, idx+1, xoptions=gtk.FILL)
 
-            self.pack_start(hbox, expand=False, fill=False)
+            self.pack_start(hbox, expand=False)
             self.pack_start(cb)
             self.pack_start(table)
 
@@ -228,6 +230,8 @@ class BlaPreferences(BlaUniqueWindow):
         def __init__(self):
             super(BlaPreferences.BrowserSettings, self).__init__("Browsers")
 
+            # TODO: Move the key and button configuration to a model dialog so
+            #       the comboboxes don't interfere with page scroll events.
             # Add the action selectors.
             from collections import OrderedDict
             actions = OrderedDict([
@@ -250,13 +254,16 @@ class BlaPreferences(BlaUniqueWindow):
                 table.attach(label, 0, 1, idx, idx+1, xoptions=gtk.FILL,
                              xpadding=5)
 
-                # FIXME: These occasionally grab focus while scrolling.
+                # FIXME: These occasionally grab focus while scrolling. It's
+                #        probably best to add these to a modal window instead.
+                #        The same goes for the scales in the equalizer section.
                 # Add the combobox.
                 cb = gtk.combo_box_new_text()
+                cb.set_size_request(250, -1)
                 map(cb.append_text, actions.keys())
                 cb.set_active(blacfg.getint("library", "%s.action" % key))
                 cb.connect("changed", changed, key)
-                table.attach(cb, 1, 2, idx, idx+1)
+                table.attach(cb, 1, 2, idx, idx+1, xoptions=gtk.FILL)
 
             cb = gtk.CheckButton("Use custom treeview as library browser")
             cb.set_active(blacfg.getboolean("library", "custom.browser"))
@@ -285,24 +292,25 @@ class BlaPreferences(BlaUniqueWindow):
             use_equalizer.set_active(state)
             use_equalizer.connect("toggled", self.__use_equalizer_changed)
 
-            self.__profiles_box = gtk.combo_box_new_text()
-            self.__profiles_box.connect("changed", self.__profile_changed)
+            self.__profile_box = gtk.combo_box_new_text()
+            self.__profile_box.set_size_request(250, -1)
+            self.__profile_box.connect("changed", self.__profile_changed)
 
             old_profile = blacfg.getstring("player", "equalizer.profile")
             profiles = blacfg.get_keys("equalizer.profiles")
 
             for idx, profile in enumerate(profiles):
-                self.__profiles_box.append_text(profile[0])
+                self.__profile_box.append_text(profile[0])
                 if profile[0] == old_profile:
-                    self.__profiles_box.set_active(idx)
+                    self.__profile_box.set_active(idx)
 
             button_table = gtk.Table(rows=1, columns=3, homogeneous=True)
             new_profile_button = gtk.Button("New")
             new_profile_button.connect(
-                "clicked", self.__new_profile, self.__profiles_box)
+                "clicked", self.__new_profile, self.__profile_box)
             delete_profile_button = gtk.Button("Delete")
             delete_profile_button.connect(
-                "clicked", self.__delete_profile, self.__profiles_box)
+                "clicked", self.__delete_profile, self.__profile_box)
             reset_profile_button = gtk.Button("Reset")
             reset_profile_button.connect_object(
                 "clicked", BlaPreferences.PlayerSettings.__reset_profile, self)
@@ -313,24 +321,31 @@ class BlaPreferences(BlaUniqueWindow):
             button_box = gtk.HBox()
             button_box.pack_start(
                 gtk.Label("Profile:"), expand=False, padding=10)
-            button_box.pack_start(self.__profiles_box, expand=False)
+            button_box.pack_start(self.__profile_box, expand=False)
             button_box.pack_start(button_table, expand=False, padding=16)
 
             table = gtk.Table(rows=2, columns=1, homogeneous=False)
             table.set_row_spacings(ROW_SPACINGS)
             table.attach(logarithmic_volume_scale, 0, 2, 0, 1, xpadding=2)
             table.attach(use_equalizer, 0, 1, 1, 2, xpadding=2)
-            # table.attach(button_box, 1, 2, 1, 2, xpadding=2)
 
-            self.__scale_box = gtk.HBox(homogeneous=True)
-            self.__scale_box.set_size_request(-1, 200)
+            self.__scale_container = gtk.Table(
+                rows=1, columns=blaconst.EQUALIZER_BANDS)
+            self.__scale_container.set_size_request(500, 200)
 
+            def format_value(scale, value):
+                sign = "+" if value >= 0 else "-"
+                return "%s%.1f dB" % (sign, abs(value))
+            # XXX: The cut-off frequencies shouldn't be hard-coded!
             bands = [29, 59, 119, 237, 474, 947, 1889, 3770, 7523, 15011]
             values = blacfg.getlistfloat("equalizer.profiles", old_profile)
             if not values:
                 values = [0] * blaconst.EQUALIZER_BANDS
             for idx, val in enumerate(values):
-                box = gtk.VBox(spacing=10)
+                vbox = gtk.VBox(spacing=10)
+                label = gtk.Label("%d Hz" % bands[idx])
+                vbox.pack_start(label, expand=False)
+
                 scale = gtk.VScale(gtk.Adjustment(val, -24., 12., 0.1))
                 scale.set_inverted(True)
                 scale.set_update_policy(gtk.UPDATE_DISCONTINUOUS)
@@ -339,18 +354,17 @@ class BlaPreferences(BlaUniqueWindow):
                 scale.set_draw_value(True)
                 scale.set_value_pos(gtk.POS_BOTTOM)
                 scale.connect("value_changed", self.__equalizer_value_changed,
-                              idx, self.__profiles_box)
-                scale.connect("format_value", lambda *x: "%.1f dB" % x[-1])
+                              idx)
+                scale.connect("format_value", format_value)
                 self.__scales.append(scale)
+                vbox.pack_start(scale)
 
-                label = gtk.Label("%d Hz" % bands[idx])
-                box.pack_start(label, expand=False)
-                box.pack_start(scale, expand=True)
-                self.__scale_box.pack_start(box)
+                self.__scale_container.attach(vbox, idx, idx+1, 0, 1,
+                                        xoptions=gtk.FILL, xpadding=15)
 
-            self.pack_start(table, expand=False)
-            self.pack_start(button_box, expand=False)
-            self.pack_start(self.__scale_box, expand=True, padding=10)
+            self.pack_start(table)
+            self.pack_start(button_box)
+            self.pack_start(self.__scale_container, expand=False, padding=10)
 
             self.__use_equalizer_changed(use_equalizer)
 
@@ -364,17 +378,17 @@ class BlaPreferences(BlaUniqueWindow):
             blacfg.setboolean("player", "use.equalizer", state)
             player.enable_equalizer(state)
 
-            if state and not self.__profiles_box.get_model().get_iter_first():
-                self.__scale_box.set_sensitive(False)
+            if state and not self.__profile_box.get_model().get_iter_first():
+                self.__scale_container.set_sensitive(False)
             else:
-                self.__scale_box.set_sensitive(state)
+                self.__scale_container.set_sensitive(state)
 
         def __reset_profile(self):
             for scale in self.__scales:
                 scale.set_value(0)
 
-        def __equalizer_value_changed(self, scale, band, combobox):
-            profile_name = combobox.get_active_text()
+        def __equalizer_value_changed(self, scale, band):
+            profile_name = self.__profile_box.get_active_text()
             if not profile_name:
                 return
 
@@ -412,7 +426,7 @@ class BlaPreferences(BlaUniqueWindow):
                 blacfg.set("player", "equalizer.profile", "")
                 for s in self.__scales:
                     s.set_value(0)
-                self.__scale_box.set_sensitive(False)
+                self.__scale_container.set_sensitive(False)
 
             player.enable_equalizer(True)
 
@@ -453,7 +467,7 @@ class BlaPreferences(BlaUniqueWindow):
                     combobox.prepend_text(profile_name)
                     combobox.set_active(0)
 
-                self.__scale_box.set_sensitive(True)
+                self.__scale_container.set_sensitive(True)
 
         def __delete_profile(self, button, combobox):
             model = combobox.get_model()
@@ -501,6 +515,7 @@ class BlaPreferences(BlaUniqueWindow):
                 bindings.append([label, accel])
 
             treeview = gtk.TreeView()
+            treeview.set_size_request(250, -1)
             treeview.set_property("rules_hint", True)
             treeview.insert_column_with_attributes(
                 -1, "Action", gtk.CellRendererText(), text=0)
@@ -529,13 +544,15 @@ class BlaPreferences(BlaUniqueWindow):
             viewport = gtk.Viewport()
             viewport.set_shadow_type(gtk.SHADOW_IN)
             viewport.add(treeview)
-            self.pack_start(viewport, expand=True)
+            hbox = gtk.HBox()
+            hbox.pack_start(viewport, expand=False)
+            self.pack_start(hbox, expand=False)
             if not blakeys.can_bind():
                 label = gtk.Label()
                 label.set_markup(
                     "<b>Note</b>: The <i>keybinder</i> module is not "
-                    "available on the system.\nAs a result, the settings on "
-                    "this page will have no effect.")
+                    "available on your system. As a result, global "
+                    "keybindings will currently have no effect.")
                 self.pack_start(label, expand=False, padding=20)
 
     class LastfmSettings(Page):
@@ -549,18 +566,15 @@ class BlaPreferences(BlaUniqueWindow):
             scrobble.connect("toggled", self.__scrobble_changed)
 
             self.__user_entry = gtk.Entry()
+            self.__user_entry.set_size_request(250, -1)
             self.__user_entry.set_text(blacfg.getstring("lastfm", "user"))
 
             self.__ignore_entry = gtk.Entry()
+            self.__user_entry.set_size_request(250, -1)
             self.__ignore_entry.set_text(
                     blacfg.getstring("lastfm", "ignore.pattern"))
             self.__ignore_entry.set_tooltip_text("Comma-separated list")
 
-            nowplaying = gtk.CheckButton("Submit \"Listening now\" messages")
-            nowplaying.set_active(blacfg.getboolean("lastfm", "now.playing"))
-            nowplaying.connect("toggled", self.__nowplaying_changed)
-
-            count = 0
             pairs = [
                 ("Username", self.__user_entry),
                 ("Ignore pattern", self.__ignore_entry)
@@ -568,14 +582,16 @@ class BlaPreferences(BlaUniqueWindow):
 
             table = gtk.Table(rows=len(pairs), columns=2, homogeneous=False)
             table.set_row_spacings(ROW_SPACINGS)
-            count = 0
-            for label, widget in pairs:
+            for idx, (label, widget) in enumerate(pairs):
                 label = gtk.Label("%s:" % label)
                 label.set_alignment(xalign=0.0, yalign=0.5)
-                table.attach(label, 0, 1, count, count+1, xoptions=gtk.FILL,
+                table.attach(label, 0, 1, idx, idx+1, xoptions=gtk.FILL,
                              xpadding=5)
-                table.attach(widget, 1, 2, count, count+1)
-                count += 1
+                table.attach(widget, 1, 2, idx, idx+1, xoptions=gtk.FILL)
+
+            nowplaying = gtk.CheckButton("Send \"now playing\" messages")
+            nowplaying.set_active(blacfg.getboolean("lastfm", "now.playing"))
+            nowplaying.connect("toggled", self.__nowplaying_changed)
 
             self.pack_start(scrobble, expand=False)
             self.pack_start(table, expand=False)
