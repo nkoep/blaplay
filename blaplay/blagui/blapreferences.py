@@ -28,11 +28,13 @@ from blawindows import BlaUniqueWindow, BlaScrolledWindow
 from blabrowsers import BlaBrowsers
 import blaguiutils
 
+ROW_SPACINGS = 3
+
 
 class BlaPreferences(BlaUniqueWindow):
     class Page(gtk.VBox):
         def __init__(self, name):
-            super(BlaPreferences.Page, self).__init__(spacing=10)
+            super(BlaPreferences.Page, self).__init__(spacing=ROW_SPACINGS)
 
             self.__name = name
             self.set_border_width(10)
@@ -120,6 +122,7 @@ class BlaPreferences(BlaUniqueWindow):
                 model.append([d])
 
             table = gtk.Table(rows=2, columns=1)
+            table.set_row_spacings(ROW_SPACINGS)
             items = [
                 ("Add...", self.__add_directory),
                 ("Remove", self.__remove_directory),
@@ -151,6 +154,7 @@ class BlaPreferences(BlaUniqueWindow):
                  "exclude")
             ]
             table = gtk.Table(rows=len(options), columns=2, homogeneous=False)
+            table.set_row_spacings(ROW_SPACINGS)
             for idx, (label, tooltip, key) in enumerate(options):
                 # Add the label.
                 label = gtk.Label("%s:" % label)
@@ -238,6 +242,7 @@ class BlaPreferences(BlaUniqueWindow):
             options = [("Double-click", "doubleclick"),
                        ("Middle-click", "middleclick"), ("Return", "return")]
             table = gtk.Table(rows=len(options), columns=2, homogeneous=False)
+            table.set_row_spacings(ROW_SPACINGS)
             for idx, (label, key) in enumerate(options):
                 # Add the label.
                 label = gtk.Label("%s:" % label)
@@ -312,7 +317,7 @@ class BlaPreferences(BlaUniqueWindow):
             button_box.pack_start(button_table, expand=False, padding=16)
 
             table = gtk.Table(rows=2, columns=1, homogeneous=False)
-            table.set_row_spacings(2)
+            table.set_row_spacings(ROW_SPACINGS)
             table.attach(logarithmic_volume_scale, 0, 2, 0, 1, xpadding=2)
             table.attach(use_equalizer, 0, 1, 1, 2, xpadding=2)
             # table.attach(button_box, 1, 2, 1, 2, xpadding=2)
@@ -562,6 +567,7 @@ class BlaPreferences(BlaUniqueWindow):
             ]
 
             table = gtk.Table(rows=len(pairs), columns=2, homogeneous=False)
+            table.set_row_spacings(ROW_SPACINGS)
             count = 0
             for label, widget in pairs:
                 label = gtk.Label("%s:" % label)
