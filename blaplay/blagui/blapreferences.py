@@ -30,17 +30,6 @@ import blaguiutils
 
 
 class BlaPreferences(BlaUniqueWindow):
-    class HPage(gtk.HBox):
-        def __init__(self, name):
-            super(BlaPreferences.HPage, self).__init__(spacing=10)
-
-            self.__name = name
-            self.set_border_width(10)
-
-        @property
-        def name(self):
-            return self.__name
-
     class Page(gtk.VBox):
         def __init__(self, name):
             super(BlaPreferences.Page, self).__init__(spacing=10)
@@ -52,57 +41,23 @@ class BlaPreferences(BlaUniqueWindow):
         def name(self):
             return self.__name
 
-    class GeneralSettings(HPage):
+    class GeneralSettings(Page):
         def __init__(self):
             super(BlaPreferences.GeneralSettings, self).__init__("General")
 
-            # Tray
-            tray_frame = gtk.Frame("Tray")
-            tray_table = gtk.Table(rows=2, columns=2, homogeneous=False)
-            tray_table.set_border_width(10)
-            tray_frame.add(tray_table)
-
-            def tray_changed(checkbutton, key):
-                blacfg.setboolean("general", key, checkbutton.get_active())
             options = [
-                ("Always display tray icon", "always.show.tray",
-                 [0, 1, 0, 1]),
-                ("Close to tray", "close.to.tray", [0, 1, 1, 2]),
-                ("Show tooltip", "tray.show.tooltip", [1, 2, 0, 1])
+                ("Cursor follows playback", "cursor.follows.playback",
+                 self.__follow_playback),
+                ("Remove tracks from queue after manual activation",
+                 "queue.remove.when.activated", self.__queue_remove),
+                ("Use timeout to perform search operations",
+                 "search.after.timeout", self.__search_after_timeout)
             ]
-            for label, key, coords in options:
-                b = gtk.CheckButton(label)
-                b.set_active(blacfg.getboolean("general", key))
-                b.connect("toggled", tray_changed, key)
-                tray_table.attach(b, *coords)
-
-            # Miscellaneous
-            misc_frame = gtk.Frame("Miscellaneous")
-            misc_table = gtk.Table(rows=1, columns=2, homogeneous=False)
-            misc_table.set_border_width(10)
-            misc_frame.add(misc_table)
-
-            cb = gtk.CheckButton("Cursor follows playback")
-            cb.set_active(
-                blacfg.getboolean("general", "cursor.follows.playback"))
-            cb.connect("toggled", self.__follow_playback)
-            misc_table.attach(cb, 0, 1, 0, 1)
-
-            cb = gtk.CheckButton(
-                "Remove track from queue on double-click or return")
-            cb.set_active(blacfg.getboolean(
-                "general", "queue.remove.when.activated"))
-            cb.connect("toggled", self.__queue_remove)
-            misc_table.attach(cb, 1, 2, 0, 1, xpadding=10)
-
-            cb = gtk.CheckButton("Search after timeout")
-            cb.set_active(
-                blacfg.getboolean("general", "search.after.timeout"))
-            cb.connect("toggled", self.__search_after_timeout)
-            misc_table.attach(cb, 0, 2, 1, 2)
-
-            self.pack_start(tray_frame, expand=False)
-            self.pack_start(misc_frame, expand=False)
+            for label, key, callback in options:
+                cb = gtk.CheckButton(label)
+                cb.set_active(blacfg.getboolean("general", key))
+                cb.connect("toggled", callback)
+                self.pack_start(cb)
 
         def __follow_playback(self, checkbutton):
             blacfg.setboolean("general", "cursor.follows.playback",
@@ -115,6 +70,23 @@ class BlaPreferences(BlaUniqueWindow):
         def __search_after_timeout(self, checkbutton):
             blacfg.setboolean("general", "search.after.timeout",
                               checkbutton.get_active())
+
+    class TraySettings(Page):
+        def __init__(self):
+            super(BlaPreferences.TraySettings, self).__init__("Tray")
+
+            def tray_changed(checkbutton, key):
+                blacfg.setboolean("general", key, checkbutton.get_active())
+            options = [
+                ("Always display tray icon", "always.show.tray"),
+                ("Close to tray", "close.to.tray"),
+                ("Show tooltip", "tray.show.tooltip")
+            ]
+            for label, key in options:
+                cb = gtk.CheckButton(label)
+                cb.set_active(blacfg.getboolean("general", key))
+                cb.connect("toggled", tray_changed, key)
+                self.pack_start(cb)
 
     class LibraryBrowsersSettings(Page):
         def __init__(self):
@@ -644,9 +616,9 @@ class BlaPreferences(BlaUniqueWindow):
 
         vbox = gtk.VBox()
         vbox.set_border_width(10)
-        for page in [self.GeneralSettings, self.LibraryBrowsersSettings,
-                     self.PlayerSettings, self.Keybindings,
-                     self.LastfmSettings]:
+        for page in [self.GeneralSettings, self.TraySettings,
+                     self.LibraryBrowsersSettings, self.PlayerSettings,
+                     self.Keybindings, self.LastfmSettings]:
             try:
                 page = page()
             except Exception as exc:
@@ -656,8 +628,8 @@ class BlaPreferences(BlaUniqueWindow):
             label.set_markup("<b>%s</b>" % page.name)
             alignment = gtk.Alignment(xalign=0.0, yalign=0.5)
             alignment.add(label)
-            vbox.pack_start(alignment, expand=False, fill=False)
-            vbox.pack_start(page, expand=True)
+            vbox.pack_start(alignment)
+            vbox.pack_start(page)
 
         sw = BlaScrolledWindow()
         sw.set_shadow_type(gtk.SHADOW_NONE)
