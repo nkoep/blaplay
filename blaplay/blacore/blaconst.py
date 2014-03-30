@@ -129,7 +129,6 @@ MENU = """
             <menuitem action="RecommendedEvents"/>
             <menuitem action="NewReleases"/>
             <separator/>
-            <menuitem action="Browsers"/>
             <menuitem action="Visualization"/>
             <menuitem action="SidePane"/>
             <menuitem action="Statusbar"/>

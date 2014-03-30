@@ -122,8 +122,6 @@ class BlaMainWindow(BlaBaseWindow):
         ui_manager.add_actions(actions)
 
         toggle_actions = [
-            ("Browsers", None, "_Browsers", None, "", self.__toggle_browsers,
-             blacfg.getboolean("general", "browsers")),
             ("SidePane", None, "_Side pane", None, "",
              self.__toggle_side_pane, blacfg.getboolean("general",
                                                         "side.pane")),
@@ -163,7 +161,6 @@ class BlaMainWindow(BlaBaseWindow):
         self.__vbox_left.pack_start(self.__browsers, expand=True)
         self.__vbox_left.pack_start(self.__visualization, expand=False)
         self.__vbox_left.show()
-        self.__vbox_left.set_visible(blacfg.getboolean("general", "browsers"))
 
         # Pack the browser + view-widget into a gtk.HPane instance.
         hpane = gtk.HPaned()
@@ -282,11 +279,6 @@ class BlaMainWindow(BlaBaseWindow):
             return True
         blaplay.shutdown()
         return False
-
-    def __toggle_browsers(self, event):
-        state = event.get_active()
-        self.__vbox_left.set_visible(state)
-        blacfg.setboolean("general", "browsers", state)
 
     def __toggle_visualization(self, event):
         self.__visualization.set_visible(event.get_active())
