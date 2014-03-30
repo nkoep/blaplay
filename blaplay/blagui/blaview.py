@@ -590,8 +590,6 @@ class BlaView(gtk.HPaned):
         self.pack1(self.__container, resize=True, shrink=False)
         self.pack2(self.__side_pane, resize=False, shrink=False)
 
-        self.set_show_side_pane(blacfg.getboolean("general", "side.pane"))
-
         def startup_complete(*args):
             self.set_view(blacfg.getint("general", "view"))
         blaplay.bla.connect("startup_complete", startup_complete)
@@ -624,10 +622,6 @@ class BlaView(gtk.HPaned):
 
     def __remove_invalid_tracks(self, *args):
         self.__mediator("remove_invalid_tracks")
-
-    def set_show_side_pane(self, state):
-        self.__side_pane.set_visible(state)
-        blacfg.setboolean("general", "side.pane", state)
 
     def set_view(self, view):
         view_prev = blacfg.getint("general", "view")

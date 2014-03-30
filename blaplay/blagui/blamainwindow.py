@@ -122,9 +122,6 @@ class BlaMainWindow(BlaBaseWindow):
         ui_manager.add_actions(actions)
 
         toggle_actions = [
-            ("SidePane", None, "_Side pane", None, "",
-             self.__toggle_side_pane, blacfg.getboolean("general",
-                                                        "side.pane")),
             ("Statusbar", None, "St_atusbar", None, "",
              self.__toggle_statusbar, blacfg.getboolean("general",
                                                         "statusbar")),
@@ -282,9 +279,6 @@ class BlaMainWindow(BlaBaseWindow):
 
     def __toggle_visualization(self, event):
         self.__visualization.set_visible(event.get_active())
-
-    def __toggle_side_pane(self, event):
-        self.__view.set_show_side_pane(event.get_active())
 
     def __toggle_statusbar(self, event):
         self.__statusbar.set_visible(event.get_active())
