@@ -30,6 +30,17 @@ import blaguiutils
 
 
 class BlaPreferences(BlaUniqueWindow):
+    class HPage(gtk.HBox):
+        def __init__(self, name):
+            super(BlaPreferences.HPage, self).__init__(spacing=10)
+
+            self.__name = name
+            self.set_border_width(10)
+
+        @property
+        def name(self):
+            return self.__name
+
     class Page(gtk.VBox):
         def __init__(self, name):
             super(BlaPreferences.Page, self).__init__(spacing=10)
@@ -41,7 +52,7 @@ class BlaPreferences(BlaUniqueWindow):
         def name(self):
             return self.__name
 
-    class GeneralSettings(Page):
+    class GeneralSettings(HPage):
         def __init__(self):
             super(BlaPreferences.GeneralSettings, self).__init__("General")
 
@@ -124,13 +135,14 @@ class BlaPreferences(BlaUniqueWindow):
             model = gtk.ListStore(gobject.TYPE_STRING)
             treeview = gtk.TreeView(model)
             treeview.set_property("rules_hint", True)
+            treeview.set_size_request(400, -1)
             r = gtk.CellRendererText()
             treeview.insert_column_with_attributes(
                 -1, "Directories", r, text=0)
 
             sw = BlaScrolledWindow()
             sw.set_shadow_type(gtk.SHADOW_IN)
-            sw.set_size_request(-1, 140)
+            # sw.set_size_request(-1, 140)
             sw.add(treeview)
 
             directories = blacfg.getdotliststr("library", "directories")
@@ -195,8 +207,8 @@ class BlaPreferences(BlaUniqueWindow):
 
             def cb_changed(combobox, key):
                 blacfg.set("library", "%s.action" % key, combobox.get_active())
-
             for key in ["doubleclick", "middleclick", "return"]:
+                # FIXME: These grab focus during scrolling.
                 cb = gtk.combo_box_new_text()
                 map(cb.append_text, actions)
                 if key == "return":
@@ -238,7 +250,7 @@ class BlaPreferences(BlaUniqueWindow):
             hbox2.pack_start(draw_tree_lines)
             hbox2.pack_start(custom_library_browser)
 
-            self.pack_start(hbox, expand=False)
+            self.pack_start(hbox, expand=False, fill=False)
             self.pack_start(update_library, expand=False)
             self.pack_start(action_table, expand=False)
             self.pack_start(hbox2, expand=False)
@@ -630,11 +642,11 @@ class BlaPreferences(BlaUniqueWindow):
 
     def __init__(self, *args):
         super(BlaPreferences, self).__init__()
+        # self.set_resizable(False)
+        self.set_title("Preferences")
 
-        self.set_resizable(False)
-        self.set_title("%s Preferences" % blaconst.APPNAME)
-
-        notebook = gtk.Notebook()
+        vbox = gtk.VBox()
+        vbox.set_border_width(10)
         for page in [self.GeneralSettings, self.LibraryBrowsersSettings,
                      self.PlayerSettings, self.Keybindings,
                      self.LastfmSettings]:
@@ -643,7 +655,17 @@ class BlaPreferences(BlaUniqueWindow):
             except Exception as exc:
                 print_d(exc)
                 continue
-            notebook.append_page(page, gtk.Label(page.name))
-        self.vbox.pack_start(notebook)
+            label = gtk.Label()
+            label.set_markup("<b>%s</b>" % page.name)
+            alignment = gtk.Alignment(xalign=0.0, yalign=0.5)
+            alignment.add(label)
+            vbox.pack_start(alignment, expand=False, fill=False)
+            vbox.pack_start(page, expand=True)
+
+        sw = BlaScrolledWindow()
+        sw.set_shadow_type(gtk.SHADOW_NONE)
+        sw.add_with_viewport(vbox)
+        self.vbox.pack_start(sw)
+        self.set_size_request(1000, 750)
         self.show_all()
 
