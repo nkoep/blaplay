@@ -94,6 +94,7 @@ class BlaPreferences(BlaUniqueWindow):
         def __init__(self):
             super(BlaPreferences.LibrarySettings, self).__init__("Library")
 
+            # TODO: Drop the restrict-to option!
             restrict_string = blacfg.getstring("library", "restrict.to")
             exclude_string = blacfg.getstring("library", "exclude")
             def destroy(*args):
@@ -559,35 +560,30 @@ class BlaPreferences(BlaUniqueWindow):
         def __init__(self):
             super(BlaPreferences.LastfmSettings, self).__init__("last.fm")
 
-            self.connect("destroy", self.__save)
-
             scrobble = gtk.CheckButton("Enable scrobbling")
             scrobble.set_active(blacfg.getboolean("lastfm", "scrobble"))
             scrobble.connect("toggled", self.__scrobble_changed)
 
-            self.__user_entry = gtk.Entry()
-            self.__user_entry.set_size_request(250, -1)
-            self.__user_entry.set_text(blacfg.getstring("lastfm", "user"))
-
-            self.__ignore_entry = gtk.Entry()
-            self.__user_entry.set_size_request(250, -1)
-            self.__ignore_entry.set_text(
-                    blacfg.getstring("lastfm", "ignore.pattern"))
-            self.__ignore_entry.set_tooltip_text("Comma-separated list")
-
-            pairs = [
-                ("Username", self.__user_entry),
-                ("Ignore pattern", self.__ignore_entry)
+            options = [
+                ("Username", "user", ""),
+                ("Ignore pattern", "ignore.pattern", "Comma-separated list")
             ]
-
-            table = gtk.Table(rows=len(pairs), columns=2, homogeneous=False)
+            table = gtk.Table(rows=len(options), columns=2, homogeneous=False)
             table.set_row_spacings(ROW_SPACINGS)
-            for idx, (label, widget) in enumerate(pairs):
+            for idx, (label, key, tooltip) in enumerate(options):
+                # Add the label.
                 label = gtk.Label("%s:" % label)
                 label.set_alignment(xalign=0.0, yalign=0.5)
                 table.attach(label, 0, 1, idx, idx+1, xoptions=gtk.FILL,
                              xpadding=5)
-                table.attach(widget, 1, 2, idx, idx+1, xoptions=gtk.FILL)
+
+                # Add the input field.
+                entry = gtk.Entry()
+                entry.set_size_request(250, -1)
+                entry.set_text(blacfg.getstring("lastfm", key))
+                entry.set_tooltip_text(tooltip)
+                entry.connect("changed", self.__entry_changed, key)
+                table.attach(entry, 1, 2, idx, idx+1, xoptions=gtk.FILL)
 
             nowplaying = gtk.CheckButton("Send \"now playing\" messages")
             nowplaying.set_active(blacfg.getboolean("lastfm", "now.playing"))
@@ -597,10 +593,9 @@ class BlaPreferences(BlaUniqueWindow):
             self.pack_start(table, expand=False)
             self.pack_start(nowplaying, expand=False)
 
-        def __save(self, *args):
-            blacfg.set("lastfm", "user", self.__user_entry.get_text())
-            blacfg.set(
-                "lastfm", "ignore.pattern", self.__ignore_entry.get_text())
+        def __entry_changed(self, entry, key):
+            print "on entry %", entry, " for key %s" % key
+            blacfg.set("lastfm", key, entry.get_text())
 
         def __scrobble_changed(self, checkbutton):
             blacfg.setboolean("lastfm", "scrobble", checkbutton.get_active())
