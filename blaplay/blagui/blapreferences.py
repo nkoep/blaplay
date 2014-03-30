@@ -583,7 +583,6 @@ class BlaPreferences(BlaUniqueWindow):
             self.pack_start(nowplaying, expand=False)
 
         def __entry_changed(self, entry, key):
-            print "on entry %", entry, " for key %s" % key
             blacfg.set("lastfm", key, entry.get_text())
 
         def __scrobble_changed(self, checkbutton):
@@ -595,22 +594,26 @@ class BlaPreferences(BlaUniqueWindow):
 
     def __init__(self, *args):
         super(BlaPreferences, self).__init__()
-        # self.set_resizable(False)
         self.set_title("Preferences")
 
-        vbox = gtk.VBox()
+        class Section(gtk.VBox):
+            def __init__(self, page):
+                super(Section, self).__init__()
+                label = gtk.Label()
+                label.set_markup("<b>%s</b>" % page.name)
+                alignment = gtk.Alignment(xalign=0.0, yalign=0.5)
+                alignment.add(label)
+                self.pack_start(alignment)
+                self.pack_start(page)
+
+        vbox = gtk.VBox(spacing=5)
         vbox.set_border_width(10)
-        for page in [self.GeneralSettings, self.TraySettings,
-                     self.LibrarySettings, self.BrowserSettings,
-                     self.PlayerSettings, self.Keybindings,
-                     self.LastfmSettings]:
-            page = page()
-            label = gtk.Label()
-            label.set_markup("<b>%s</b>" % page.name)
-            alignment = gtk.Alignment(xalign=0.0, yalign=0.5)
-            alignment.add(label)
-            vbox.pack_start(alignment)
-            vbox.pack_start(page)
+        for cls in [self.GeneralSettings, self.TraySettings,
+                    self.LibrarySettings, self.BrowserSettings,
+                    self.PlayerSettings, self.Keybindings,
+                    self.LastfmSettings]:
+            section = Section(cls())
+            vbox.pack_start(section)
 
         sw = BlaScrolledWindow()
         sw.set_shadow_type(gtk.SHADOW_NONE)
