@@ -532,6 +532,7 @@ class BlaLibraryBrowser(gtk.VBox):
         self.__treeview = BlaTreeView(parent=parent, multicol=False,
                                       browser_id=blaconst.BROWSER_LIBRARY)
         self.__treeview.set_headers_visible(False)
+        self.__treeview.set_enable_tree_lines(True)
         column = gtk.TreeViewColumn()
         column.set_sizing(gtk.TREE_VIEW_COLUMN_FIXED)
         self.__treeview.append_column(column)
@@ -595,13 +596,9 @@ class BlaLibraryBrowser(gtk.VBox):
         self.pack_start(hbox, expand=False)
 
         self.update_treeview_style()
-        self.update_tree_lines()
         def config_changed(cfg, section, key):
-            if section == "library":
-                if key == "custom.browser":
-                    self.update_treeview_style()
-                elif key == "draw.tree.lines":
-                    self.update_tree_lines()
+            if section == "library" and key == "custom.browser":
+                self.update_treeview_style()
         blacfg.connect("changed", config_changed)
 
         library.connect("library_updated", queue_model_update)
@@ -690,10 +687,6 @@ class BlaLibraryBrowser(gtk.VBox):
             renderer.set_property("text", text)
         column.pack_start(renderer)
         column.set_cell_data_func(renderer, cdf)
-
-    def update_tree_lines(self):
-        self.__treeview.set_enable_tree_lines(
-            blacfg.getboolean("library", "draw.tree.lines"))
 
 class BlaFileBrowser(gtk.VBox):
     __layout = (

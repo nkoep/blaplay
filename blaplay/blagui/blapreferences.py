@@ -245,42 +245,22 @@ class BlaPreferences(BlaUniqueWindow):
                 table.attach(label, 0, 1, idx, idx+1, xoptions=gtk.FILL,
                              xpadding=5)
 
+                # FIXME: These occasionally grab focus while scrolling.
                 # Add the combobox.
-                # FIXME: These grab focus during scrolling.
                 cb = gtk.combo_box_new_text()
                 map(cb.append_text, actions.keys())
                 cb.set_active(blacfg.getint("library", "%s.action" % key))
                 cb.connect("changed", changed, key)
                 table.attach(cb, 1, 2, idx, idx+1)
 
-            # Add miscellaneous browser options.
-            hbox = gtk.HBox(spacing=10)
-
-            draw_tree_lines = gtk.CheckButton("Draw tree lines in browsers")
-            draw_tree_lines.set_active(
-                blacfg.getboolean("library", "draw.tree.lines"))
-            draw_tree_lines.connect("toggled", self.__tree_lines_changed)
-
-            custom_library_browser = gtk.CheckButton(
-                "Use custom treeview as library browser")
-            custom_library_browser.set_active(
-                blacfg.getboolean("library", "custom.browser"))
-            custom_library_browser.connect(
-                "toggled", self.__custom_library_browser_changed)
-
-            hbox.pack_start(draw_tree_lines)
-            hbox.pack_start(custom_library_browser)
+            cb = gtk.CheckButton("Use custom treeview as library browser")
+            cb.set_active(blacfg.getboolean("library", "custom.browser"))
+            def toggled(cb):
+                blacfg.setboolean("library", "custom.browser", cb.get_active())
+            cb.connect("toggled", toggled)
 
             self.pack_start(table)
-            self.pack_start(hbox)
-
-        def __tree_lines_changed(self, checkbutton):
-            blacfg.setboolean(
-                "library", "draw.tree.lines", checkbutton.get_active())
-
-        def __custom_library_browser_changed(self, checkbutton):
-            blacfg.setboolean(
-                "library", "custom.browser", checkbutton.get_active())
+            self.pack_start(cb)
 
     class PlayerSettings(Page):
         def __init__(self):

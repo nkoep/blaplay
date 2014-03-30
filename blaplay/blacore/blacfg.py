@@ -83,7 +83,6 @@ class BlaCfg(RawConfigParser, gobject.GObject):
                 "doubleclick.action": blaconst.ACTION_SEND_TO_CURRENT,
                 "middleclick.action": blaconst.ACTION_ADD_TO_CURRENT,
                 "return.action": blaconst.ACTION_SEND_TO_NEW,
-                "draw.tree.lines": "yes",
                 "custom.browser": "yes",
                 "update.on.startup": "yes"
             },
