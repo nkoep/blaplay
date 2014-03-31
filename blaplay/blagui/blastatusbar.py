@@ -104,7 +104,6 @@ class BlaStatusbar(gtk.Table):
         # TODO: group these two
         self.__pb.set_visible(False)
         self.__pb_label.set_visible(False)
-        self.set_visible(blacfg.getboolean("general", "statusbar"))
 
     def __changed(self, player):
         self.__state = player.get_state()
@@ -167,10 +166,6 @@ class BlaStatusbar(gtk.Table):
         else:
             cls.__instance.__position = cls.__instance.__convert_time(position)
         cls.__instance.__update_track_status()
-
-    def set_visible(self, yes):
-        super(BlaStatusbar, self).set_visible(yes)
-        blacfg.setboolean("general", "statusbar", yes)
 
     def update_progress(self, library, arg):
         def pulse(pb):

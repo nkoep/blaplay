@@ -122,7 +122,6 @@ MENU = """
         </menu>
         <menu action="View">
             <menuitem action="Visualization"/>
-            <menuitem action="Statusbar"/>
             <separator/>
             <menuitem action="JumpToPlayingTrack"/>
         </menu>

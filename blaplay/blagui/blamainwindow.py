@@ -143,12 +143,9 @@ class BlaMainWindow(BlaBaseWindow):
         ui_manager.add_actions(actions)
 
         toggle_actions = [
-            ("Statusbar", None, "_Statusbar", None, "",
-             self.__toggle_statusbar, blacfg.getboolean("general",
-                                                        "statusbar")),
             ("Visualization", None, "_Visualization", None, "",
              self.__toggle_visualization,
-             blacfg.getboolean("general", "show.visualization"))
+             blacfg.getboolean("general", "show.visualization"),)
         ]
         ui_manager.add_toggle_actions(toggle_actions)
 
@@ -302,9 +299,6 @@ class BlaMainWindow(BlaBaseWindow):
 
     def __toggle_visualization(self, event):
         self.__visualization.set_visible(event.get_active())
-
-    def __toggle_statusbar(self, event):
-        self.__statusbar.set_visible(event.get_active())
 
     def __set_file_chooser_directory(self, diag):
         directory = blacfg.getstring("general", "filechooser.directory")
