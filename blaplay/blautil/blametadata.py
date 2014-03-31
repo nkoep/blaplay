@@ -42,16 +42,15 @@ metadata = None
 def init():
     global metadata
     metadata = BlaMetadata()
-    blaplay.bla.register_for_cleanup(metadata)
 
 
 class BlaMetadata(object):
     def __init__(self):
         metadata = blautil.deserialize_from_file(blaconst.METADATA_PATH)
         self.__metadata = metadata or {"lyrics": {}}
-
-    def __call__(self):
-        blautil.serialize_to_file(self.__metadata, blaconst.METADATA_PATH)
+        def pre_shutdown_hook():
+            blautil.serialize_to_file(self.__metadata, blaconst.METADATA_PATH)
+        blaplay.bla.add_pre_shutdown_hook(pre_shutdown_hook)
 
     def add(self, section, key, value):
         self.__metadata[section][key] = value

@@ -23,22 +23,20 @@ import gtk
 from blaplay.blacore import blaconst
 from blaplay import blautil
 
-cli_queue = None
-
 
 class Blaplay(gobject.GObject):
     __metaclass__ = blautil.BlaSingletonMeta
-    __slots__ = ("library", "player", "ui_manager", "window")
+    __slots__ = ("_pre_shutdown_hooks", "library", "player", "ui_manager",
+                 "window")
 
     __gsignals__ = {
         "startup_complete": blautil.signal(0)
     }
 
-    __cleanup = []
-
     def __init__(self):
         super(Blaplay, self).__init__()
         self.library = self.player = self.ui_manager = self.window = None
+        self._pre_shutdown_hooks = []
 
     def __setattr__(self, attr, value):
         # The attributes for this class are frozen. That is, we only allow the
@@ -57,12 +55,8 @@ class Blaplay(gobject.GObject):
         print_d("Entering the main loop")
         gtk.main()
 
-    def register_for_cleanup(self, instance):
-        # Class instances which need to shut down gracefully and preferably
-        # before the user interface has been destroyed can register themselves
-        # via this method. Classes that do so need to implement the __call__
-        # method as their cleanup routine.
-        self.__cleanup.append(instance)
+    def add_pre_shutdown_hook(self, hook):
+        self._pre_shutdown_hooks.append(hook)
 
     def shutdown(self):
         print_d("Shutting down %s..." % blaconst.APPNAME)
@@ -86,10 +80,10 @@ class Blaplay(gobject.GObject):
         from blaplay import blautil
         blautil.BlaThread.kill_threads()
 
-        for instance in self.__cleanup:
-            print_d("Calling shutdown routine for %s" %
-                    instance.__class__.__name__)
-            instance()
+        for hook in self._pre_shutdown_hooks:
+            print_d("Calling pre-shutdown hook '%s.%s'" %
+                    (hook.__module__, hook.__name__))
+            hook()
 
         from blaplay.blagui import blaguiutils
         # TODO: destroy all additional windows instead of just hiding them.

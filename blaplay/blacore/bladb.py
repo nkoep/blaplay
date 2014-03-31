@@ -288,12 +288,6 @@ class BlaLibrary(gobject.GObject):
         self.__extension_filter = re.compile(
             r".*\.(%s)$" % "|".join(formats.formats.keys())).match
 
-    def __call__(self):
-        print_i("Saving pending library changes")
-
-        if pending_save:
-            self.__save_library()
-
     def __getitem__(self, key):
         try:
             return self.__tracks[key]
@@ -438,7 +432,11 @@ class BlaLibrary(gobject.GObject):
         #        a single-purpose-single-use signal.
         self.__library_monitor.update_directories()
 
-        blaplay.bla.register_for_cleanup(self)
+        def pre_shutdown_hook():
+            print_i("Saving pending library changes")
+            if pending_save:
+                self.__save_library()
+        blaplay.bla.add_pre_shutdown_hook(pre_shutdown_hook)
 
     # This method exclusively inserts tracks into the library. The form
     # `self[uri] = track', on the other hand, inserts it into the library only

@@ -1256,10 +1256,7 @@ class BlaPlaylistManager(gtk.Notebook):
 
         self.show_all()
 
-        blaplay.bla.register_for_cleanup(self)
-
-    def __call__(self):
-        self.save()
+        blaplay.bla.add_pre_shutdown_hook(self.save)
 
     def __drag_data_recv(self, drag_context, x, y, selection_data, info, time):
         # This gets called when DND operations end on the tab strip of the

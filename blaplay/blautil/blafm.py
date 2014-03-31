@@ -358,11 +358,10 @@ class BlaScrobbler(object):
 
     def __init__(self):
         super(BlaScrobbler, self).__init__()
-        blaplay.bla.register_for_cleanup(self)
         self.__queue = BlaScrobbler.SubmissionQueue()
-
-    def __call__(self):
-        self.__submit_last_track(True)
+        def pre_shutdown_hook():
+            self.__submit_last_track(True)
+        blaplay.bla.add_pre_shutdown_hook(pre_shutdown_hook)
 
     @classmethod
     def __request_authorization(cls):

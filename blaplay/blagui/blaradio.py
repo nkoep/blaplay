@@ -203,11 +203,9 @@ class BlaRadio(gtk.VBox):
         player.connect_object("get_station", BlaRadio.__get_station, self)
         player.connect_object("state_changed", BlaRadio.__update_rows, self)
 
-        blaplay.bla.register_for_cleanup(self)
-        self.show_all()
+        blaplay.bla.add_pre_shutdown_hook(self.__save_stations)
 
-    def __call__(self):
-        self.__save_stations()
+        self.show_all()
 
     def __drag_data_get(self, treeview, drag_context, selection_data, info,
                         time):
