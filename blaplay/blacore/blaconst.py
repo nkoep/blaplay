@@ -16,6 +16,7 @@
 # Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
 import os
+from collections import OrderedDict
 
 import gtk
 
@@ -112,11 +113,6 @@ MENU = """
             <separator/>
             <menuitem action="Preferences"/>
         </menu>
-        <menu action="PlayOrder">
-            <menuitem action="OrderNormal"/>
-            <menuitem action="OrderRepeat"/>
-            <menuitem action="OrderShuffle"/>
-        </menu>
         <menu action="Help">
             <menuitem action="About"/>
         </menu>
@@ -138,8 +134,6 @@ MENU_EDIT = _builder(
      "Selection/Remove", "RemoveInvalidTracks"] +
     _builder("Select/Select%s", ["All", "ByArtist", "ByAlbum",
                                  "ByAlbumArtist", "ByGenre"]))
-MENU_ORDER = _builder("/Menu/PlayOrder/%s",
-                      ["OrderNormal", "OrderRepeat", "OrderShuffle"])
 del _builder
 
 # Library and browser constants
@@ -158,7 +152,10 @@ BROWSER_LIBRARY, BROWSER_FILESYSTEM = xrange(2)
 # Playlist constants
 TAG_EDITOR_MAX_ITEMS = QUEUE_MAX_ITEMS = 128
 ORDER_NORMAL, ORDER_REPEAT, ORDER_SHUFFLE = xrange(3)
-ORDER_LITERALS = ["Normal", "Repeat", "Shuffle"]
+ORDER_LITERALS = OrderedDict([
+    ("Normal", ORDER_NORMAL), ("Repeat", ORDER_REPEAT),
+    ("Shuffle", ORDER_SHUFFLE)
+])
 #ORDER = ["Normal", "Repeat", "Repeat album", "Shuffle", "Shuffle albums"]
 (PLAYLIST_FROM_SELECTION, PLAYLIST_FROM_ARTISTS, PLAYLIST_FROM_ALBUMS,
  PLAYLIST_FROM_ALBUM_ARTISTS, PLAYLIST_FROM_GENRE) = xrange(5)

@@ -142,18 +142,6 @@ class BlaMainWindow(BlaBaseWindow):
         ]
         ui_manager.add_actions(actions)
 
-        radio_actions = [
-            ("OrderNormal", None, "_Normal", None, "", blaconst.ORDER_NORMAL),
-            ("OrderRepeat", None, "_Repeat", None, "", blaconst.ORDER_REPEAT),
-            ("OrderShuffle", None, "_Shuffle", None, "",
-             blaconst.ORDER_SHUFFLE)
-        ]
-        # TODO: Emit "order_changed" signal in the on_change handler instead
-        #       and let interested widgets handle this instead.
-        ui_manager.add_radio_actions(
-            radio_actions, value=blacfg.getint("general", "play.order"),
-            on_change=BlaStatusbar.set_order)
-
         # This is the topmost box that holds all the other components.
         self.add(gtk.VBox())
 

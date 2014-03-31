@@ -61,16 +61,11 @@ class BlaStatusbar(gtk.Table):
 
         # Playback order
         self.__order = gtk.combo_box_new_text()
-        map(self.__order.append_text, blaconst.ORDER_LITERALS)
+        map(self.__order.append_text, blaconst.ORDER_LITERALS.keys())
         self.__order.set_active(blacfg.getint("general", "play.order"))
         def order_changed(cb):
-            order = cb.get_active()
-            states = [False] * len(blaconst.ORDER_LITERALS)
-            states[order] = True
-            ui_manager = blaplay.bla.ui_manager
-            for idx, order in enumerate(blaconst.MENU_ORDER):
-                action = ui_manager.get_widget(order)
-                action.set_active(states[idx])
+            order = cb.get_active_text()
+            blacfg.set("general", "play.order", blaconst.ORDER_LITERALS[order])
         self.__order.connect("changed", order_changed)
 
         table = gtk.Table(rows=1, columns=3)
@@ -152,12 +147,6 @@ class BlaStatusbar(gtk.Table):
             except AttributeError:
                 pass
         return False
-
-    @classmethod
-    def set_order(cls, radioaction, current):
-        order = current.get_current_value()
-        cls.__instance.__order.set_active(order)
-        blacfg.set("general", "play.order", order)
 
     @classmethod
     def update_position(cls, position):
