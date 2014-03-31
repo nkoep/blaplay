@@ -110,7 +110,6 @@ MENU = """
                 <menuitem action="PlaylistFromGenre"/>
             </menu>
             <separator/>
-            <menuitem action="RemoveDuplicates"/>
             <menuitem action="RemoveInvalidTracks"/>
             <menuitem action="Search"/>
             <separator/>
@@ -145,7 +144,7 @@ MENU_EDIT = _builder(
     "/Menu/Edit/%s",
     ["Paste", "Clear", "Select", "Select/SelectAll",
      "Select/SelectComplement", "Selection/Cut", "Selection/Copy",
-     "Selection/Remove", "RemoveDuplicates", "RemoveInvalidTracks"] +
+     "Selection/Remove", "RemoveInvalidTracks"] +
     _builder("Select/Select%s", ["All", "ByArtist", "ByAlbum",
                                  "ByAlbumArtist", "ByGenre"]))
 MENU_ORDER = _builder("/Menu/PlayOrder/%s",

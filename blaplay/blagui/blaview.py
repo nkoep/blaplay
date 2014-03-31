@@ -467,8 +467,6 @@ class BlaView(gtk.HPaned):
             ("Copy", None, "Copy", None, "", self.__copy),
             ("Remove", None, "Remove", None, "", self.__remove),
             ("Paste", None, "Paste", None, "", self.__paste),
-            ("RemoveDuplicates", None, "Remove _duplicates", None, "",
-             self.__remove_duplicates),
             ("RemoveInvalidTracks", None, "Remove _invalid tracks", None, "",
              self.__remove_invalid_tracks)
         ]
@@ -544,9 +542,6 @@ class BlaView(gtk.HPaned):
 
     def __remove(self, *args):
         self.__mediator("remove")
-
-    def __remove_duplicates(self, *args):
-        self.__mediator("remove_duplicates")
 
     def __remove_invalid_tracks(self, *args):
         self.__mediator("remove_invalid_tracks")

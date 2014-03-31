@@ -343,17 +343,6 @@ class BlaQueue(BlaScrolledWindow):
     def remove(self, *args):
         self.__get_items(remove=True)
 
-    def remove_duplicates(self):
-        unique = set()
-        model = self.__treeview.get_model()
-        for row in model:
-            uri = row[0].uri
-            if uri not in unique:
-                unique.add(uri)
-            else:
-                model.remove(row.iter)
-        self.update_queue_positions()
-
     def remove_invalid_tracks(self):
         model = self.__treeview.get_model()
         isfile = os.path.isfile

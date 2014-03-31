@@ -303,7 +303,8 @@ class BlaPlaylist(gtk.VBox):
         self.clear()
 
         self.pack_start(self.__filter_box, expand=False)
-        self.pack_start(sw, expand=True)
+        self.pack_start(sw)
+
         sw.show_all()
 
         update_columns(self.__treeview, view_id=blaconst.VIEW_PLAYLISTS)
@@ -913,42 +914,6 @@ class BlaPlaylist(gtk.VBox):
 
             playlist_manager.update_statusbar()
         return items
-
-    def remove_duplicates(self):
-        def remove_duplicates():
-            items = self.__get_current_items()
-            scroll_item, row_align, selected_items = \
-                self.__get_selection_and_row()
-
-            paths = self.get_selected_paths()
-            selected_items = self.get_items_from_paths(paths)
-
-            # Determine unique tracks
-            unique_items = blautil.BlaOrderedSet()
-            unique_uris = blautil.BlaOrderedSet()
-            for item in items:
-                if item.uri not in unique_uris:
-                    unique_items.add(item)
-                    unique_uris.add(item.uri)
-            unique_items = list(unique_items)
-            unique_uris = list(unique_uris)
-
-            if self.__mode & MODE_FILTERED:
-                if self.__mode & MODE_SORTED:
-                    self.__sorted = unique_items
-                else:
-                    self.__items = unique_items
-            else:
-                if self.__mode & MODE_SORTED:
-                    self.__all_sorted = unique_items
-                else:
-                    self.__all_items = unique_items
-
-            self.__populate_model(scroll_item, row_align, selected_items)
-            self.__treeview.set_sensitive(True)
-
-        self.__treeview.set_sensitive(False)
-        remove_duplicates()
 
     def remove_invalid_tracks(self):
         # TODO
@@ -1870,9 +1835,6 @@ class BlaPlaylistManager(gtk.Notebook):
 
     def new_playlist_from_type(self, type_):
         self.get_current_playlist().new_playlist_from_type(type_)
-
-    def remove_duplicates(self):
-        self.get_current_playlist().remove_duplicates()
 
     def remove_invalid_tracks(self):
         self.get_current_playlist().remove_invalid_tracks()
