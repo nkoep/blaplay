@@ -1453,8 +1453,7 @@ class BlaPlaylistManager(gtk.Notebook):
         items = [
             ("Add new playlist...",
              lambda *x: self.add_playlist(query_name=True, focus=True)),
-            ("Remove playlist", lambda *x: self.remove_playlist(playlist)),
-            ("Clear playlist", lambda *x: playlist.clear())
+            ("Remove playlist", lambda *x: self.remove_playlist(playlist))
         ]
 
         for label, callback in items:

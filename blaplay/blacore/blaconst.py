@@ -83,7 +83,6 @@ MENU = """
         <menu action="Edit">
             <menuitem action="AddNewPlaylist"/>
             <menuitem action="RemovePlaylist"/>
-            <menuitem action="Clear"/>
             <menuitem action="LockUnlockPlaylist"/>
             <menu action="Select">
                 <menuitem action="SelectAll"/>
@@ -129,9 +128,9 @@ MENU_PLAYLISTS = _builder(
      "Edit/JumpToPlayingTrack"])
 MENU_EDIT = _builder(
     "/Menu/Edit/%s",
-    ["Paste", "Clear", "Select", "Select/SelectAll",
-     "Select/SelectComplement", "Selection/Cut", "Selection/Copy",
-     "Selection/Remove", "RemoveInvalidTracks"] +
+    ["Paste", "Select", "Select/SelectAll", "Select/SelectComplement",
+     "Selection/Cut", "Selection/Copy", "Selection/Remove",
+     "RemoveInvalidTracks"] +
     _builder("Select/Select%s", ["All", "ByArtist", "ByAlbum",
                                  "ByAlbumArtist", "ByGenre"]))
 del _builder

@@ -450,7 +450,6 @@ class BlaView(gtk.HPaned):
         super(BlaView, self).__init__()
 
         actions = [
-            ("Clear", None, "_Clear", None, "", self.__clear),
             ("SelectAll", None, "All", None, "",
              lambda *x: self.__select(blaconst.SELECT_ALL)),
             ("SelectComplement", None, "Complement", None, "",
@@ -521,9 +520,6 @@ class BlaView(gtk.HPaned):
         view = blacfg.getint("general", "view")
         if view in (blaconst.VIEW_PLAYLISTS, blaconst.VIEW_QUEUE):
             getattr(self.__views[view], method_name)(*args)
-
-    def __clear(self, *args):
-        self.__mediator("clear")
 
     def __select(self, type_):
         self.__mediator("select", type_)

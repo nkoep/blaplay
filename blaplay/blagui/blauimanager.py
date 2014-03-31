@@ -58,7 +58,6 @@ class BlaUIManager(gtk.UIManager):
                 clipboard = queue.clipboard
                 label = "queue"
 
-            self.get_widget("/Menu/Edit/Clear").set_label("Clear %s" % label)
             self.get_widget("/Menu/Edit/Paste").set_sensitive(bool(clipboard))
         else:
             state = False
