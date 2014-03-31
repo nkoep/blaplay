@@ -1249,6 +1249,11 @@ class BlaPlaylistManager(gtk.Notebook):
         ]
         ui_manager.add_actions(actions)
 
+        accel_group = ui_manager.get_accel_group()
+        accel_group.connect_group(
+            ord("W"), gtk.gdk.CONTROL_MASK, gtk.ACCEL_VISIBLE,
+            lambda *x: self.remove_playlist())
+
         self.set_scrollable(True)
 
         # Set up DND support for the tab strip.
