@@ -1230,7 +1230,7 @@ class BlaPlaylistManager(gtk.Notebook):
         actions = [
             ("AddNewPlaylist", None, "New playlist...", "<Ctrl>T", "",
              lambda *x: self.add_playlist(query_name=True, focus=True)),
-            ("LockUnlockPlaylist", None, "Lock/Unlock playlist", None, "",
+            ("LockUnlockView", None, "Lock/Unlock playlist", None, "",
              self.toggle_lock_playlist),
             ("PlaylistFromSelection", None, "Selection", None, "",
              new_playlist(blaconst.PLAYLIST_FROM_SELECTION)),
@@ -1611,12 +1611,12 @@ class BlaPlaylistManager(gtk.Notebook):
     def update_playlist_lock_state(self):
         playlist = self.get_current_playlist()
         try:
-            label = "%s playlist" % ("Unlock" if playlist.locked() else "Lock")
+            action = "Unlock" if playlist.locked() else "Lock"
         except AttributeError:
             return
-        self.__lock_button.set_tooltip_text(label)
-
-        ui_manager.get_widget("/Menu/Edit/LockUnlockPlaylist").set_label(label)
+        self.__lock_button.set_tooltip_text("%s playlist" % action)
+        ui_manager.get_widget("/Menu/Edit/LockUnlockView").set_label(
+            "%s page" % action)
 
     def get_active_playlist(self):
         try:
