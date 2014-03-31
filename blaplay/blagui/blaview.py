@@ -401,13 +401,6 @@ class BlaSidePane(gtk.VBox):
             BlaSidePane.track = track
 
 def BlaViewMeta(view_name):
-    # This returns a metaclass which automatically -- among other things --
-    # attaches a view_name property that always returns the `view_name'
-    # argument. We use a metaclass for defining view classes for the main view
-    # outlet as it appears to be the most flexible way to add default
-    # properties and signals. The __gsignals__ attribute gets stripped from a
-    # class's __dict__ by gobject.GObjectMeta so we can't check for the
-    # existence of the `count_changed' signal except with a custom metaclass.
     class _BlaViewMeta(blautil.BlaSingletonMeta):
         def __new__(cls, name, bases, dct):
             # Make sure at least one baseclass inherits from gobject.GObject.
@@ -420,14 +413,6 @@ def BlaViewMeta(view_name):
                 raise ValueError("View class %s already defines an attribute "
                                  "'view_name'" % name)
             dct["view_name"] = property(lambda self: view_name)
-
-            # Add the count_changed signal.
-            signals = dct.get("__gsignals__", {})
-            if "count_changed" in signals or "count-changed" in signals:
-                raise ValueError("Class %s already defines a 'count_changed' "
-                                 "signal" % name)
-            signals["count_changed"] = blautil.signal(2)
-            dct["__gsignals__"] = signals
 
             # Add the init-function stub.
             if "init" not in dct:
@@ -477,8 +462,7 @@ class BlaView(gtk.HPaned):
             return 0
         player.set_sync_handler(sync_handler)
 
-        # We have to defer initialization until all count_changed signal
-        # handlers have been hooked up.
+        # Initialize each view.
         for view in self.__views:
             view.init()
 

@@ -1217,11 +1217,6 @@ class BlaPlaylistManager(gtk.Notebook):
                            blagui.DND_TARGETS.values(),
                            gtk.gdk.ACTION_COPY)
 
-        def page_num_changed(*args):
-            self.emit("count_changed", blaconst.VIEW_PLAYLISTS,
-                      self.get_n_pages())
-        self.connect("page_added", page_num_changed)
-        self.connect("page_removed", page_num_changed)
         def switch_page(*args):
             playlist = self.get_nth_page(args[-1])
             self.update_playlist_lock_state()

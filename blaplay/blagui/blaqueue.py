@@ -256,7 +256,6 @@ class BlaQueue(BlaScrolledWindow):
             size += track[FILESIZE]
             length += track[LENGTH]
         self.__size, self.__length = size, length
-        self.emit("count_changed", blaconst.VIEW_QUEUE, self.n_items)
         self.update_statusbar()
 
     def get_queue_positions(self, item):

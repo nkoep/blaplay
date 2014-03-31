@@ -280,7 +280,6 @@ class BlaRadio(gtk.VBox):
             model = self.__treeview.get_model()
             iterators = [model.append([None, station])
                          for station in stations]
-            self.emit("count_changed", blaconst.VIEW_RADIO, len(model))
             self.__treeview.set_cursor(model.get_path(iterators[0]))
             select_path = self.__treeview.get_selection().select_path
             map(select_path, map(model.get_path, iterators))
@@ -389,5 +388,4 @@ class BlaRadio(gtk.VBox):
                 if row[1] == self.__current:
                     self.__treeview.set_cursor(row.path)
                     break
-        self.emit("count_changed", blaconst.VIEW_RADIO, len(model))
 
