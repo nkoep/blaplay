@@ -112,6 +112,7 @@ MENU = """
             <separator/>
             <menuitem action="RemoveInvalidTracks"/>
             <menuitem action="Search"/>
+            <menuitem action="JumpToPlayingTrack"/>
             <separator/>
             <menuitem action="Preferences"/>
         </menu>
@@ -122,8 +123,6 @@ MENU = """
         </menu>
         <menu action="View">
             <menuitem action="Visualization"/>
-            <separator/>
-            <menuitem action="JumpToPlayingTrack"/>
         </menu>
         <menu action="Help">
             <menuitem action="About"/>
@@ -138,7 +137,7 @@ MENU_PLAYLISTS = _builder(
     ["File/AddFiles", "File/AddDirectories", "File/SavePlaylist",
      "Edit/AddNewPlaylist", "Edit/RemovePlaylist",
      "Edit/LockUnlockPlaylist", "Edit/NewPlaylistFrom", "Edit/Search",
-     "View/JumpToPlayingTrack"])
+     "Edit/JumpToPlayingTrack"])
 MENU_EDIT = _builder(
     "/Menu/Edit/%s",
     ["Paste", "Clear", "Select", "Select/SelectAll",
