@@ -58,8 +58,7 @@ class BlaCfg(RawConfigParser, gobject.GObject):
                 "cursor.follows.playback": "yes",
                 "queue.remove.when.activated": "yes",
                 "search.after.timeout": "no",
-                "show.visualization": "yes",
-                "releases.filter": blaconst.NEW_RELEASES_FROM_LIBRARY
+                "show.visualization": "yes"
             },
             "player": {
                 "logarithmic.volume.scale": "no",

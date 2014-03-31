@@ -225,22 +225,6 @@ def get_cover(track, image_base):
         return None
     return retrieve_image(image_base, image_urls)
 
-def get_new_releases(recommended=False):
-    user = blacfg.getstring("lastfm", "user")
-    if not user:
-        return []
-
-    url = "%s&method=user.getNewReleases&user=%s&userecs=%d" % (
-        blaconst.LASTFM_BASEURL, user, int(recommended))
-    url = quote_url(url)
-    response = get_response(url, "albums")
-    if isinstance(response, ResponseError):
-        print_d("Failed to get new releases: %s" % response)
-        return None
-    response = response.content
-
-    return response["album"]
-
 def get_request_token():
     url = "%s&method=auth.gettoken" % blaconst.LASTFM_BASEURL
     response = get_response(url, "token")

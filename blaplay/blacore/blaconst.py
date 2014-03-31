@@ -38,7 +38,6 @@ IMAGES_PATH = os.path.join(BASEDIR, "images")
 ICONS_PATH = os.path.join(IMAGES_PATH, "icons")
 COVERS = os.path.join(CACHEDIR, "covers")
 ARTISTS = os.path.join(CACHEDIR, "artists")
-RELEASES = os.path.join(CACHEDIR, "releases")
 
 # Files
 CFG_PATH = os.path.join(USERDIR, "config")
@@ -49,7 +48,6 @@ PLAYLISTS_PATH = os.path.join(USERDIR, "playlists")
 METADATA_PATH = os.path.join(USERDIR, "metadata")
 SCROBBLES_PATH = os.path.join(USERDIR, "scrobbles")
 STATIONS_PATH = os.path.join(USERDIR, "stations")
-RELEASES_PATH = os.path.join(USERDIR, "releases")
 WISDOM_PATH = os.path.join(USERDIR, "wisdom")
 LOGO = os.path.join(IMAGES_PATH, "logo.svg")
 COVER = os.path.join(IMAGES_PATH, "cover.svg")
@@ -153,7 +151,7 @@ BROWSER_LIBRARY, BROWSER_FILESYSTEM = xrange(2)
  ACTION_EXPAND_COLLAPSE) = xrange(4)
 
 # View constants
-(VIEW_PLAYLISTS, VIEW_QUEUE, VIEW_RADIO, VIEW_VIDEO, VIEW_RELEASES) = xrange(5)
+(VIEW_PLAYLISTS, VIEW_QUEUE, VIEW_RADIO, VIEW_VIDEO) = xrange(4)
 (SELECT_ALL, SELECT_COMPLEMENT, SELECT_BY_ARTISTS, SELECT_BY_ALBUMS,
  SELECT_BY_ALBUM_ARTISTS, SELECT_BY_GENRES) = xrange(6)
 
@@ -166,7 +164,4 @@ ORDER_LITERALS = ["Normal", "Repeat", "Shuffle"]
  PLAYLIST_FROM_ALBUM_ARTISTS, PLAYLIST_FROM_GENRE) = xrange(5)
 
 (METADATA_TAGS, METADATA_PROPERTIES, METADATA_LYRICS) = xrange(3)
-
-# Releases browser
-NEW_RELEASES_FROM_LIBRARY, NEW_RELEASES_RECOMMENDED = xrange(2)
 
