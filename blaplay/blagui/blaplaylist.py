@@ -1228,8 +1228,8 @@ class BlaPlaylistManager(gtk.Notebook):
                 self.new_playlist_from_type(type_)
             return wrapper
         actions = [
-            ("AddNewPlaylist", None, "Add new playlist", "<Ctrl>T", "",
-             lambda *x: self.add_playlist(focus=True)),
+            ("AddNewPlaylist", None, "New playlist...", "<Ctrl>T", "",
+             lambda *x: self.add_playlist(query_name=True, focus=True)),
             ("RemovePlaylist", None, "Remove playlist", "<Ctrl>W", "",
              lambda *x: self.remove_playlist()),
             ("LockUnlockPlaylist", None, "Lock/Unlock playlist", None, "",
@@ -1451,9 +1451,9 @@ class BlaPlaylistManager(gtk.Notebook):
         menu = gtk.Menu()
 
         items = [
-            ("Add new playlist...",
+            ("New playlist...",
              lambda *x: self.add_playlist(query_name=True, focus=True)),
-            ("Remove playlist", lambda *x: self.remove_playlist(playlist))
+            ("Remove", lambda *x: self.remove_playlist(playlist))
         ]
 
         for label, callback in items:
@@ -1463,7 +1463,7 @@ class BlaPlaylistManager(gtk.Notebook):
                 m.set_sensitive(False)
             menu.append(m)
 
-        m = gtk.MenuItem("Rename playlist...")
+        m = gtk.MenuItem("Rename...")
         m.connect("activate",
                   lambda *x: self.__rename_playlist(playlist))
         if not all_options:
@@ -1471,7 +1471,7 @@ class BlaPlaylistManager(gtk.Notebook):
         menu.append(m)
 
         try:
-            label = "%s playlist" % ("Unlock" if playlist.locked() else "Lock")
+            label = "Unlock" if playlist.locked() else "Lock"
         except AttributeError:
             pass
         else:
