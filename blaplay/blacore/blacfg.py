@@ -171,8 +171,15 @@ class BlaCfg(RawConfigParser, gobject.GObject):
     def set_(self, section, key, value):
         if not self.has_section(section):
             self.add_section(section)
+
+        try:
+            old_value = super(BlaCfg, self).get(section, key)
+        except NoOptionError:
+            old_value = None
         super(BlaCfg, self).set(section, key, value)
-        self.emit("changed", section, key)
+        if old_value != value:
+            self.emit("changed", section, key)
+
     set = set_ # TODO: remove this eventually for PEP8 compliance
 
     def setboolean(self, section, key, value):
