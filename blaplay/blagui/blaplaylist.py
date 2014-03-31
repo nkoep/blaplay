@@ -1256,20 +1256,6 @@ class BlaPlaylistManager(gtk.Notebook):
                            blagui.DND_TARGETS.values(),
                            gtk.gdk.ACTION_COPY)
 
-        # Lock/Unlock playlist button
-        self.__lock_button = gtk.Button()
-        self.__lock_button.set_relief(gtk.RELIEF_NONE)
-        self.__lock_button.set_focus_on_click(False)
-        self.__lock_button.add(
-            gtk.image_new_from_stock(gtk.STOCK_DIALOG_AUTHENTICATION,
-                                     gtk.ICON_SIZE_SMALL_TOOLBAR))
-        style = gtk.RcStyle()
-        style.xthickness = style.ythickness = 0
-        self.__lock_button.modify_style(style)
-        self.__lock_button.connect("clicked", self.toggle_lock_playlist)
-        self.__lock_button.show_all()
-        self.set_action_widget(self.__lock_button, gtk.PACK_END)
-
         def page_num_changed(*args):
             self.emit("count_changed", blaconst.VIEW_PLAYLISTS,
                       self.get_n_pages())
@@ -1614,7 +1600,6 @@ class BlaPlaylistManager(gtk.Notebook):
             action = "Unlock" if playlist.locked() else "Lock"
         except AttributeError:
             return
-        self.__lock_button.set_tooltip_text("%s playlist" % action)
         ui_manager.get_widget("/Menu/Edit/LockUnlockView").set_label(
             "%s page" % action)
 
