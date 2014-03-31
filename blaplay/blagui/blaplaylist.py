@@ -1363,7 +1363,7 @@ class BlaPlaylistManager(gtk.Notebook):
                     not event.type == gtk.gdk._3BUTTON_PRESS):
                     self.remove_playlist(child)
                 elif event.button == 3:
-                    self.__open_popup(child, event.button, event.time)
+                    self.__open_popup(event.button, event.time, child)
                 return False
 
         if ((event.button == 2 and
@@ -1375,8 +1375,7 @@ class BlaPlaylistManager(gtk.Notebook):
             return True
 
         elif event.button == 3:
-            self.__open_popup(None, event.button, event.time,
-                              all_options=False)
+            self.__open_popup(event.button, event.time)
             return True
 
         return False
@@ -1436,37 +1435,30 @@ class BlaPlaylistManager(gtk.Notebook):
         if new_name:
             playlist.set_name(new_name)
 
-    def __open_popup(self, playlist, button, time, all_options=True):
+    def __open_popup(self, button, time, playlist=None):
+        def add_entry(menu, label):
+            m = gtk.MenuItem(label)
+            menu.append(m)
+            return m
+
         menu = gtk.Menu()
-
-        items = [
-            ("New playlist...",
-             lambda *x: self.add_playlist(query_name=True, focus=True)),
-            ("Remove", lambda *x: self.remove_playlist(playlist))
-        ]
-
-        for label, callback in items:
-            m = gtk.MenuItem(label)
-            m.connect("activate", callback)
-            if not all_options:
-                m.set_sensitive(False)
-            menu.append(m)
-
-        m = gtk.MenuItem("Rename...")
+        m = add_entry(menu, "New playlist...")
         m.connect("activate",
-                  lambda *x: self.__rename_playlist(playlist))
-        if not all_options:
-            m.set_sensitive(False)
-        menu.append(m)
+                  lambda *x: self.add_playlist(query_name=True, focus=True))
+        entries = [
+            ("Remove", lambda *x: self.remove_playlist(playlist)),
+            ("Rename...", lambda *x: self.__rename_playlist(playlist))
+        ]
+        for label, callback in entries:
+            m = add_entry(menu, label)
+            if playlist:
+                m.connect("activate", callback)
+            else:
+                m.set_sensitive(False)
 
-        try:
-            label = "Unlock" if playlist.locked() else "Lock"
-        except AttributeError:
-            pass
-        else:
-            m = gtk.MenuItem(label)
+        if playlist:
+            m = add_entry(menu, "Unlock" if playlist.locked() else "Lock")
             m.connect("activate", lambda *x: playlist.toggle_lock())
-            menu.append(m)
 
         menu.show_all()
         menu.popup(None, None, None, button, time)
