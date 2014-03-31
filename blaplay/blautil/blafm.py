@@ -33,7 +33,6 @@ import gobject
 
 import blaplay
 player = blaplay.bla.player
-library = blaplay.bla.library
 from blaplay.blacore import blacfg, blaconst
 from blaplay import blautil
 from blaplay.formats._identifiers import *
@@ -43,9 +42,9 @@ TIMEOUT = 5
 scrobbler = None
 
 
-def init():
+def init(library):
     global scrobbler
-    scrobbler = BlaScrobbler()
+    scrobbler = BlaScrobbler(library)
     player.connect("track_changed", scrobbler.submit_track)
     player.connect("track_stopped", scrobbler.submit_track)
 
@@ -281,8 +280,9 @@ class BlaScrobbler(object):
     __iterations = 0
 
     class SubmissionQueue(Queue.Queue):
-        def __init__(self):
+        def __init__(self, library):
             Queue.Queue.__init__(self)
+            self._library = library
             self.__restore()
             self.__submit_scrobbles()
 
@@ -309,7 +309,7 @@ class BlaScrobbler(object):
                 for idx, item in enumerate(items):
                     uri, start_time = item
                     try:
-                        track = library[uri]
+                        track = self._library[uri]
                     except KeyError:
                         continue
                     params.extend(
@@ -356,9 +356,10 @@ class BlaScrobbler(object):
                 print_d("Saving %d unsubmitted scrobble(s)" % len(items))
             blautil.serialize_to_file(items, blaconst.SCROBBLES_PATH)
 
-    def __init__(self):
+    def __init__(self, library):
         super(BlaScrobbler, self).__init__()
-        self.__queue = BlaScrobbler.SubmissionQueue()
+        self._library = library
+        self.__queue = BlaScrobbler.SubmissionQueue(library)
         def pre_shutdown_hook():
             self.__submit_last_track(True)
         blaplay.bla.add_pre_shutdown_hook(pre_shutdown_hook)
@@ -393,7 +394,7 @@ class BlaScrobbler(object):
     @blautil.thread
     def __update_now_playing(self):
         try:
-            track = library[self.__uri]
+            track = self._library[self.__uri]
         except KeyError:
             return
         if (not track[ARTIST] or not track[TITLE] or track[LENGTH] < 30 or
@@ -443,7 +444,7 @@ class BlaScrobbler(object):
     def __submit_last_track(self, shutdown=False):
         if self.__uri:
             try:
-                track = library[self.__uri]
+                track = self._library[self.__uri]
             except KeyError:
                 return
             # According to the last.fm API docs, only tracks longer than 30

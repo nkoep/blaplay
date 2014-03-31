@@ -27,7 +27,6 @@ import pango
 import pangocairo
 
 import blaplay
-library = blaplay.bla.library
 from blaplay.blacore import blaconst, blacfg
 from blaplay import blautil, blagui
 from blaplay.formats._identifiers import *
@@ -392,7 +391,7 @@ class BlaLibraryBrowser(gtk.VBox):
             "populated": blautil.signal(0)
         }
 
-        def populate(self, view, filter_string):
+        def populate(self, view, library, filter_string):
             start_time = time.time()
 
             if view == blaconst.ORGANIZE_BY_DIRECTORY:
@@ -526,8 +525,9 @@ class BlaLibraryBrowser(gtk.VBox):
                 track[ALBUM_ARTIST] or track[ARTIST], track[ALBUM] or "?")
             return (organizer, label, cls.__get_track_label(track))
 
-    def __init__(self, parent):
+    def __init__(self, parent, library):
         super(BlaLibraryBrowser, self).__init__()
+        self._library = library
 
         self.__treeview = BlaTreeView(parent=parent, multicol=False,
                                       browser_id=blaconst.BROWSER_LIBRARY)
@@ -623,7 +623,8 @@ class BlaLibraryBrowser(gtk.VBox):
 
         gobject.source_remove(self.__cid)
         self.__cid = gobject.idle_add(
-            model.populate(view, self.__entry.get_text().strip()).next)
+            model.populate(view, self._library,
+                           self.__entry.get_text().strip()).next)
         try:
             self.window.set_cursor(gtk.gdk.Cursor(gtk.gdk.WATCH))
         except AttributeError:
@@ -1046,13 +1047,14 @@ class BlaFileBrowser(gtk.VBox):
         selection_data.set_uris(uris)
 
 class BlaBrowsers(gtk.Notebook):
-    def __init__(self):
+    def __init__(self, library): # XXX: Ugly, shouldn't have to know about the
+                                 #      existence of a library per-se.
         super(BlaBrowsers, self).__init__()
 
-        type(self).__library_browser = BlaLibraryBrowser(self)
-        self.__file_browser = BlaFileBrowser(self)
-        self.append_page(self.__library_browser, gtk.Label("Library"))
-        self.append_page(self.__file_browser, gtk.Label("Filesystem"))
+        library_browser = BlaLibraryBrowser(self, library)
+        file_browser = BlaFileBrowser(self)
+        self.append_page(library_browser, gtk.Label("Library"))
+        self.append_page(file_browser, gtk.Label("Filesystem"))
 
         self.show_all()
 

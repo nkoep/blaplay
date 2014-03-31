@@ -23,7 +23,6 @@ import pango
 
 import blaplay
 player = blaplay.bla.player
-library = blaplay.bla.library
 ui_manager = blaplay.bla.ui_manager
 from blaplay.blacore import blaconst, blacfg
 from blaplay import blautil, blagui

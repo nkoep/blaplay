@@ -21,7 +21,6 @@ import gtk
 
 import blaplay
 player = blaplay.bla.player
-library = blaplay.bla.library
 from blaplay.blacore import blacfg, blaconst
 from blaplay import blagui
 from blawindows import BlaUniqueWindow, BlaScrolledWindow
@@ -81,8 +80,9 @@ class BlaPreferences(BlaUniqueWindow):
                 self.pack_start(cb)
 
     class LibrarySettings(Page):
-        def __init__(self):
+        def __init__(self, library):
             super(BlaPreferences.LibrarySettings, self).__init__("Library")
+            self._library = library
 
             hbox = gtk.HBox(spacing=ROW_SPACINGS)
 
@@ -182,7 +182,7 @@ class BlaPreferences(BlaUniqueWindow):
                            ":".join(directories + [directory]))
                 if (os.path.realpath(directory) not in
                     map(os.path.realpath, directories)):
-                    library.scan_directory(directory)
+                    self._library.scan_directory(directory)
 
         def __remove_directory(self, button, treeview):
             model, iterator = treeview.get_selection().get_selected()
@@ -200,11 +200,11 @@ class BlaPreferences(BlaUniqueWindow):
                 blacfg.set("library", "directories", ":".join(directories))
                 if (os.path.realpath(directory) not in
                     map(os.path.realpath, directories)):
-                    library.remove_directory(directory)
+                    self._library.remove_directory(directory)
 
         def __rescan_all(self, button, treeview):
             for row in treeview.get_model():
-                library.scan_directory(row[0])
+                self._library.scan_directory(row[0])
 
     class BrowserSettings(Page):
         def __init__(self):
@@ -582,7 +582,7 @@ class BlaPreferences(BlaUniqueWindow):
             blacfg.setboolean("lastfm", "now.playing",
                               checkbutton.get_active())
 
-    def __init__(self, *args):
+    def __init__(self, library):
         super(BlaPreferences, self).__init__()
         self.set_title("Preferences")
 
@@ -602,7 +602,12 @@ class BlaPreferences(BlaUniqueWindow):
                     self.LibrarySettings, self.BrowserSettings,
                     self.PlayerSettings, self.Keybindings,
                     self.LastfmSettings]:
-            section = Section(cls())
+            # XXX: Ugly! BlaPreferences has no direct use for the library, so
+            #      the dependency should be specific to LibrarySettings only.
+            if cls is self.LibrarySettings:
+                section = Section(cls(library))
+            else:
+                section = Section(cls())
             vbox.pack_start(section)
 
         sw = BlaScrolledWindow()

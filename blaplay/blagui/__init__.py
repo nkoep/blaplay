@@ -30,14 +30,14 @@ DND_TARGETS = {
 }
 
 
-def init():
+def init(library):
     from blamainwindow import BlaMainWindow
 
     gtk.icon_theme_get_default().append_search_path(blaconst.ICONS_PATH)
     theme = gtk.icon_theme_get_default()
     gtk.window_set_default_icon_name(blaconst.APPNAME)
 
-    return BlaMainWindow()
+    return BlaMainWindow(library)
 
 def is_accel(event, accel):
     # Convenience function from Quod Libet to check for accelerator matches.

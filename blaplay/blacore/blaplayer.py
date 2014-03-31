@@ -20,7 +20,6 @@ from math import log10
 import gobject
 
 import blaplay
-library = blaplay.bla.library
 from blaplay.blacore import blaconst, blacfg, blagst as gst
 from blaplay import blautil
 from blaplay.formats._identifiers import TITLE
@@ -29,7 +28,7 @@ BlaStatusbar = None
 gstreamer_is_working = None
 
 
-def init():
+def init(library):
     def test_gstreamer():
         try:
             gst.Bin()
@@ -53,7 +52,7 @@ def init():
     if fluendo and mad:
         fluendo.set_rank(min(fluendo.get_rank(), max(mad.get_rank() - 1, 0)))
 
-    return BlaPlayer()
+    return BlaPlayer(library)
 
 
 class BlaPlayer(gobject.GObject):
@@ -75,8 +74,9 @@ class BlaPlayer(gobject.GObject):
     __state = blaconst.STATE_STOPPED
     __window_id = 0
 
-    def __init__(self):
+    def __init__(self, library):
         super(BlaPlayer, self).__init__()
+        self._library = library
 
     def __init_pipeline(self):
         if not gstreamer_is_working:
@@ -291,7 +291,7 @@ class BlaPlayer(gobject.GObject):
 
     def get_track(self):
         try:
-            return self.__station or blaplay.bla.library[self.__uri]
+            return self.__station or self._library[self.__uri]
         except KeyError:
             pass
         return None
@@ -339,7 +339,7 @@ class BlaPlayer(gobject.GObject):
 
         # If `update_track' returns None it means the track needed updating,
         # but failed to be parsed properly so request another song.
-        if library.update_track(self.__uri) is None:
+        if self._library.update_track(self.__uri) is None:
             self.emit("get_track", blaconst.TRACK_PLAY, True)
 
         if (self.__state == blaconst.STATE_STOPPED and

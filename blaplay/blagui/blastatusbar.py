@@ -19,7 +19,6 @@ import gobject
 
 import blaplay
 player = blaplay.bla.player
-library = blaplay.bla.library
 from blaplay.blacore import blaconst, blacfg
 from blaplay import blautil, blagui
 
@@ -43,7 +42,7 @@ class BlaStatusbar(gtk.Table):
     __lock = blautil.BlaLock()
     __tid = None
 
-    def __init__(self):
+    def __init__(self, library):
         super(BlaStatusbar, self).__init__(rows=1, columns=3, homogeneous=True)
         type(self).__instance = self
 

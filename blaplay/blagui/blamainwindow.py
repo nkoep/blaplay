@@ -21,7 +21,6 @@ import gtk
 
 import blaplay
 player = blaplay.bla.player
-library = blaplay.bla.library
 from blaplay.blacore import blaconst, blacfg
 from blaplay import blautil, blagui
 from blaplay.formats._identifiers import *
@@ -60,7 +59,7 @@ class BlaMainWindow(BlaBaseWindow):
             else:
                 return blacfg.getboolean("general", "maximized")
 
-    def __init__(self):
+    def __init__(self, library):
         super(BlaMainWindow, self).__init__(
             BlaMainWindow.StateManager(), gtk.WINDOW_TOPLEVEL)
         self.connect("delete_event", self.__delete_event)
@@ -128,7 +127,8 @@ class BlaMainWindow(BlaBaseWindow):
              lambda *x: self.__add_tracks()),
             ("AddDirectories", None, "_Add directories...", None, "",
              lambda *x: self.__add_tracks(files=False)),
-            ("Preferences", None, "Pre_ferences...", None, "", BlaPreferences),
+            ("Preferences", None, "Pre_ferences...", None, "",
+             lambda *x: BlaPreferences(library)),
             ("About", None, "_About...", None, "", BlaAbout),
             ("Quit", gtk.STOCK_QUIT, "_Quit", "<Ctrl>Q", "",
              lambda *x: blaplay.shutdown())
@@ -140,10 +140,10 @@ class BlaMainWindow(BlaBaseWindow):
 
         # Create instances of the main parts of the GUI.
         self.__toolbar = BlaToolbar()
-        self.__browsers = BlaBrowsers()
+        self.__browsers = BlaBrowsers(library)
         self.__visualization = BlaVisualization()
         self.__view = BlaView()
-        self.__statusbar = BlaStatusbar()
+        self.__statusbar = BlaStatusbar(library)
 
         # Group the browsers and the visualization widget.
         self.__vbox_left = gtk.VBox(spacing=blaconst.WIDGET_SPACING)

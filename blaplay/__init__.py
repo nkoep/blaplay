@@ -114,18 +114,18 @@ def finish_startup():
     blacfg.init()
 
     # Initialize the library.
-    bla.library = bladb.init()
+    library = bla.library = bladb.init(blaconst.LIBRARY_PATH, blacfg)
 
     # Create an instance of the playback device.
     from blaplay.blacore import blaplayer
-    bla.player = blaplayer.init()
+    bla.player = blaplayer.init(library)
 
     # Initialize the GUI.
     from blaplay.blagui.blauimanager import BlaUIManager
     bla.ui_manager = BlaUIManager()
 
     from blaplay import blagui
-    bla.window = blagui.init()
+    bla.window = blagui.init(library)
 
     from blaplay.blagui import blakeys
     blakeys.BlaKeys()
@@ -163,7 +163,7 @@ def finish_startup():
 
     # Initialize last.fm services.
     from blaplay.blautil import blafm
-    blafm.init()
+    blafm.init(library)
 
     # Initialize metadata module.
     from blaplay.blautil import blametadata
