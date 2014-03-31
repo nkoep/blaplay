@@ -1228,8 +1228,8 @@ class BlaPlaylistManager(gtk.Notebook):
                 self.new_playlist_from_type(type_)
             return wrapper
         actions = [
-            ("AddNewPlaylist", None, "New playlist...", "<Ctrl>T", "",
-             lambda *x: self.add_playlist(query_name=True, focus=True)),
+            ("AddNewPlaylist", None, "New playlist", "<Ctrl>T", "",
+             lambda *x: self.add_playlist(focus=True)),
             ("LockUnlockView", None, "Lock/Unlock playlist", None, "",
              self.toggle_lock_playlist),
             ("PlaylistFromSelection", None, "Selection", None, "",
