@@ -39,29 +39,3 @@ class BlaUIManager(gtk.UIManager):
         self.__actiongroup.add_radio_actions(
             radio_actions, value=value, on_change=on_change)
 
-    def update_menu(self, view):
-        from blaplaylist import playlist_manager
-        from blaqueue import queue
-
-        state = view == blaconst.VIEW_PLAYLISTS
-        for entry in blaconst.MENU_PLAYLISTS:
-            self.get_widget(entry).set_visible(state)
-
-        state = True
-        if view in (blaconst.VIEW_PLAYLISTS, blaconst.VIEW_QUEUE):
-            # TODO: Add a BlaClipboard mixin to the playlist manager and the
-            #       queue.
-            if view == blaconst.VIEW_PLAYLISTS:
-                clipboard = playlist_manager.clipboard
-                label = "playlist"
-            else:
-                clipboard = queue.clipboard
-                label = "queue"
-
-            self.get_widget("/Menu/Edit/Paste").set_sensitive(bool(clipboard))
-        else:
-            state = False
-
-        for entry in blaconst.MENU_EDIT:
-            self.get_widget(entry).set_visible(state)
-

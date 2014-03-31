@@ -1746,13 +1746,11 @@ class BlaPlaylistManager(gtk.Notebook):
 
     def cut(self, *args):
         self.clipboard = self.remove()
-        ui_manager.update_menu(blaconst.VIEW_PLAYLISTS)
 
     def copy(self, *args):
         playlist = self.get_current_playlist()
         paths = playlist.get_selected_paths()
         self.clipboard = map(copy, playlist.get_items(paths))
-        ui_manager.update_menu(blaconst.VIEW_PLAYLISTS)
 
     def paste(self, *args, **kwargs):
         playlist = self.get_current_playlist()

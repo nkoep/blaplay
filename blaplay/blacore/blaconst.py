@@ -83,27 +83,6 @@ MENU = """
         <menu action="Edit">
             <menuitem action="AddNewPlaylist"/>
             <menuitem action="LockUnlockView"/>
-            <menu action="Select">
-                <menuitem action="SelectAll"/>
-                <menuitem action="SelectComplement"/>
-                <menuitem action="SelectByArtist"/>
-                <menuitem action="SelectByAlbum"/>
-                <menuitem action="SelectByAlbumArtist"/>
-                <menuitem action="SelectByGenre"/>
-            </menu>
-            <menu action="Selection">
-                <menuitem action="Cut"/>
-                <menuitem action="Copy"/>
-                <menuitem action="Remove"/>
-            </menu>
-            <menuitem action="Paste"/>
-            <menu action="NewPlaylistFrom">
-                <menuitem action="PlaylistFromSelection"/>
-                <menuitem action="PlaylistFromArtists"/>
-                <menuitem action="PlaylistFromAlbums"/>
-                <menuitem action="PlaylistFromAlbumArtists"/>
-                <menuitem action="PlaylistFromGenre"/>
-            </menu>
             <separator/>
             <menuitem action="Search"/>
             <menuitem action="JumpToPlayingTrack"/>
@@ -116,20 +95,6 @@ MENU = """
     </menubar>
 </ui>
 """
-def _builder(base, items):
-    return [base % item for item in items]
-MENU_PLAYLISTS = _builder(
-    "/Menu/%s",
-    ["File/AddFiles", "File/AddDirectories", "File/SavePlaylist",
-     "Edit/AddNewPlaylist", "Edit/LockUnlockView", "Edit/NewPlaylistFrom",
-     "Edit/Search", "Edit/JumpToPlayingTrack"])
-MENU_EDIT = _builder(
-    "/Menu/Edit/%s",
-    ["Paste", "Select", "Select/SelectAll", "Select/SelectComplement",
-     "Selection/Cut", "Selection/Copy", "Selection/Remove"] +
-    _builder("Select/Select%s", ["All", "ByArtist", "ByAlbum",
-                                 "ByAlbumArtist", "ByGenre"]))
-del _builder
 
 # Library and browser constants
 (ORGANIZE_BY_DIRECTORY, ORGANIZE_BY_ARTIST, ORGANIZE_BY_ARTIST_ALBUM,

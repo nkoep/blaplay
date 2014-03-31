@@ -449,26 +449,6 @@ class BlaView(gtk.HPaned):
     def __init__(self):
         super(BlaView, self).__init__()
 
-        actions = [
-            ("SelectAll", None, "All", None, "",
-             lambda *x: self.__select(blaconst.SELECT_ALL)),
-            ("SelectComplement", None, "Complement", None, "",
-             lambda *x: self.__select(blaconst.SELECT_COMPLEMENT)),
-            ("SelectByArtist", None, "By artist", None, "",
-             lambda *x: self.__select(blaconst.SELECT_BY_ARTISTS)),
-            ("SelectByAlbum", None, "By album", None, "",
-             lambda *x: self.__select(blaconst.SELECT_BY_ALBUMS)),
-            ("SelectByAlbumArtist", None, "By album artist", None, "",
-             lambda *x: self.__select(blaconst.SELECT_BY_ALBUM_ARTISTS)),
-            ("SelectByGenre", None, "By genre", None, "",
-             lambda *x: self.__select(blaconst.SELECT_BY_GENRES)),
-            ("Cut", None, "Cut", None, "", self.__cut),
-            ("Copy", None, "Copy", None, "", self.__copy),
-            ("Remove", None, "Remove", None, "", self.__remove),
-            ("Paste", None, "Paste", None, "", self.__paste)
-        ]
-        ui_manager.add_actions(actions)
-
         from blaplaylist import playlist_manager
         from blaqueue import queue
         from blavideo import BlaVideo
@@ -554,8 +534,4 @@ class BlaView(gtk.HPaned):
             child.unparent()
         self.__container.add(child)
         child.update_statusbar()
-
-        # Not all menu items are available for all views so update them
-        # accordingly.
-        ui_manager.update_menu(view)
 

@@ -327,7 +327,6 @@ class BlaQueue(BlaScrolledWindow):
 
     def cut(self, *args):
         self.clipboard = self.__get_items(remove=True)
-        ui_manager.update_menu(blaconst.VIEW_QUEUE)
 
     def copy(self, *args):
         # We specifically don't create actual copies of items here as it's not
@@ -335,7 +334,6 @@ class BlaQueue(BlaScrolledWindow):
         # should still refer to the same BlaTrackListItem instances which are
         # possibly part of a playlist.
         self.clipboard = self.__get_items(remove=False)
-        ui_manager.update_menu(blaconst.VIEW_QUEUE)
 
     def paste(self, *args, **kwargs):
         self.__add_items(items=self.clipboard, select_rows=True)

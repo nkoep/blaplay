@@ -119,11 +119,6 @@ class BlaMainWindow(BlaBaseWindow):
             # Menus and submenus
             ("File", None, "_File"),
             ("Edit", None, "_Edit"),
-            ("Select", None, "S_elect"),
-            ("Selection", None, "Se_lection"),
-            ("NewPlaylistFrom", None, "_New playlist from"),
-            ("PlayOrder", None, "_Order"),
-            ("View", None, "_View"),
             ("Help", None, "_Help"),
 
             # Menu items
