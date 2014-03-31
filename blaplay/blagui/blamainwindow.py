@@ -122,12 +122,12 @@ class BlaMainWindow(BlaBaseWindow):
             ("Help", None, "_Help"),
 
             # Menu items
-            ("OpenPlaylist", None, "Open playlist...", None, "",
-             self.__open_playlist),
             ("AddFiles", None, "Add _files...", None, "",
              lambda *x: self.__add_tracks()),
             ("AddDirectories", None, "_Add directories...", None, "",
              lambda *x: self.__add_tracks(files=False)),
+            ("OpenPlaylist", None, "Open playlist...", None, "",
+             self.__open_playlist),
             ("SavePlaylist", None, "_Save playlist...", None, "",
              self.__save_playlist),
             ("Quit", gtk.STOCK_QUIT, "_Quit", "<Ctrl>Q", "",

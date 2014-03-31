@@ -73,9 +73,9 @@ MENU = """
 <ui>
     <menubar name="Menu">
         <menu action="File">
-            <menuitem action="OpenPlaylist"/>
             <menuitem action="AddFiles"/>
             <menuitem action="AddDirectories"/>
+            <menuitem action="OpenPlaylist"/>
             <menuitem action="SavePlaylist"/>
             <separator/>
             <menuitem action="Quit"/>
