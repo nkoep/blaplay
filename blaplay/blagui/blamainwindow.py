@@ -142,13 +142,6 @@ class BlaMainWindow(BlaBaseWindow):
         ]
         ui_manager.add_actions(actions)
 
-        toggle_actions = [
-            ("Visualization", None, "_Visualization", None, "",
-             self.__toggle_visualization,
-             blacfg.getboolean("general", "show.visualization"),)
-        ]
-        ui_manager.add_toggle_actions(toggle_actions)
-
         radio_actions = [
             ("OrderNormal", None, "_Normal", None, "", blaconst.ORDER_NORMAL),
             ("OrderRepeat", None, "_Repeat", None, "", blaconst.ORDER_REPEAT),
@@ -238,6 +231,7 @@ class BlaMainWindow(BlaBaseWindow):
         self.present()
         if not blacfg.getboolean("general", "always.show.tray"):
             self.__tray.set_visible(False)
+        # XXX: This is SO ugly!!
         self.__visualization.flush_buffers()
 
     def toggle_hide(self):
@@ -296,9 +290,6 @@ class BlaMainWindow(BlaBaseWindow):
             return True
         blaplay.shutdown()
         return False
-
-    def __toggle_visualization(self, event):
-        self.__visualization.set_visible(event.get_active())
 
     def __set_file_chooser_directory(self, diag):
         directory = blacfg.getstring("general", "filechooser.directory")

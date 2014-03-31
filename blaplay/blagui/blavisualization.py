@@ -51,6 +51,11 @@ class BlaVisualization(gtk.Viewport):
 
         self.show_all()
 
+        def on_config_changed(cfg, section, key):
+            if section == "general" and key == "show.visualization":
+                self.set_visible(blacfg.getboolean(section, key))
+        blacfg.connect("changed", on_config_changed)
+
         def startup_complete(*args):
             self.set_visible(
                 blacfg.getboolean("general", "show.visualization"))
@@ -58,8 +63,6 @@ class BlaVisualization(gtk.Viewport):
 
     def __set_visible(self, state):
         super(BlaVisualization, self).set_visible(state)
-        blaplay.bla.ui_manager.get_widget(
-            "/Menu/View/Visualization").set_active(state)
 
     def __enable(self):
         try:

@@ -47,31 +47,21 @@ class BlaPreferences(BlaUniqueWindow):
         def __init__(self):
             super(BlaPreferences.GeneralSettings, self).__init__("General")
 
+            def on_toggled(checkbutton, key):
+                blacfg.setboolean("general", key, checkbutton.get_active())
             options = [
-                ("Cursor follows playback", "cursor.follows.playback",
-                 self.__follow_playback),
+                ("Display audio spectrum", "show.visualization"),
+                ("Cursor follows playback", "cursor.follows.playback"),
                 ("Remove tracks from queue after manual activation",
-                 "queue.remove.when.activated", self.__queue_remove),
+                 "queue.remove.when.activated"),
                 ("Use timeout to perform search operations",
-                 "search.after.timeout", self.__search_after_timeout)
+                 "search.after.timeout")
             ]
-            for label, key, callback in options:
+            for label, key in options:
                 cb = gtk.CheckButton(label)
                 cb.set_active(blacfg.getboolean("general", key))
-                cb.connect("toggled", callback)
+                cb.connect("toggled", on_toggled, key)
                 self.pack_start(cb)
-
-        def __follow_playback(self, checkbutton):
-            blacfg.setboolean("general", "cursor.follows.playback",
-                              checkbutton.get_active())
-
-        def __queue_remove(self, checkbutton):
-            blacfg.setboolean("general", "queue.remove.when.activated",
-                              checkbutton.get_active())
-
-        def __search_after_timeout(self, checkbutton):
-            blacfg.setboolean("general", "search.after.timeout",
-                              checkbutton.get_active())
 
     class TraySettings(Page):
         def __init__(self):

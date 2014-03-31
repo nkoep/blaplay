@@ -121,9 +121,6 @@ MENU = """
             <menuitem action="OrderRepeat"/>
             <menuitem action="OrderShuffle"/>
         </menu>
-        <menu action="View">
-            <menuitem action="Visualization"/>
-        </menu>
         <menu action="Help">
             <menuitem action="About"/>
         </menu>
