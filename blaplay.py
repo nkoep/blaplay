@@ -23,7 +23,6 @@ gobject.threads_init()
 
 from blaplay.blacore import blaconst
 
-lock_file = None
 cli_queue = None
 
 
@@ -150,10 +149,9 @@ def process_args(args):
         if args[cmd]:
             bladbus.query_bus(cmd)
 
-def force_singleton():
-    # TODO: do this via dbus once we ported to pygobject. in that case
-    #       python-dbus can be dropped as optional dependency as an
-    #       introspected dbus wrapper is accessible through glib/gio
+def ensure_singleton():
+    # TODO: Make python2-dbus a hard-dependency and ensure singleton behavior
+    #       with owned bus names.
 
     # Set up user directories if necessary.
     directories = [blaconst.CACHEDIR, blaconst.USERDIR, blaconst.COVERS,
@@ -174,7 +172,6 @@ def force_singleton():
     # lock is only valid as long as the file descriptor is alive. That's why we
     # need to keep it open (and referenced) which is why we assign it to a
     # global.
-    global lock_file
     lock_file = open(blaconst.PIDFILE, "w")
     try:
         fcntl.lockf(lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
@@ -190,6 +187,7 @@ def force_singleton():
             cli_queue = None
         raise SystemExit
     lock_file.write(str(os.getpid()))
+    return lock_file
 
 def main():
     init_signals()
@@ -200,9 +198,9 @@ def main():
 
     process_args(args)
 
-    force_singleton()
+    lock_file = ensure_singleton()
 
-    # Finish startup
+    # Finish startup. This blocks until the shutdown sequence is initiated.
     import blaplay
     blaplay.finish_startup()
 
