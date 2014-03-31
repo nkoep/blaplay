@@ -240,7 +240,7 @@ def popup(treeview, event, view_id, target):
         ("Cut", element.cut, "<Ctrl>X", True),
         ("Copy",  element.copy, "<Ctrl>C", True),
         ("Paste", element.paste, "<Ctrl>V", bool(element.clipboard)),
-        ("Remove", element.remove, None, True)
+        ("Remove", element.remove, "Delete", True)
     ]
     for label, callback, accelerator, visibility in items:
         m = gtk.MenuItem(label)
