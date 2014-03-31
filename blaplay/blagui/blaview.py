@@ -476,10 +476,9 @@ class BlaView(gtk.HPaned):
         from blaqueue import queue
         from blavideo import BlaVideo
         from blaradio import BlaRadio
-        from blaeventbrowser import BlaEventBrowser
         from blareleasebrowser import BlaReleaseBrowser
         self.__views = [playlist_manager, queue, BlaRadio(), BlaVideo(),
-                        BlaEventBrowser(), BlaReleaseBrowser()]
+                        BlaReleaseBrowser()]
 
         self.__container = gtk.Viewport()
         self.__container.set_shadow_type(gtk.SHADOW_NONE)

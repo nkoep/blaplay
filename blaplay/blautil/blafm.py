@@ -225,38 +225,6 @@ def get_cover(track, image_base):
         return None
     return retrieve_image(image_base, image_urls)
 
-def get_events(limit, recommended, city="", country=""):
-    if recommended:
-        session_key = BlaScrobbler.get_session_key()
-        if not session_key:
-            return events
-
-        # Since this is an authorized service the location information from the
-        # associated last.fm user account is used. Passing the country kwarg
-        # doesn't allow specifying the city, so we just ignore it here.
-        method = "user.getRecommendedEvents"
-        params = [
-            ("method", method), ("api_key", blaconst.LASTFM_APIKEY),
-            ("sk", session_key), ("limit", str(limit))
-        ]
-
-        api_signature = sign_api_call(params)
-        params.append(("api_sig", api_signature))
-        response = post_message(params, "events")
-    else:
-        location = ", ".join([city, country] if country else [city])
-        url = "%s&method=geo.getEvents&location=%s&limit=%d" % (
-            blaconst.LASTFM_BASEURL, location, limit)
-        url = quote_url(url)
-        response = get_response(url, "events")
-
-    if isinstance(response, ResponseError):
-        print_d("Failed to retrieve recommended events: %s" % response)
-        return None
-    response = response.content
-
-    return response["event"]
-
 def get_new_releases(recommended=False):
     user = blacfg.getstring("lastfm", "user")
     if not user:

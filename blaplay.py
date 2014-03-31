@@ -157,12 +157,11 @@ def force_singleton():
 
     # Set up user directories if necessary.
     directories = [blaconst.CACHEDIR, blaconst.USERDIR, blaconst.COVERS,
-                   blaconst.ARTISTS, blaconst.RELEASES, blaconst.EVENTS]
+                   blaconst.ARTISTS, blaconst.RELEASES]
 
     if not all(map(os.path.isdir, directories)):
         print_i("Setting up user directories")
-        for directory in [blaconst.USERDIR, blaconst.COVERS, blaconst.ARTISTS,
-                          blaconst.RELEASES, blaconst.EVENTS]:
+        for directory in directories:
             try:
                 os.makedirs(directory)
             except OSError as (errno, strerror):

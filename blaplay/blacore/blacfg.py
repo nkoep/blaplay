@@ -59,11 +59,7 @@ class BlaCfg(RawConfigParser, gobject.GObject):
                 "queue.remove.when.activated": "yes",
                 "search.after.timeout": "no",
                 "show.visualization": "yes",
-                "releases.filter": blaconst.NEW_RELEASES_FROM_LIBRARY,
-                "events.country": "",
-                "events.city": "",
-                "events.filter": blaconst.EVENTS_RECOMMENDED,
-                "events.limit": 25
+                "releases.filter": blaconst.NEW_RELEASES_FROM_LIBRARY
             },
             "player": {
                 "logarithmic.volume.scale": "no",
