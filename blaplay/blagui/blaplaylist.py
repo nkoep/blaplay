@@ -1191,6 +1191,8 @@ class BlaPlaylistManager(gtk.Notebook):
              lambda *x: self.add_playlist(focus=True)),
             ("LockUnlockView", None, "Lock/Unlock playlist", None, "",
              self.toggle_lock_playlist),
+            ("CloseView", None, "Close page", "<Ctrl>W", "",
+             lambda *x: self.remove_playlist()),
             ("PlaylistFromSelection", None, "Selection", None, "",
              new_playlist(blaconst.PLAYLIST_FROM_SELECTION)),
             ("PlaylistFromArtists", None, "Selected artist(s)", None, "",
@@ -1207,11 +1209,6 @@ class BlaPlaylistManager(gtk.Notebook):
              "", lambda *x: self.jump_to_playing_track())
         ]
         ui_manager.add_actions(actions)
-
-        accel_group = ui_manager.get_accel_group()
-        accel_group.connect_group(
-            ord("W"), gtk.gdk.CONTROL_MASK, gtk.ACCEL_VISIBLE,
-            lambda *x: self.remove_playlist())
 
         self.set_scrollable(True)
 
@@ -1556,8 +1553,12 @@ class BlaPlaylistManager(gtk.Notebook):
             action = "Unlock" if playlist.locked() else "Lock"
         except AttributeError:
             return
-        ui_manager.get_widget("/Menu/Edit/LockUnlockView").set_label(
-            "%s page" % action)
+        widget = ui_manager.get_widget(
+            "/Menu/%s/LockUnlockView" % blaconst.APPNAME)
+        widget.set_label("%s page" % action)
+
+        widget= ui_manager.get_widget("/Menu/%s/CloseView" % blaconst.APPNAME)
+        widget.set_sensitive(not playlist.locked())
 
     def get_active_playlist(self):
         try:

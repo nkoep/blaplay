@@ -116,24 +116,22 @@ class BlaMainWindow(BlaBaseWindow):
         self.add_accel_group(ui_manager.get_accel_group())
 
         actions = [
-            # Menus and submenus
-            ("File", None, "_File"),
-            ("Edit", None, "_Edit"),
-            ("Help", None, "_Help"),
+            # Menu root
+            (blaconst.APPNAME, None, "_%s" % blaconst.APPNAME),
 
             # Menu items
-            ("AddFiles", None, "Add _files...", None, "",
-             lambda *x: self.__add_tracks()),
-            ("AddDirectories", None, "_Add directories...", None, "",
-             lambda *x: self.__add_tracks(files=False)),
             ("OpenPlaylist", None, "Open playlist...", None, "",
              self.__open_playlist),
             ("SavePlaylist", None, "_Save playlist...", None, "",
              self.__save_playlist),
-            ("Quit", gtk.STOCK_QUIT, "_Quit", "<Ctrl>Q", "",
-             lambda *x: blaplay.shutdown()),
+            ("AddFiles", None, "Add _files...", None, "",
+             lambda *x: self.__add_tracks()),
+            ("AddDirectories", None, "_Add directories...", None, "",
+             lambda *x: self.__add_tracks(files=False)),
             ("Preferences", None, "Pre_ferences...", None, "", BlaPreferences),
-            ("About", None, "_About...", None, "", BlaAbout)
+            ("About", None, "_About...", None, "", BlaAbout),
+            ("Quit", gtk.STOCK_QUIT, "_Quit", "<Ctrl>Q", "",
+             lambda *x: blaplay.shutdown())
         ]
         ui_manager.add_actions(actions)
 

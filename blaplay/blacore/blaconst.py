@@ -71,30 +71,28 @@ WIDGET_SPACING = gtk.HPaned().style_get_property("handle_size")
 # Main menu
 MENU = """
 <ui>
-    <menubar name="Menu">
-        <menu action="File">
-            <menuitem action="AddFiles"/>
-            <menuitem action="AddDirectories"/>
-            <menuitem action="OpenPlaylist"/>
-            <menuitem action="SavePlaylist"/>
-            <separator/>
-            <menuitem action="Quit"/>
-        </menu>
-        <menu action="Edit">
-            <menuitem action="AddNewPlaylist"/>
-            <menuitem action="LockUnlockView"/>
-            <separator/>
-            <menuitem action="Search"/>
-            <menuitem action="JumpToPlayingTrack"/>
-            <separator/>
-            <menuitem action="Preferences"/>
-        </menu>
-        <menu action="Help">
-            <menuitem action="About"/>
-        </menu>
-    </menubar>
+  <menubar name="Menu">
+    <menu action="%s">
+      <menuitem action="AddNewPlaylist"/>
+      <menuitem action="OpenPlaylist"/>
+      <menuitem action="SavePlaylist"/>
+      <menuitem action="AddFiles"/>
+      <menuitem action="AddDirectories"/>
+      <separator/>
+      <menuitem action="LockUnlockView"/>
+      <menuitem action="CloseView"/>
+      <separator/>
+      <menuitem action="Search"/>
+      <menuitem action="JumpToPlayingTrack"/>
+      <separator/>
+      <menuitem action="Preferences"/>
+      <menuitem action="About"/>
+      <separator/>
+      <menuitem action="Quit"/>
+    </menu>
+  </menubar>
 </ui>
-"""
+""" % APPNAME
 
 # Library and browser constants
 (ORGANIZE_BY_DIRECTORY, ORGANIZE_BY_ARTIST, ORGANIZE_BY_ARTIST_ALBUM,
