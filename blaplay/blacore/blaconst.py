@@ -105,7 +105,6 @@ MENU = """
                 <menuitem action="PlaylistFromGenre"/>
             </menu>
             <separator/>
-            <menuitem action="RemoveInvalidTracks"/>
             <menuitem action="Search"/>
             <menuitem action="JumpToPlayingTrack"/>
             <separator/>
@@ -127,8 +126,7 @@ MENU_PLAYLISTS = _builder(
 MENU_EDIT = _builder(
     "/Menu/Edit/%s",
     ["Paste", "Select", "Select/SelectAll", "Select/SelectComplement",
-     "Selection/Cut", "Selection/Copy", "Selection/Remove",
-     "RemoveInvalidTracks"] +
+     "Selection/Cut", "Selection/Copy", "Selection/Remove"] +
     _builder("Select/Select%s", ["All", "ByArtist", "ByAlbum",
                                  "ByAlbumArtist", "ByGenre"]))
 del _builder

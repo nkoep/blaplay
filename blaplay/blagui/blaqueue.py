@@ -343,16 +343,6 @@ class BlaQueue(BlaScrolledWindow):
     def remove(self, *args):
         self.__get_items(remove=True)
 
-    def remove_invalid_tracks(self):
-        model = self.__treeview.get_model()
-        isfile = os.path.isfile
-
-        for row in model:
-            uri = row[0].uri
-            if not isfile(uri):
-                model.remove(row.iter)
-        self.update_queue_positions()
-
     def clear(self):
         self.__treeview.get_model().clear()
         self.update_queue_positions()

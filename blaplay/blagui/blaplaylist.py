@@ -915,47 +915,6 @@ class BlaPlaylist(gtk.VBox):
             playlist_manager.update_statusbar()
         return items
 
-    def remove_invalid_tracks(self):
-        # TODO
-        def remove_invalid_tracks():
-            if self.__mode & MODE_FILTERED:
-                if self.__mode & MODE_SORTED:
-                    items = self.__sorted
-                else:
-                    items = self.__items
-            else:
-                if self.__mode & MODE_SORTED:
-                    items = self.__all_sorted
-                else:
-                    items = self.__all_items
-
-            # Create a copy to leave the referenced list unchanged.
-            items_copy = list(items)
-
-            isfile = os.path.isfile
-            for idx, item in enumerate(items):
-                uri = item.uri
-                if not isfile(uri):
-                    items_copy.remove(item)
-                if idx % 25 == 0:
-                    yield True
-
-            paths = self.get_selected_paths()
-            get_item_from_path = self.get_item_from_path
-            selected_items = []
-            for idx, path in enumerate(paths):
-                selected_items.append(get_item_from_path(path))
-                if idx % 25 == 0:
-                    yield True
-
-            self.__populate_model(items_copy, selected_items)
-            self.__treeview.set_sensitive(True)
-            yield False
-
-        self.__treeview.set_sensitive(False)
-        p = remove_invalid_tracks()
-        gobject.idle_add(p.next)
-
     def toggle_lock(self):
         self.__header_box.set_lock_state(
             not self.__header_box.get_lock_state())
@@ -1814,9 +1773,6 @@ class BlaPlaylistManager(gtk.Notebook):
 
     def new_playlist_from_type(self, type_):
         self.get_current_playlist().new_playlist_from_type(type_)
-
-    def remove_invalid_tracks(self):
-        self.get_current_playlist().remove_invalid_tracks()
 
     def send_to_current_playlist(self, uris, resolve=False):
         playlist = self.get_current_playlist()
