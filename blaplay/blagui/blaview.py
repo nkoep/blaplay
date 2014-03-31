@@ -42,9 +42,6 @@ def set_view(view):
 class BlaSidePane(gtk.VBox):
     track = None
 
-    __MIN_WIDTH = 175
-    __DELAY = 100
-
     __tid = -1
     __timestamp = -1
 
@@ -62,14 +59,17 @@ class BlaSidePane(gtk.VBox):
             # Set up the drawing area.
             self.__is_video_canvas = False
             from blavideo import BlaVideoCanvas
-            drawing_area = BlaVideoCanvas()
-            self.__cid = drawing_area.connect_object(
+            self._drawing_area = BlaVideoCanvas()
+            self.__cid = self._drawing_area.connect_object(
                 "expose_event",
                 BlaSidePane.BlaCoverDisplay.__expose_event, self)
-            drawing_area.connect_object(
+            self._drawing_area.connect_object(
                 "button_press_event",
                 BlaSidePane.BlaCoverDisplay.__button_press_event, self)
-            self.add(drawing_area)
+
+            # XXX: Temporary
+            self._drawing_area.set_size_request(-1, 154)
+            self.add(self._drawing_area)
 
             # Make sure the cover area is a square.
             def size_allocate(*args):
@@ -83,7 +83,7 @@ class BlaSidePane(gtk.VBox):
             # We have to guarantee that the drawing_area is realized after
             # startup, even if the side pane is set to hidden in the config.
             def startup_complete(*args):
-                drawing_area.realize()
+                self._drawing_area.realize()
             blaplay.bla.connect("startup_complete", startup_complete)
 
         def __update_timestamp(self):
@@ -196,7 +196,7 @@ class BlaSidePane(gtk.VBox):
                 self.__alpha = 0.0
                 return False
 
-            cr = self.child.window.cairo_create()
+            cr = self._drawing_area.window.cairo_create()
             cr.set_source_color(self.get_style().bg[gtk.STATE_NORMAL])
             x, y, width, height = self.get_allocation()
 
@@ -223,7 +223,7 @@ class BlaSidePane(gtk.VBox):
         def update(self, timestamp, cover, force):
             def crossfade():
                 if self.__alpha > 0.0:
-                    self.child.queue_draw()
+                    self._drawing_area.queue_draw()
                     return True
                 return False
 
@@ -245,8 +245,8 @@ class BlaSidePane(gtk.VBox):
                 if not self.__is_video_canvas:
                     self.__is_video_canvas = True
                     self.__cover = None
-                    self.child.queue_draw()
-                    player.set_xwindow_id(self.child.window.xid)
+                    self._drawing_area.queue_draw()
+                    player.set_xwindow_id(self._drawing_area.window.xid)
             else:
                 self.reset()
 
@@ -255,7 +255,7 @@ class BlaSidePane(gtk.VBox):
             self.update(self.__update_timestamp(), blaconst.COVER, True)
 
         def get_video_canvas(self):
-            return self.child
+            return self._drawing_area
 
     def __init__(self, views):
         super(BlaSidePane, self).__init__(spacing=blaconst.WIDGET_SPACING)
@@ -265,7 +265,6 @@ class BlaSidePane(gtk.VBox):
 
         # Set up the lyrics textview.
         self.__tv = gtk.TextView()
-        self.__tv.set_size_request(self.__MIN_WIDTH, -1)
         self.__tv.set_editable(False)
         self.__tv.set_cursor_visible(False)
         self.__tv.set_wrap_mode(gtk.WRAP_WORD)
@@ -282,43 +281,6 @@ class BlaSidePane(gtk.VBox):
         self.__tb.create_tag("large", scale=pango.SCALE_LARGE)
         self.__tb.create_tag("italic", style=pango.STYLE_ITALIC)
         self.__tag = self.__tb.create_tag("color")
-
-        # Set up the view selector.
-        viewport = gtk.Viewport()
-        viewport.set_shadow_type(gtk.SHADOW_IN)
-        self.__treeview = blaguiutils.BlaTreeViewBase(
-            allow_empty_selection=False)
-        self.__treeview.get_selection().set_mode(gtk.SELECTION_SINGLE)
-        self.__treeview.set_headers_visible(False)
-        self.__treeview.set_property("rules_hint", True)
-        r = gtk.CellRendererText()
-        r.set_property("ellipsize", pango.ELLIPSIZE_END)
-        c = gtk.TreeViewColumn()
-        c.pack_start(r, expand=True)
-        c.add_attribute(r, "text", 0)
-        r = gtk.CellRendererText()
-        r.set_alignment(1.0, 0.5)
-        c.pack_start(r, expand=False)
-        def cell_data_func(column, renderer, model, iterator):
-            count = model[iterator][1]
-            renderer.set_property(
-                "markup", "<i>(%d)</i>" % count if count > 0 else "")
-        c.set_cell_data_func(r, cell_data_func)
-        self.__treeview.append_column(c)
-        viewport.add(self.__treeview)
-        model = gtk.ListStore(gobject.TYPE_STRING, gobject.TYPE_INT)
-        self.__treeview.set_model(model)
-        [model.append([view.view_name, 0]) for view in views]
-        selection = self.__treeview.get_selection()
-        selection.select_path(blacfg.getint("general", "view"))
-        self.__treeview.get_selection().connect(
-            "changed", self.__selection_changed)
-
-        self.cover_display = BlaSidePane.BlaCoverDisplay()
-
-        hbox = gtk.HBox(spacing=blaconst.WIDGET_SPACING)
-        hbox.pack_start(viewport, expand=True)
-        hbox.pack_start(self.cover_display, expand=False, fill=True)
 
         notebook.append_page(BlaTagEditor(views[blaconst.VIEW_PLAYLISTS]),
                              gtk.Label("Tags"))
@@ -347,7 +309,7 @@ class BlaSidePane(gtk.VBox):
                 style = gtk.RcStyle()
                 style.xthickness = style.ythickness = 0
                 button.modify_style(style)
-                # TODO: Implement a widget to edit metadata.
+                # TODO: Implement a widget to edit lyrics.
                 button.connect("clicked", lambda *x: False)
                 button.show_all()
                 widget = button
@@ -372,7 +334,10 @@ class BlaSidePane(gtk.VBox):
         switch_page(notebook, None, page_num)
 
         self.pack_start(notebook, expand=True)
-        self.pack_start(hbox, expand=False)
+
+        # Set up the cover display.
+        self.cover_display = BlaSidePane.BlaCoverDisplay()
+        self.pack_start(self.cover_display, expand=False)
 
         # Hook up the metadata callbacks.
         BlaSidePane.fetcher = blametadata.BlaFetcher()
@@ -382,16 +347,7 @@ class BlaSidePane(gtk.VBox):
             "cover", type(self.cover_display).update, self.cover_display)
 
         notebook.show()
-        hbox.show_all()
-        self.show()
-
-    def __selection_changed(self, selection):
-        view = selection.get_selected_rows()[-1][0][0]
-        states = [False] * len(self.__treeview.get_model())
-        states[view] = True
-        for idx, view in enumerate(blaconst.MENU_VIEWS):
-            action = ui_manager.get_widget(view)
-            action.set_active(states[idx])
+        self.show_all()
 
     @blautil.idle
     def __update_track(self, track):
@@ -420,16 +376,6 @@ class BlaSidePane(gtk.VBox):
         self.__tb.delete(
             self.__tb.get_start_iter(), self.__tb.get_end_iter())
 
-    def set_active_view(self, view):
-        path = self.__treeview.get_selection().get_selected_rows()[-1][0][0]
-        if view == path:
-            return True
-        self.__treeview.set_cursor((view,))
-
-    def update_count(self, widget, view, count):
-        model = self.__treeview.get_model()
-        model[view][1] = count
-
     def update_track(self):
         def worker(track):
             self.__update_track(track)
@@ -452,7 +398,7 @@ class BlaSidePane(gtk.VBox):
             BlaSidePane.track = None
             self.cover_display.reset()
         else:
-            self.__tid = gobject.timeout_add(self.__DELAY, worker, track)
+            self.__tid = gobject.timeout_add(100, worker, track)
             BlaSidePane.track = track
 
 def BlaViewMeta(view_name):
@@ -528,22 +474,6 @@ class BlaView(gtk.HPaned):
         ]
         ui_manager.add_actions(actions)
 
-        radio_actions = [
-            ("Playlists", None, "_Playlists", None, "",
-             blaconst.VIEW_PLAYLISTS),
-            ("Queue", None, "_Queue", None, "", blaconst.VIEW_QUEUE),
-            ("Radio", None, "R_adio", None, "", blaconst.VIEW_RADIO),
-            ("Video", None, "_Video", None, "", blaconst.VIEW_VIDEO),
-            ("RecommendedEvents", None, "_Recommended events", None, "",
-             blaconst.VIEW_EVENTS),
-            ("NewReleases", None, "_New releases", None, "",
-             blaconst.VIEW_RELEASES),
-        ]
-        ui_manager.add_radio_actions(
-            radio_actions, value=blacfg.getint("general", "view"),
-            on_change=lambda *x: self.set_view(
-            x[-1].get_current_value()))
-
         from blaplaylist import playlist_manager
         from blaqueue import queue
         from blavideo import BlaVideo
@@ -576,8 +506,6 @@ class BlaView(gtk.HPaned):
             return 0
         player.set_sync_handler(sync_handler)
 
-        for view in self.__views:
-            view.connect("count_changed", self.__side_pane.update_count)
         # We have to defer initialization until all count_changed signal
         # handlers have been hooked up.
         for view in self.__views:
@@ -647,5 +575,4 @@ class BlaView(gtk.HPaned):
         # Not all menu items are available for all views so update them
         # accordingly.
         ui_manager.update_menu(view)
-        self.__side_pane.set_active_view(view)
 

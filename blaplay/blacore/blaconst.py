@@ -122,13 +122,6 @@ MENU = """
             <menuitem action="OrderShuffle"/>
         </menu>
         <menu action="View">
-            <menuitem action="Playlists"/>
-            <menuitem action="Queue"/>
-            <menuitem action="Radio"/>
-            <menuitem action="Video"/>
-            <menuitem action="RecommendedEvents"/>
-            <menuitem action="NewReleases"/>
-            <separator/>
             <menuitem action="Visualization"/>
             <menuitem action="Statusbar"/>
             <separator/>
@@ -157,8 +150,6 @@ MENU_EDIT = _builder(
                                  "ByAlbumArtist", "ByGenre"]))
 MENU_ORDER = _builder("/Menu/PlayOrder/%s",
                       ["OrderNormal", "OrderRepeat", "OrderShuffle"])
-MENU_VIEWS = _builder("/Menu/View/%s", ["Playlists", "Queue", "Radio", "Video",
-                                        "RecommendedEvents", "NewReleases"])
 del _builder
 
 # Library and browser constants
