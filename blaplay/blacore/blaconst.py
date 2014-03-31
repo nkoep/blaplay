@@ -82,7 +82,6 @@ MENU = """
         </menu>
         <menu action="Edit">
             <menuitem action="AddNewPlaylist"/>
-            <menuitem action="RemovePlaylist"/>
             <menuitem action="LockUnlockPlaylist"/>
             <menu action="Select">
                 <menuitem action="SelectAll"/>
@@ -123,9 +122,8 @@ def _builder(base, items):
 MENU_PLAYLISTS = _builder(
     "/Menu/%s",
     ["File/AddFiles", "File/AddDirectories", "File/SavePlaylist",
-     "Edit/AddNewPlaylist", "Edit/RemovePlaylist",
-     "Edit/LockUnlockPlaylist", "Edit/NewPlaylistFrom", "Edit/Search",
-     "Edit/JumpToPlayingTrack"])
+     "Edit/AddNewPlaylist", "Edit/LockUnlockPlaylist", "Edit/NewPlaylistFrom",
+     "Edit/Search", "Edit/JumpToPlayingTrack"])
 MENU_EDIT = _builder(
     "/Menu/Edit/%s",
     ["Paste", "Select", "Select/SelectAll", "Select/SelectComplement",

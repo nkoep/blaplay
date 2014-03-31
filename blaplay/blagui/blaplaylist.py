@@ -1230,8 +1230,6 @@ class BlaPlaylistManager(gtk.Notebook):
         actions = [
             ("AddNewPlaylist", None, "New playlist...", "<Ctrl>T", "",
              lambda *x: self.add_playlist(query_name=True, focus=True)),
-            ("RemovePlaylist", None, "Remove playlist", "<Ctrl>W", "",
-             lambda *x: self.remove_playlist()),
             ("LockUnlockPlaylist", None, "Lock/Unlock playlist", None, "",
              self.toggle_lock_playlist),
             ("PlaylistFromSelection", None, "Selection", None, "",
