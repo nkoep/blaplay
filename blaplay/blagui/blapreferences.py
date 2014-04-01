@@ -70,8 +70,7 @@ class BlaPreferences(BlaUniqueWindow):
                 blacfg.setboolean("general", key, checkbutton.get_active())
             options = [
                 ("Always display tray icon", "always.show.tray"),
-                ("Close to tray", "close.to.tray"),
-                ("Show tooltip", "tray.show.tooltip")
+                ("Close to tray", "close.to.tray")
             ]
             for label, key in options:
                 cb = gtk.CheckButton(label)

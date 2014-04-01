@@ -34,15 +34,9 @@ class BlaTray(gtk.StatusIcon):
         self.set_visible(
             blacfg.getboolean("general", "always.show.tray"))
         self.set_tooltip_text("Stopped")
-        self.set_has_tooltip(
-            blacfg.getboolean("general", "tray.show.tooltip"))
-
         def config_changed(cfg, section, key):
-            if section == "general":
-                if key == "always.show.tray":
-                    self.set_visible(blacfg.getboolean(section, key))
-                elif key == "tray.show.tooltip":
-                    self.set_has_tooltip(blacfg.getboolean(section, key))
+            if section == "general" and key == "always.show.tray":
+                self.set_visible(blacfg.getboolean(section, key))
         blacfg.connect("changed", config_changed)
 
         def activate(status_icon):
@@ -51,8 +45,6 @@ class BlaTray(gtk.StatusIcon):
         self.connect("popup_menu", self.__tray_menu)
 
     def __tray_menu(self, icon, button, activation_time):
-        import blaplay
-
         menu = blaguiutils.create_control_popup_menu()
         menu.append(gtk.SeparatorMenuItem())
 

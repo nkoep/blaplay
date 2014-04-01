@@ -252,8 +252,6 @@ class BlaMainWindow(BlaBaseWindow):
 
         self.set_title(title)
         self.__tray.set_tooltip(tooltip)
-        if not blacfg.getboolean("general", "tray.show.tooltip"):
-            self.__tray.set_has_tooltip(False)
 
     def __hide_windows(self, yes):
         blaguiutils.set_visible(not yes)
