@@ -1281,8 +1281,6 @@ class BlaPlaylistManager(gtk.Notebook):
         if not self.current or not self.current.playlist:
             return
         playlist = self.current.playlist
-        if self.get_current_playlist() != playlist:
-            self.focus_playlist(playlist)
         playlist.set_row(playlist.get_path_from_item(self.current))
 
     def __clear_current_icon(self):
