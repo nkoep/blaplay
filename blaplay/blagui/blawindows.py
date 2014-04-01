@@ -16,7 +16,6 @@
 
 import gtk
 
-from blaplay.blacore import blacfg
 from blaplay import blautil
 
 
@@ -30,97 +29,92 @@ class BlaBaseWindow(gtk.Window):
     to allow the state manager to keep track of modifications.
     """
 
+    class StateManager(object):
+        def size(self, *args):
+            pass
+        def position(self, *args):
+            pass
+        def maximized(self, *args):
+            return False
+
     def __init__(self, state_manager=None, *args, **kwargs):
         super(BlaBaseWindow, self).__init__(*args, **kwargs)
-        self.__position = (-1, -1)
-        self.__size = (-1, -1)
-        self.__maximized = self.__was_maximized = False
-
-        if state_manager is not None:
-            for meth in "size position maximized".split():
-                if (not hasattr(state_manager, meth) or
-                    not callable(getattr(state_manager, meth, None))):
-                    raise ValueError(
-                        "state_manager implements no proper '%s' method" %
-                        meth)
-        self.__state_manager = state_manager
-        self.connect("configure_event", self.__configure_event)
-        self.connect("window_state_event", self.__window_state_event)
-        self.connect("map", self.__map)
-        self.__restore_window_state()
+        self._position = (-1, -1)
+        self._size = (-1, -1)
+        self._maximized = self._was_maximized = False
+        if state_manager is None:
+            state_manager = self.StateManager()
+        elif not isinstance(state_manager, self.StateManager):
+            raise TypeError()
+        self._state_manager = state_manager
+        self.connect("configure_event", self._configure_event)
+        self.connect("window_state_event", self._window_state_event)
+        self.connect("map", self._map)
+        self._restore_window_state()
 
     def present(self):
         # Set the proper window state before presenting the window to the user.
         # This is necessary to avoid that the window appears in its default
         # state for a brief moment first.
-        self.__restore_window_state()
+        self._restore_window_state()
         super(BlaBaseWindow, self).present()
 
-    def __configure_event(self, window, event):
-        if self.__maximized:
+    def _configure_event(self, window, event):
+        if self._maximized:
             return
-        self.__size = (event.width, event.height)
-        if self.__state_manager:
-            self.__state_manager.size(self.__size)
+        self._size = (event.width, event.height)
+        self._state_manager.size(self._size)
 
         if self.get_property("visible"):
-            self.__position = self.get_position()
-            if self.__state_manager:
-                self.__state_manager.position(self.__position)
+            self._position = self.get_position()
+            self._state_manager.position(self._position)
 
-    def __window_state_event(self, window, event):
-        self.__maximized = bool(
+    def _window_state_event(self, window, event):
+        self._maximized = bool(
             event.new_window_state & gtk.gdk.WINDOW_STATE_MAXIMIZED)
         if event.new_window_state & gtk.gdk.WINDOW_STATE_WITHDRAWN:
             return
-        if self.__state_manager:
-            self.__state_manager.maximized(
-                self.__maximized and self.__was_maximized)
+        self._state_manager.maximized(self._maximized and self.__was_maximized)
 
-    def __map(self, *args):
-        self.__restore_window_state()
+    def _map(self, *args):
+        self._restore_window_state()
 
-    def __restore_window_state(self):
-        self.__restore_size()
-        self.__restore_state()
-        self.__restore_position()
+    def _restore_window_state(self):
+        self._restore_size()
+        self._restore_state()
+        self._restore_position()
 
-    def __restore_size(self):
-        if self.__state_manager:
-            size = self.__state_manager.size()
-            if size is not None:
-                self.__size = size
-        w, h = self.__size
+    def _restore_size(self):
+        size = self._state_manager.size()
+        if size is not None:
+            self._size = size
+        w, h = self._size
         screen = self.get_screen()
         w = min(w, screen.get_width())
         h = min(h, screen.get_height())
         if w >= 0 and h >= 0:
             self.resize(w, h)
 
-    def __restore_state(self):
-        if self.__state_manager:
-            maximized = self.__state_manager.maximized()
-            self.__maximized = self.__was_maximized = maximized
-
-        if self.__maximized:
+    def _restore_state(self):
+        self._maximized = self._was_maximized = self._state_manager.maximized()
+        if self._maximized:
             self.maximize()
         else:
             self.unmaximize()
 
-    def __restore_position(self):
-        if self.__state_manager:
-            position = self.__state_manager.position()
-            if position is not None:
-                self.__position = position
-        x, y = self.__position
+    def _restore_position(self):
+        position = self._state_manager.position()
+        if position is not None:
+            self._position = position
+        x, y = self._position
         if x >= 0 and y >= 0:
             self.move(x, y)
 
     def set_maximized(self, yes):
         if yes:
-            self.__was_maximized = self.__maximized
+            self._was_maximized = self._maximized
             self.maximize()
-        elif not self.__was_maximized:
+        elif not self._was_maximized:
             # If the window was not already maximized before we maximized it
             # restore the old state here, i.e. unmaximize the window again.
             self.unmaximize()

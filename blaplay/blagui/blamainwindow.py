@@ -37,18 +37,18 @@ from blatray import BlaTray
 import blaguiutils
 
 class BlaMainWindow(BlaBaseWindow):
-    class StateManager(object):
+    class StateManager(BlaBaseWindow.StateManager):
         def size(self, *args):
             if args:
                 (size,) = args
-                blacfg.set("general", "size", "%d, %d" % size)
+                blacfg.set_("general", "size", "%d, %d" % size)
             else:
                 return blacfg.getlistint("general", "size")
 
         def position(self, *args):
             if args:
                 (position,) = args
-                blacfg.set("general", "position", "%d, %d" % position)
+                blacfg.set_("general", "position", "%d, %d" % position)
             else:
                 return blacfg.getlistint("general", "position")
 
