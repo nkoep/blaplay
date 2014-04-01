@@ -453,26 +453,6 @@ class BlaView(gtk.Viewport):
             self.set_view(blacfg.getint("general", "view"))
         blaplay.bla.connect("startup_complete", startup_complete)
 
-    def __mediator(self, method_name, *args):
-        view = blacfg.getint("general", "view")
-        if view in (blaconst.VIEW_PLAYLISTS, blaconst.VIEW_QUEUE):
-            getattr(self.__views[view], method_name)(*args)
-
-    def __select(self, type_):
-        self.__mediator("select", type_)
-
-    def __cut(self, *args):
-        self.__mediator("cut")
-
-    def __copy(self, *args):
-        self.__mediator("copy")
-
-    def __paste(self, *args):
-        self.__mediator("paste")
-
-    def __remove(self, *args):
-        self.__mediator("remove")
-
     def set_view(self, view):
         view_prev = blacfg.getint("general", "view")
         blacfg.set_("general", "view", view)
