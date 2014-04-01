@@ -197,6 +197,8 @@ class BlaFetcher(gobject.GObject):
     @blautil.thread
     def __fetch_lyrics(self, track, timestamp):
         def emit(lyrics):
+            if not lyrics:
+                lyrics = None
             self.emit("lyrics", timestamp, lyrics)
 
         lyrics = None
