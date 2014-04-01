@@ -30,6 +30,7 @@ from blabrowsers import BlaBrowsers
 from blaplaylist import playlist_manager
 from blavisualization import BlaVisualization
 from blaview import BlaView
+from blasidepane import BlaSidePane
 from blastatusbar import BlaStatusbar
 from blapreferences import BlaPreferences
 from blaabout import BlaAbout
@@ -151,28 +152,34 @@ class BlaMainWindow(BlaBaseWindow):
         self.__vbox_left.pack_start(self.__visualization, expand=False)
         self.__vbox_left.show()
 
-        # Pack the browser + view-widget into a paned widget.
-        hpane = gtk.HPaned()
-        hpane.pack1(self.__vbox_left, resize=False, shrink=False)
-        hpane.pack2(self.__view, resize=True, shrink=True)
-        hpane.show()
+        pane_right = gtk.HPaned()
+        pane_right.pack1(self.__view, shrink=False)
+        pane_right.pack2(BlaSidePane(), resize=False, shrink=False)
+        pane_right.show()
 
-        # Restore the pane position.
-        key = "pane.pos.left"
-        try:
-            hpane.set_position(blacfg.getint("general", key))
-        except TypeError:
-            pass
+        # Pack the browser + view-widget into a paned widget.
+        pane_left = gtk.HPaned()
+        pane_left.pack1(self.__vbox_left, shrink=False)
+        pane_left.pack2(pane_right, shrink=False)
+        pane_left.show()
+
+        # Restore the pane positions.
         def notify(pane, propspec, key):
             blacfg.set_("general", key, str(pane.get_position()))
-        hpane.connect("notify", notify, key)
+        for pane, side in [(pane_left, "left"), (pane_right, "right")]:
+            key = "pane.pos.%s" % side
+            try:
+                pane.set_position(blacfg.getint("general", key))
+            except TypeError:
+                pass
+            pane.connect("notify", notify, key)
 
-        # Create a vbox for the hpane and the statusbar. This allows for
+        # Create a vbox for the pane and the statusbar. This allows for
         # setting a border around those items which excludes the menubar and
         # the toolbar.
         vbox = gtk.VBox(spacing=blaconst.BORDER_PADDING)
         vbox.set_border_width(blaconst.BORDER_PADDING)
-        vbox.pack_start(hpane)
+        vbox.pack_start(pane_left)
         vbox.pack_start(self.__statusbar, expand=False)
         vbox.show()
 

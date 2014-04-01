@@ -63,7 +63,7 @@ class BlaMetadata(object):
 
 class BlaFetcher(gobject.GObject):
     __gsignals__ = {
-        "cover": blautil.signal(3),
+        "cover": blautil.signal(2),
         "lyrics": blautil.signal(2)
     }
 
@@ -271,10 +271,10 @@ class BlaFetcher(gobject.GObject):
         emit(lyrics)
 
     @blautil.thread
-    def __fetch_cover(self, track, timestamp, force_download):
+    def __fetch_cover(self, track, timestamp):
         def emit(cover):
             gobject.source_remove(self.__tid)
-            self.emit("cover", timestamp, cover, force_download)
+            self.emit("cover", timestamp, cover)
             return False
 
         gobject.source_remove(self.__tid)
@@ -284,20 +284,17 @@ class BlaFetcher(gobject.GObject):
         if image_base is None:
             return
 
-        if not force_download:
-            if os.path.isfile("%s.jpg" % image_base):
-                cover = "%s.jpg" % image_base
-            elif os.path.isfile("%s.png" % image_base):
-                cover = "%s.png" % image_base
+        if os.path.isfile("%s.jpg" % image_base):
+            cover = "%s.jpg" % image_base
+        elif os.path.isfile("%s.png" % image_base):
+            cover = "%s.png" % image_base
 
         if cover is not None:
             return emit(cover)
 
         self.__tid = gobject.timeout_add(2000, emit, blaconst.COVER)
         cover = blafm.get_cover(track, image_base)
-        # Don't try to get a cover from disk if we were specifically asked to
-        # download it.
-        if cover is None and not force_download:
+        if cover is None:
             base = os.path.dirname(track.uri)
             images = [f for f in os.listdir(base)
                       if blautil.get_extension(f).lower() in ["jpg", "png"]]
@@ -320,7 +317,7 @@ class BlaFetcher(gobject.GObject):
         if cover is not None:
             emit(cover)
 
-    def fetch_cover(self, track, timestamp, force_download=False):
+    def fetch_cover(self, track, timestamp):
         # This convenience method makes sure we keep a reference to the thread
         # that retrieves the cover so we're able to kill it once the method is
         # called again. Covers ought to be able to be fetched independently of
@@ -329,8 +326,7 @@ class BlaFetcher(gobject.GObject):
             self.__thread_cover.kill()
         except AttributeError:
             pass
-        self.__thread_cover = self.__fetch_cover(
-            track, timestamp, force_download)
+        self.__thread_cover = self.__fetch_cover(track, timestamp)
 
     def fetch_lyrics(self, track, timestamp):
         for thread in [self.__thread_lyrics, self.__thread_cover]:
@@ -340,28 +336,4 @@ class BlaFetcher(gobject.GObject):
                 pass
 
         self.__thread_lyrics = self.__fetch_lyrics(track, timestamp)
-
-    def set_cover(self, timestamp, path=None):
-        track = self.__track
-
-        # Stop any thread which still might be trying to retrieve a cover.
-        self.__thread_cover.kill()
-
-        # Remove any old images -- both user-set and downloaded.
-        if path != blaconst.COVER:
-            image_base = track.get_cover_basepath()
-            if image_base is not None:
-                name = os.path.basename(image_base)
-                images = [
-                    os.path.join(blaconst.COVERS, f)
-                    for f in os.listdir(blaconst.COVERS) if f.startswith(name)]
-                map(os.unlink, images)
-
-        if path is not None:
-            cover = "%s.%s" % (image_base, blautil.get_extension(path))
-            shutil.copy(path, cover)
-        else:
-            cover = blaconst.COVER
-
-        self.emit("cover", timestamp, cover, False)
 
