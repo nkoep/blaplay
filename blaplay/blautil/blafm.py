@@ -504,7 +504,7 @@ class BlaScrobbler(object):
             cls.__requested_authorization = True
         else:
             session_key = response.content["key"]
-            blacfg.set("lastfm", "sessionkey", session_key)
+            blacfg.set_("lastfm", "sessionkey", session_key)
         return session_key
 
     def submit_track(self, player):

@@ -200,7 +200,7 @@ class VolumeControl(gtk.HBox):
         else:
             volume = scale.get_value()
 
-        blacfg.set("player", "volume", volume / 100.0)
+        blacfg.set_("player", "volume", volume / 100.0)
         player.set_volume(scale.get_value())
         self.__update_icon(state)
 

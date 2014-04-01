@@ -64,7 +64,8 @@ class BlaStatusbar(gtk.Table):
         self.__order.set_active(blacfg.getint("general", "play.order"))
         def order_changed(cb):
             order = cb.get_active_text()
-            blacfg.set("general", "play.order", blaconst.ORDER_LITERALS[order])
+            blacfg.set_("general",
+                        "play.order", blaconst.ORDER_LITERALS[order])
         self.__order.connect("changed", order_changed)
 
         table = gtk.Table(rows=1, columns=3)

@@ -293,7 +293,7 @@ class BlaSidePane(gtk.VBox):
                 action_widget.remove(action_widget.child)
 
             page = notebook.get_nth_page(page_num)
-            blacfg.set("general", "metadata.view", page_num)
+            blacfg.set_("general", "metadata.view", page_num)
 
             if page_num == blaconst.METADATA_TAGS:
                 widget = page.get_control_widget()
@@ -499,7 +499,7 @@ class BlaView(gtk.HPaned):
 
     def set_view(self, view):
         view_prev = blacfg.getint("general", "view")
-        blacfg.set("general", "view", view)
+        blacfg.set_("general", "view", view)
 
         if player.video:
             # If the previous view was the video view coerce the cover art

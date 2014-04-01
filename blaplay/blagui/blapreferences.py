@@ -127,7 +127,7 @@ class BlaPreferences(BlaUniqueWindow):
 
             # Set up file restriction and exclusion options.
             def changed(entry, key):
-                blacfg.set("library", key, entry.get_text())
+                blacfg.set_("library", key, entry.get_text())
             options = [
                 ("Restrict to", "Comma-separated list, works on filenames",
                  "restrict.to"),
@@ -178,8 +178,8 @@ class BlaPreferences(BlaUniqueWindow):
 
                 model.append([directory])
                 directories = blacfg.getdotliststr("library", "directories")
-                blacfg.set("library", "directories",
-                           ":".join(directories + [directory]))
+                blacfg.set_("library", "directories",
+                            ":".join(directories + [directory]))
                 if (os.path.realpath(directory) not in
                     map(os.path.realpath, directories)):
                     self._library.scan_directory(directory)
@@ -197,7 +197,7 @@ class BlaPreferences(BlaUniqueWindow):
                 except ValueError:
                     pass
 
-                blacfg.set("library", "directories", ":".join(directories))
+                blacfg.set_("library", "directories", ":".join(directories))
                 if (os.path.realpath(directory) not in
                     map(os.path.realpath, directories)):
                     self._library.remove_directory(directory)
@@ -222,7 +222,7 @@ class BlaPreferences(BlaUniqueWindow):
             ])
             def changed(combobox, key):
                 action = actions[combobox.get_active_text()]
-                blacfg.set("library", "%s.action" % key, action)
+                blacfg.set_("library", "%s.action" % key, action)
             options = [("Double-click", "doubleclick"),
                        ("Middle-click", "middleclick"), ("Return", "return")]
             table = gtk.Table(rows=len(options), columns=2, homogeneous=False)
@@ -378,10 +378,10 @@ class BlaPreferences(BlaUniqueWindow):
                 values.append(s.get_value())
             values[band] = scale.get_value()
 
-            blacfg.set("equalizer.profiles", profile_name,
-                       ("%.1f, " * (blaconst.EQUALIZER_BANDS-1) + "%.1f") %
-                       tuple(values))
-            blacfg.set("player", "equalizer.profile", profile_name)
+            blacfg.set_("equalizer.profiles", profile_name,
+                        ("%.1f, " * (blaconst.EQUALIZER_BANDS-1) + "%.1f") %
+                        tuple(values))
+            blacfg.set_("player", "equalizer.profile", profile_name)
 
             # Update the specified band in the playback device.
             player.set_equalizer_value(band, scale.get_value())
@@ -391,11 +391,11 @@ class BlaPreferences(BlaUniqueWindow):
             if profile_name:
                 values = blacfg.getlistfloat(
                     "equalizer.profiles", profile_name)
-                blacfg.set("player", "equalizer.profile", profile_name)
+                blacfg.set_("player", "equalizer.profile", profile_name)
 
                 if not values:
                     values = [0.0] * blaconst.EQUALIZER_BANDS
-                    blacfg.set(
+                    blacfg.set_(
                         "equalizer.profiles", profile_name,
                         ("%.1f, " * (blaconst.EQUALIZER_BANDS-1) + "%.1f") %
                         tuple(values))
@@ -403,7 +403,7 @@ class BlaPreferences(BlaUniqueWindow):
                 for idx, s in enumerate(self.__scales):
                     s.set_value(values[idx])
             else:
-                blacfg.set("player", "equalizer.profile", "")
+                blacfg.set_("player", "equalizer.profile", "")
                 for s in self.__scales:
                     s.set_value(0)
                 self.__scale_container.set_sensitive(False)
@@ -505,13 +505,13 @@ class BlaPreferences(BlaUniqueWindow):
                 accel = gtk.accelerator_name(key, mod)
                 blakeys.bind(action, accel)
                 bindings.set_value(bindings.get_iter(path), 1, accel)
-                blacfg.set("keybindings", action, accel)
+                blacfg.set_("keybindings", action, accel)
 
             def cleared(renderer, path):
                 bindings.set_value(bindings.get_iter(path), 1, None)
                 action = actions[int(path)][-1]
                 blakeys.unbind(blacfg.getstring("keybindings", action))
-                blacfg.set("keybindings", action, "")
+                blacfg.set_("keybindings", action, "")
 
             renderer = gtk.CellRendererAccel()
             renderer.set_property("editable", True)
@@ -573,7 +573,7 @@ class BlaPreferences(BlaUniqueWindow):
             self.pack_start(nowplaying, expand=False)
 
         def __entry_changed(self, entry, key):
-            blacfg.set("lastfm", key, entry.get_text())
+            blacfg.set_("lastfm", key, entry.get_text())
 
         def __scrobble_changed(self, checkbutton):
             blacfg.setboolean("lastfm", "scrobble", checkbutton.get_active())

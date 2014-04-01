@@ -102,7 +102,7 @@ class BlaCfg(RawConfigParser, gobject.GObject):
         for section, values in default.iteritems():
             self.add_section(section)
             for key, value in values.iteritems():
-                self.set(section, key, value)
+                self.set_(section, key, value)
 
         if not self.read(blaconst.CFG_PATH):
             self.read("%s.bak" % blaconst.CFG_PATH)
@@ -175,15 +175,13 @@ class BlaCfg(RawConfigParser, gobject.GObject):
         if old_value != value:
             self.emit("changed", section, key)
 
-    set = set_ # TODO: remove this eventually for PEP8 compliance
-
     def setboolean(self, section, key, value):
         if not self.has_section(section):
             self.add_section(section)
         if value:
-            self.set(section, key, "yes")
+            self.set_(section, key, "yes")
         else:
-            self.set(section, key, "no")
+            self.set_(section, key, "no")
 
     def save(self):
         import os

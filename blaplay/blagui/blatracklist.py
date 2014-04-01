@@ -109,8 +109,8 @@ def _header_popup(button, event, view_id):
             except ValueError:
                 pass
 
-        blacfg.set("general",
-                   "columns.%s" % view, ", ".join(map(str, columns)))
+        blacfg.set_("general",
+                    "columns.%s" % view, ", ".join(map(str, columns)))
         if view_id == blaconst.VIEW_PLAYLISTS:
             for treeview in BlaTreeView.playlist_instances:
                 update_columns(treeview, view_id)
@@ -164,8 +164,8 @@ def update_columns(treeview, view_id):
 
     if columns is None:
         columns = default
-        blacfg.set(
-            "general", "columns.%s" % view, ", ".join(map(str, columns)))
+        blacfg.set_("general",
+                    "columns.%s" % view, ", ".join(map(str, columns)))
 
     xpad = gtk.CellRendererText().get_property("xpad")
     for column_id in columns:
@@ -195,6 +195,9 @@ def update_columns(treeview, view_id):
     treeview.connect_changed_signal()
 
 def popup(treeview, event, view_id, target):
+    # TODO: Let playlist manager and queue provide their own popup function to
+    #       decouple the track list from its concrete implementations.
+
     from blaplaylist import playlist_manager
     from blaqueue import queue
 
@@ -469,8 +472,8 @@ class BlaTreeView(blaguiutils.BlaTreeViewBase):
                 view = "queue"
 
             columns = [column.id_ for column in treeview.get_columns()]
-            blacfg.set("general", "columns.%s" % view,
-                       ", ".join(map(str, columns)))
+            blacfg.set_("general", "columns.%s" % view,
+                        ", ".join(map(str, columns)))
 
         if self.__view_id is not None:
             self.__columns_changed_id = self.connect(

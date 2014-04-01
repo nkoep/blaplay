@@ -667,7 +667,7 @@ class BlaLibraryBrowser(gtk.VBox):
 
     def __organize_by_changed(self, combobox):
         view = combobox.get_active()
-        blacfg.set("library", "organize.by", view)
+        blacfg.set_("library", "organize.by", view)
         self.__queue_model_update(view)
 
     def update_treeview_style(self):
@@ -957,7 +957,7 @@ class BlaFileBrowser(gtk.VBox):
                 return False
             self.__directory = directory
             self.__entry.set_text(self.__directory)
-            blacfg.set("general", "filesystem.directory", self.__directory)
+            blacfg.set_("general", "filesystem.directory", self.__directory)
             if add_to_history:
                 self.__history.add(self.__directory)
 
@@ -1063,5 +1063,5 @@ class BlaBrowsers(gtk.Notebook):
             page_num = 0
         self.set_current_page(page_num)
         self.connect("switch_page",
-                     lambda *x: blacfg.set("general", "browser.view", x[-1]))
+                     lambda *x: blacfg.set_("general", "browser.view", x[-1]))
 

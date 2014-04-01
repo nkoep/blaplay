@@ -159,7 +159,7 @@ class BlaMainWindow(BlaBaseWindow):
 
         # Restore the pane positions.
         def notify(pane, propspec, key):
-            blacfg.set("general", key, str(pane.get_position()))
+            blacfg.set_("general", key, str(pane.get_position()))
         for pane, side in [(hpane, "left"), (self.__view, "right")]:
             key = "pane.pos.%s" % side
             try:
@@ -293,8 +293,8 @@ class BlaMainWindow(BlaBaseWindow):
             path = path.strip()
             if playlist_manager.open_playlist(path):
                 self.__view.set_view(blaconst.VIEW_PLAYLISTS)
-                blacfg.set("general", "filechooser.directory",
-                           os.path.dirname(path))
+                blacfg.set_("general", "filechooser.directory",
+                            os.path.dirname(path))
 
     def __add_tracks(self, files=True):
         if files:
@@ -316,8 +316,8 @@ class BlaMainWindow(BlaBaseWindow):
         if response == gtk.RESPONSE_OK and filenames:
             filenames = map(str.strip, filenames)
             playlist_manager.add_to_current_playlist(filenames, resolve=True)
-            blacfg.set("general", "filechooser.directory",
-                       os.path.dirname(filenames[0]))
+            blacfg.set_("general", "filechooser.directory",
+                        os.path.dirname(filenames[0]))
 
     def __save_playlist(self, window):
         diag = gtk.FileChooserDialog(
@@ -371,8 +371,8 @@ class BlaMainWindow(BlaBaseWindow):
             if type_ is None:
                 type_ = blautil.get_extension(path)
             playlist_manager.save(path, type_, cb.get_active() == 0)
-            blacfg.set("general", "filechooser.directory",
-                       os.path.dirname(path))
+            blacfg.set_("general", "filechooser.directory",
+                        os.path.dirname(path))
 
         diag.destroy()
 
