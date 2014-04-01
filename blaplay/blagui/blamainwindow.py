@@ -157,16 +157,15 @@ class BlaMainWindow(BlaBaseWindow):
         hpane.pack2(self.__view, resize=True, shrink=True)
         hpane.show()
 
-        # Restore the pane positions.
+        # Restore the pane position.
+        key = "pane.pos.left"
+        try:
+            hpane.set_position(blacfg.getint("general", key))
+        except TypeError:
+            pass
         def notify(pane, propspec, key):
             blacfg.set_("general", key, str(pane.get_position()))
-        for pane, side in [(hpane, "left"), (self.__view, "right")]:
-            key = "pane.pos.%s" % side
-            try:
-                pane.set_position(blacfg.getint("general", key))
-            except TypeError:
-                pass
-            pane.connect("notify", notify, key)
+        hpane.connect("notify", notify, key)
 
         # Create a vbox for the hpane and the statusbar. This allows for
         # setting a border around those items which excludes the menubar and

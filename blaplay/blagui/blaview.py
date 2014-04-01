@@ -427,7 +427,7 @@ def BlaViewMeta(view_name):
 
     return _BlaViewMeta
 
-class BlaView(gtk.HPaned):
+class BlaView(gtk.Viewport):
     __metaclass__ = blautil.BlaSingletonMeta
 
     def __init__(self):
@@ -435,30 +435,11 @@ class BlaView(gtk.HPaned):
 
         from blaplaylist import playlist_manager
         from blaqueue import queue
-        from blavideo import BlaVideo
-        from blaradio import BlaRadio
-        self.__views = [playlist_manager, queue, BlaRadio(), BlaVideo()]
+        self.__views = [playlist_manager, queue]
 
-        self.__container = gtk.Viewport()
-        self.__container.set_shadow_type(gtk.SHADOW_NONE)
-        self.__side_pane = BlaSidePane(self.__views)
+        self.set_shadow_type(gtk.SHADOW_NONE)
 
-        player.connect(
-            "state_changed", lambda *x: self.__side_pane.update_track())
-        # The sync handler gets called every time gstreamer needs an xwindow
-        # for rendering video.
         def sync_handler():
-            view = blacfg.getint("general", "view")
-            if view == blaconst.VIEW_VIDEO:
-                element = self.__views[blaconst.VIEW_VIDEO]
-            else:
-                element = self.__side_pane.cover_display
-                # Coerce the cover display into a video canvas.
-                element.use_as_video_canvas(True)
-            canvas = element.get_video_canvas()
-            if canvas.get_realized():
-                return canvas.window.xid
-            print_w("Drawing area for video playback not yet realized")
             return 0
         player.set_sync_handler(sync_handler)
 
@@ -466,12 +447,7 @@ class BlaView(gtk.HPaned):
         for view in self.__views:
             view.init()
 
-        self.show()
-        self.__container.show_all()
-        self.__side_pane.show()
-
-        self.pack1(self.__container, resize=True, shrink=False)
-        self.pack2(self.__side_pane, resize=False, shrink=False)
+        self.show_all()
 
         def startup_complete(*args):
             self.set_view(blacfg.getint("general", "view"))
@@ -507,14 +483,14 @@ class BlaView(gtk.HPaned):
             self.__side_pane.cover_display.use_as_video_canvas(
                 view != blaconst.VIEW_VIDEO)
 
-        child = self.__container.get_child()
+        child = self.get_child()
         if view == view_prev and child is not None:
             return
         if child is not None:
-            self.__container.remove(child)
+            self.remove(child)
         child = self.__views[view]
         if child.get_parent() is not None:
             child.unparent()
-        self.__container.add(child)
+        self.add(child)
         child.update_statusbar()
 
