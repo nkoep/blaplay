@@ -25,6 +25,7 @@ import urlparse
 import hashlib
 import webbrowser
 import subprocess
+import inspect
 import functools
 from threading import Thread, ThreadError, Lock
 import collections
@@ -94,6 +95,29 @@ def lock(lock_):
                 func(*args, **kwargs)
         return wrapper
     return wrapper_
+
+def caches_return_value(f):
+    """
+    Caches the return value of the decorated function. Note that this does not
+    support calling the decorated function with keyword arguments. For obvious
+    reasons, it is only useful for pure functions that do not depend on global
+    state and only accept immutable argument types.
+    """
+
+    if inspect.getargspec(f).keywords is not None:
+        raise ValueError(
+            "Decorator does not support functions with keyword arguments")
+
+    _cache = {}
+    @functools.wraps(f)
+    def wrapper(*args):
+        key = args
+        try:
+            value = _cache[key]
+        except KeyError:
+            value = _cache[key] = f(*args)
+        return value
+    return wrapper
 
 def toss_extension(filepath):
     return os.path.splitext(filepath)[0]

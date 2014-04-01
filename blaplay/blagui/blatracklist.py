@@ -47,6 +47,7 @@ COLUMNS_DEFAULT_QUEUE = (COLUMN_QUEUE_POSITION, COLUMN_ARTIST, COLUMN_TITLE,
                          COLUMN_ALBUM)
 
 
+@blautil.caches_return_value
 def parse_track_list_stats(count, size, length_seconds):
     values = [("seconds", 60), ("minutes", 60), ("hours", 24), ("days",)]
     length = {}.fromkeys([v[0] for v in values], 0)
