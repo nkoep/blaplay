@@ -38,10 +38,15 @@ import gio
 import gtk
 
 
+def cdll(lib):
+    soname = ctypes.util.find_library(lib)
+    if soname is None:
+        raise OSError("No shared library for '%s' found" % lib)
+    return ctypes.CDLL(soname)
+
 def thread_id():
-    soname = ctypes.util.find_library("c")
     # 186 == SYS_gettid
-    return ctypes.CDLL(soname).syscall(186)
+    return cdll("c").syscall(186)
 
 def clamp(min_, max_, value):
     if min_ > max_:

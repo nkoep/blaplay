@@ -166,13 +166,9 @@ def finish_startup():
     blametadata.init()
 
     # Set process name for programs like top or gnome-system-monitor.
-    import ctypes
-    import ctypes.util
-
     gobject.set_prgname(blaconst.APPNAME)
-    soname = ctypes.util.find_library("c")
     # 15 == PR_SET_NAME
-    ctypes.CDLL(soname).prctl(15, blaconst.APPNAME, 0, 0, 0)
+    blautil.cdll("c").prctl(15, blaconst.APPNAME, 0, 0, 0)
 
     # Finally, start the main loop.
     bla.main()
