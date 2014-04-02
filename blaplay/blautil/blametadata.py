@@ -199,7 +199,7 @@ class BlaFetcher(gobject.GObject):
         def emit(lyrics):
             if not lyrics:
                 lyrics = None
-            self.emit("lyrics", timestamp, lyrics)
+            gobject.idle_add(self.emit, "lyrics", timestamp, lyrics)
 
         lyrics = None
 
@@ -274,7 +274,7 @@ class BlaFetcher(gobject.GObject):
     def __fetch_cover(self, track, timestamp):
         def emit(cover):
             gobject.source_remove(self.__tid)
-            self.emit("cover", timestamp, cover)
+            gobject.idle_add(self.emit, "cover", timestamp, cover)
             return False
 
         gobject.source_remove(self.__tid)
