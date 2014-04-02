@@ -29,9 +29,6 @@ import gtk
 import blaplay
 player = blaplay.bla.player
 library = blaplay.bla.library
-# XXX: Remove this once UIManager is no longer a singleton!!
-from blauimanager import BlaUIManager
-ui_manager = blaplay.bla.ui_manager = BlaUIManager()
 from blaplay.blacore import blaconst, blacfg
 from blaplay import blautil, blagui
 from blaplay.formats._identifiers import *
@@ -1178,9 +1175,10 @@ class BlaPlaylistManager(gtk.Notebook):
         "selection_changed": blautil.signal(1)
     }
 
-    def __init__(self):
+    def __init__(self, ui_manager):
         super(BlaPlaylistManager, self).__init__()
 
+        self._ui_manager = ui_manager
         self.current = None # Reference to the currently active playlist
         self.clipboard = [] # List of items after a cut/copy operation
 
@@ -1545,11 +1543,12 @@ class BlaPlaylistManager(gtk.Notebook):
             action = "Unlock" if playlist.locked() else "Lock"
         except AttributeError:
             return
-        widget = ui_manager.get_widget(
+        widget = self._ui_manager.get_widget(
             "/Menu/%s/LockUnlockView" % blaconst.APPNAME)
         widget.set_label("%s page" % action)
 
-        widget= ui_manager.get_widget("/Menu/%s/CloseView" % blaconst.APPNAME)
+        widget= self._ui_manager.get_widget(
+            "/Menu/%s/CloseView" % blaconst.APPNAME)
         widget.set_sensitive(not playlist.locked())
 
     def get_active_playlist(self):
@@ -1887,7 +1886,10 @@ class BlaPlaylistManager(gtk.Notebook):
             playlist == self.get_current_playlist()):
             playlist.jump_to_playing_track()
 
-playlist_manager = BlaPlaylistManager()
+# XXX: Remove this once UIManager is no longer a singleton!!
+from blauimanager import BlaUIManager
+ui_manager = BlaUIManager()
+playlist_manager = BlaPlaylistManager(ui_manager)
 
 # Defer importing the queue instance until the BlaPlaylistManager class
 # object has been defined. This is necessary right now because the queue in

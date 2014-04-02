@@ -141,7 +141,7 @@ class BlaMainWindow(BlaBaseWindow):
         toolbar = BlaToolbar()
         browsers = BlaBrowsers(library)
         self._visualization = BlaVisualization()
-        self._view = BlaView.create_view_manager()
+        self._view = BlaView.create_view_manager(ui_manager)
         statusbar = BlaStatusbar(library)
 
         # Group the browsers and the visualization widget.

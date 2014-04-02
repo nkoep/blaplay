@@ -26,8 +26,7 @@ from blaplay import blautil
 
 class Blaplay(gobject.GObject):
     __metaclass__ = blautil.BlaSingletonMeta
-    __slots__ = ("_pre_shutdown_hooks", "library", "player", "ui_manager",
-                 "window")
+    __slots__ = ("_pre_shutdown_hooks", "library", "player", "window")
 
     __gsignals__ = {
         "startup_complete": blautil.signal(0)
@@ -35,7 +34,7 @@ class Blaplay(gobject.GObject):
 
     def __init__(self):
         super(Blaplay, self).__init__()
-        self.library = self.player = self.ui_manager = self.window = None
+        self.library = self.player = self.window = None
         self._pre_shutdown_hooks = []
 
     def __setattr__(self, attr, value):

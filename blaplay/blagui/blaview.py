@@ -97,8 +97,8 @@ class BlaView(gtk.Viewport):
         child.update_statusbar()
 
     @staticmethod
-    def create_view_manager():
-        from blaplaylist import playlist_manager
+    def create_view_manager(ui_manager):
+        from blaplaylist import playlist_manager # XXX: Pass ui_manager.
         from blaqueue import queue
         return BlaView([playlist_manager, queue])
 
