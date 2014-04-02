@@ -23,7 +23,6 @@ from pangocairo import CairoContext
 
 import blaplay
 library = blaplay.bla.library
-ui_manager = blaplay.bla.ui_manager
 from blaplay.blacore import blaconst, blacfg
 from blaplay import blautil, blagui
 from blaplay.formats._identifiers import *
@@ -207,7 +206,7 @@ def popup(treeview, event, view_id, target):
     elif view_id == blaconst.VIEW_QUEUE:
         element = queue
 
-    accel_group = ui_manager.get_accel_group()
+    accel_group = blagui.get_accelerator_group(treeview)
 
     try:
         path = treeview.get_path_at_pos(*map(int, [event.x, event.y]))[0]

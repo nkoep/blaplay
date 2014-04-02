@@ -29,7 +29,9 @@ import gtk
 import blaplay
 player = blaplay.bla.player
 library = blaplay.bla.library
-ui_manager = blaplay.bla.ui_manager
+# XXX: Remove this once UIManager is no longer a singleton!!
+from blauimanager import BlaUIManager
+ui_manager = blaplay.bla.ui_manager = BlaUIManager()
 from blaplay.blacore import blaconst, blacfg
 from blaplay import blautil, blagui
 from blaplay.formats._identifiers import *

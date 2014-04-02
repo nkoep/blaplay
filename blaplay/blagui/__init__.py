@@ -42,6 +42,14 @@ def init(library):
 
     return BlaMainWindow(ui_manager, library)
 
+def get_accelerator_group(widget):
+    toplevel = widget.get_toplevel()
+    accel_groups = gtk.accel_groups_from_object(toplevel)
+    if len(accel_groups) > 1:
+        raise ValueError("Ambiguous accelerator group found for widget '%s'" %
+                         widget)
+    return accel_groups[-1]
+
 def is_accel(event, accel):
     # Convenience function from Quod Libet to check for accelerator matches.
     if event.type != gtk.gdk.KEY_PRESS:

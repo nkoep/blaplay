@@ -22,7 +22,6 @@ import gobject
 import gtk
 
 import blaplay
-ui_manager = blaplay.bla.ui_manager
 from blaplay.blacore import blaconst, blacfg
 from blaplay import blagui
 from blaplay.formats._identifiers import *

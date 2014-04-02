@@ -16,7 +16,7 @@
 
 import os
 
-from blaplay.blacore import blacfg, blaconst
+from blaplay.blacore import blaconst
 from blaplay import blautil
 from _identifiers import *
 

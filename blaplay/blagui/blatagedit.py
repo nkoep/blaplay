@@ -352,7 +352,7 @@ class BlaTagEditor(BlaMetadataViewer):
                  lambda *x: self.__delete_tags(identifiers)),
                 ("Capitalize", None, lambda *x: self.__capitalize(identifiers))
             ]
-            accel_group = blaplay.bla.ui_manager.get_accel_group()
+            accel_group = blagui.get_accelerator_group(self)
             for label, accel, callback in items:
                 m = gtk.MenuItem(label)
                 if accel:

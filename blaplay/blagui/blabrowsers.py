@@ -26,7 +26,6 @@ import cairo
 import pango
 import pangocairo
 
-import blaplay
 from blaplay.blacore import blaconst, blacfg
 from blaplay import blautil, blagui
 from blaplay.formats._identifiers import *
@@ -329,7 +328,7 @@ class BlaTreeView(blaguiutils.BlaTreeViewBase):
             items.append(("Add to playback queue", "Q",
                           lambda *x: self.__send_to_queue(), True))
 
-        accel_group = blaplay.bla.ui_manager.get_accel_group()
+        accel_group = blagui.get_accelerator_group(self)
         menu = gtk.Menu()
         for item in items:
             if item is None:

@@ -308,7 +308,7 @@ class BlaRadio(gtk.VBox):
         except TypeError:
             return False
 
-        accel_group = blaplay.bla.ui_manager.get_accel_group()
+        accel_group = blagui.get_accelerator_group(self)
         menu = gtk.Menu()
         m = gtk.MenuItem("Remove")
         mod, key = gtk.accelerator_parse("Delete")
