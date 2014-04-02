@@ -39,25 +39,25 @@ class _CoverDisplay(gtk.DrawingArea):
         self.set_size_request(COVER_SIZE, COVER_SIZE)
 
         self._metadata_fetcher = metadata_fetcher
-        self._cover = None
+        self._cover = blaconst.COVER
         self._alpha = 1.0
         self._cover_pixbuf = None
         self._border_color = gtk.gdk.color_parse("#808080")
         self._timestamp = -1
-        self._timeout_id = -1
+        self._fetch_timeout_id = -1
+        self._draw_timeout_id = -1
 
         metadata_fetcher.connect_object(
             "cover", _CoverDisplay._display_cover, self)
-
-        # Set up the drawing agea.
-        self.__cid = self.connect_object(
+        self.connect_object(
             "expose-event", _CoverDisplay._on_expose_event, self)
         self.connect_object(
             "button-press-event",
             _CoverDisplay._on_button_press_event, self)
 
     def _update_timestamp(self):
-        # Update the timestamp and return it.
+        """Updates the timestamp and returns it."""
+
         self._timestamp = gobject.get_current_time()
         return self._timestamp
 
@@ -90,37 +90,25 @@ class _CoverDisplay(gtk.DrawingArea):
         return True
 
     def _on_expose_event(self, event):
-        # FIXME: This flashes white on cover changes.
         cr = self.window.cairo_create()
-        cr.set_source_color(self.get_style().bg[gtk.STATE_NORMAL])
-        x, y, width, height = event.area
-
-        # Fill background.
-        # cr.rectangle(0, 0, width, height)
-        # cr.fill()
 
         if self._cover_pixbuf:
             alpha = blautil.clamp(0.0, 1.0, self._alpha)
 
-            # # Draw the old cover.
-            # cr.set_source_pixbuf(self._pb_prev, 0, 0)
-            # cr.paint_with_alpha(alpha)
-
-            # Draw the new cover.
+            # Draw the new cover on top of the previous one.
             cr.set_source_pixbuf(self._cover_pixbuf, 0, 0)
             cr.paint_with_alpha(alpha)
 
             # Decrease the alpha value to create a linear fade between covers.
             self._alpha += 0.05
 
-        # Draw outline. The default cover has a transparent background and
+        # Draw an outline. The default cover has a transparent background and
         # therefore looks better without border.
         if self._cover != blaconst.COVER:
             cr.set_source_color(self._border_color)
-            cr.rectangle(0, 0, width, height)
+            cr.rectangle(*event.area)
             cr.stroke()
 
-    @blautil.idle
     def _display_cover(self, timestamp, cover):
         def crossfade():
             if self._alpha < 1.0:
@@ -134,14 +122,14 @@ class _CoverDisplay(gtk.DrawingArea):
         self._cover = cover
         self._cover_pixbuf = self._prepare_cover(cover)
         self._alpha = 0.0
+        gobject.source_remove(self._draw_timeout_id)
         # Use 25 ms intervals for an update rate of 40 fps.
-        gobject.timeout_add(25, crossfade)
+        self._draw_timeout_id = gobject.timeout_add(25, crossfade)
 
     def _prepare_cover(self, cover):
         try:
             pb = gtk.gdk.pixbuf_new_from_file(cover)
         except gobject.GError:
-            # XXX: Just to be sure, follow links here!
             if cover != blaconst.COVER:
                 try:
                     os.unlink(cover)
@@ -152,13 +140,13 @@ class _CoverDisplay(gtk.DrawingArea):
         return pb.scale_simple(height, height, gtk.gdk.INTERP_HYPER)
 
     def update_cover(self, track):
-        gobject.source_remove(self._timeout_id)
-        self._timeout_id = gobject.timeout_add(
-            250, self._metadata_fetcher.fetch_cover, track,
-            self._update_timestamp())
-
-    def reset(self):
-        self._display_cover(self._update_timestamp(), blaconst.COVER)
+        if track is None:
+            self._display_cover(self._update_timestamp(), blaconst.COVER)
+        else:
+            gobject.source_remove(self._fetch_timeout_id)
+            self._fetch_timeout_id = gobject.timeout_add(
+                250, self._metadata_fetcher.fetch_cover, track,
+                self._update_timestamp())
 
 class BlaTrackInfo(gtk.Viewport):
     def __init__(self, metadata_fetcher):
@@ -229,9 +217,8 @@ class BlaTrackInfo(gtk.Viewport):
 
         if state == blaconst.STATE_STOPPED or player.radio:
             self._track = None
-            self._cover_display.reset()
         else:
             self._track = track
-            self._cover_display.update_cover(track)
+        self._cover_display.update_cover(self._track)
         self._update_track_info(self._track)
 
