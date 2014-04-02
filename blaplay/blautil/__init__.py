@@ -18,6 +18,8 @@ import os
 import sys
 import tempfile
 import cPickle as pickle
+import ctypes
+import ctypes.util
 import re
 import shutil
 import urllib
@@ -35,6 +37,11 @@ import gobject
 import gio
 import gtk
 
+
+def thread_id():
+    soname = ctypes.util.find_library("c")
+    # 186 == SYS_gettid
+    return ctypes.CDLL(soname).syscall(186)
 
 def clamp(min_, max_, value):
     if min_ > max_:
