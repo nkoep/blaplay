@@ -29,13 +29,14 @@ from blatoolbar import BlaToolbar
 from blabrowsers import BlaBrowsers
 from blaplaylist import playlist_manager
 from blavisualization import BlaVisualization
-from blaview import BlaView
+from blaview import BlaView # XXX: We'll rename this in the future.
 from blasidepane import BlaSidePane
 from blastatusbar import BlaStatusbar
 from blapreferences import BlaPreferences
 from blaabout import BlaAbout
 from blatray import BlaTray
 import blaguiutils
+
 
 class BlaMainWindow(BlaBaseWindow):
     class StateManager(BlaBaseWindow.StateManager):
@@ -60,7 +61,7 @@ class BlaMainWindow(BlaBaseWindow):
             else:
                 return blacfg.getboolean("general", "maximized")
 
-    def __init__(self, library):
+    def __init__(self, ui_manager, library):
         super(BlaMainWindow, self).__init__(
             BlaMainWindow.StateManager(), gtk.WINDOW_TOPLEVEL)
         self.connect("delete_event", self.__delete_event)
@@ -111,10 +112,7 @@ class BlaMainWindow(BlaBaseWindow):
                                   button_press_hook)
 
         # Main menu
-        # TODO: Pass the ui_manager on during construction instead.
-        ui_manager = blaplay.bla.ui_manager
         self.add_accel_group(ui_manager.get_accel_group())
-
         actions = [
             # Menu root
             (blaconst.APPNAME, None, "_%s" % blaconst.APPNAME),
@@ -140,26 +138,26 @@ class BlaMainWindow(BlaBaseWindow):
         self.add(gtk.VBox())
 
         # Create instances of the main parts of the GUI.
-        self.__toolbar = BlaToolbar()
-        self.__browsers = BlaBrowsers(library)
-        self.__visualization = BlaVisualization()
-        self.__view = BlaView()
-        self.__statusbar = BlaStatusbar(library)
+        toolbar = BlaToolbar()
+        browsers = BlaBrowsers(library)
+        self._visualization = BlaVisualization()
+        self._view = BlaView.create_view_manager(ui_manager)
+        statusbar = BlaStatusbar(library)
 
         # Group the browsers and the visualization widget.
-        self.__vbox_left = gtk.VBox(spacing=blaconst.WIDGET_SPACING)
-        self.__vbox_left.pack_start(self.__browsers)
-        self.__vbox_left.pack_start(self.__visualization, expand=False)
-        self.__vbox_left.show()
+        vbox = gtk.VBox(spacing=blaconst.WIDGET_SPACING)
+        vbox.pack_start(browsers)
+        vbox.pack_start(self._visualization, expand=False)
+        vbox.show()
 
         pane_right = gtk.HPaned()
-        pane_right.pack1(self.__view, shrink=False)
+        pane_right.pack1(self._view, shrink=False)
         pane_right.pack2(BlaSidePane(), resize=False, shrink=False)
         pane_right.show()
 
         # Pack the browser + view-widget into a paned widget.
         pane_left = gtk.HPaned()
-        pane_left.pack1(self.__vbox_left, shrink=False)
+        pane_left.pack1(vbox, shrink=False)
         pane_left.pack2(pane_right, shrink=False)
         pane_left.show()
 
@@ -180,12 +178,12 @@ class BlaMainWindow(BlaBaseWindow):
         vbox = gtk.VBox(spacing=blaconst.BORDER_PADDING)
         vbox.set_border_width(blaconst.BORDER_PADDING)
         vbox.pack_start(pane_left)
-        vbox.pack_start(self.__statusbar, expand=False)
+        vbox.pack_start(statusbar, expand=False)
         vbox.show()
 
         # Pack everything up together in the main window's vbox.
         self.child.pack_start(ui_manager.get_widget("/Menu"), expand=False)
-        self.child.pack_start(self.__toolbar, expand=False)
+        self.child.pack_start(toolbar, expand=False)
         self.child.pack_start(vbox)
         self.child.show()
 
@@ -219,7 +217,7 @@ class BlaMainWindow(BlaBaseWindow):
         if not blacfg.getboolean("general", "always.show.tray"):
             self.__tray.set_visible(False)
         # XXX: This is SO ugly!!
-        self.__visualization.flush_buffers()
+        self._visualization.flush_buffers()
 
     def toggle_hide(self):
         self.__hide_windows(self.get_visible())
@@ -296,7 +294,7 @@ class BlaMainWindow(BlaBaseWindow):
         if response == gtk.RESPONSE_OK and path:
             path = path.strip()
             if playlist_manager.open_playlist(path):
-                self.__view.set_view(blaconst.VIEW_PLAYLISTS)
+                self._view.set_view(blaconst.VIEW_PLAYLISTS)
                 blacfg.set_("general", "filechooser.directory",
                             os.path.dirname(path))
 

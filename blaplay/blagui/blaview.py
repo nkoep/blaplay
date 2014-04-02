@@ -23,7 +23,6 @@ import pango
 
 import blaplay
 player = blaplay.bla.player
-ui_manager = blaplay.bla.ui_manager
 from blaplay.blacore import blaconst, blacfg
 from blaplay import blautil, blagui
 from blaplay.formats._identifiers import *
@@ -68,28 +67,19 @@ def BlaViewMeta(view_name):
 class BlaView(gtk.Viewport):
     __metaclass__ = blautil.BlaSingletonMeta
 
-    def __init__(self):
+    def __init__(self, views):
         super(BlaView, self).__init__()
-
-        from blaplaylist import playlist_manager
-        from blaqueue import queue
-        self.__views = [playlist_manager, queue]
-
         self.set_shadow_type(gtk.SHADOW_NONE)
 
-        def sync_handler():
-            return 0
-        player.set_sync_handler(sync_handler)
-
-        # Initialize each view.
-        for view in self.__views:
+        self._views = views
+        for view in self._views:
             view.init()
-
-        self.show_all()
 
         def startup_complete(*args):
             self.set_view(blacfg.getint("general", "view"))
         blaplay.bla.connect("startup_complete", startup_complete)
+
+        self.show_all()
 
     def set_view(self, view):
         view_prev = blacfg.getint("general", "view")
@@ -100,9 +90,15 @@ class BlaView(gtk.Viewport):
             return
         if child is not None:
             self.remove(child)
-        child = self.__views[view]
+        child = self._views[view]
         if child.get_parent() is not None:
             child.unparent()
         self.add(child)
         child.update_statusbar()
+
+    @staticmethod
+    def create_view_manager(ui_manager):
+        from blaplaylist import playlist_manager # XXX: Pass in ui_manager.
+        from blaqueue import queue
+        return BlaView([playlist_manager, queue])
 
