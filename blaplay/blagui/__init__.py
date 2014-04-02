@@ -37,7 +37,10 @@ def init(library):
     theme = gtk.icon_theme_get_default()
     gtk.window_set_default_icon_name(blaconst.APPNAME)
 
-    return BlaMainWindow(library)
+    from blaplay.blagui.blauimanager import BlaUIManager
+    ui_manager = BlaUIManager()
+
+    return BlaMainWindow(ui_manager, library)
 
 def is_accel(event, accel):
     # Convenience function from Quod Libet to check for accelerator matches.

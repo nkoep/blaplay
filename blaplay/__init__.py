@@ -121,9 +121,6 @@ def finish_startup():
     bla.player = blaplayer.init(library)
 
     # Initialize the GUI.
-    from blaplay.blagui.blauimanager import BlaUIManager
-    bla.ui_manager = BlaUIManager()
-
     from blaplay import blagui
     bla.window = blagui.init(library)
 
