@@ -123,8 +123,8 @@ class BlaProgressBar(gtk.Window):
         hbox = gtk.HBox(spacing=10)
         self.__pb = gtk.ProgressBar()
         button = gtk.Button()
-        button.add(gtk.image_new_from_stock(
-                gtk.STOCK_CANCEL, gtk.ICON_SIZE_BUTTON))
+        button.add(
+            gtk.image_new_from_stock(gtk.STOCK_CANCEL, gtk.ICON_SIZE_BUTTON))
         button.connect("clicked", lambda *x: self.destroy())
         hbox.pack_start(self.__pb, expand=True)
         hbox.pack_start(button, expand=False)
@@ -268,18 +268,16 @@ class BlaTreeViewBase(gtk.TreeView):
                 return True
             self.set_cursor(path, column, 0)
 
-# TODO: Rename this to BlaMenu. We use it for submenus as well which aren't
-#       technically popup menus as we never explicitly call `show()' on them.
 class BlaMenu(gtk.Menu):
     def __init__(self, event=None):
         super(BlaMenu, self).__init__()
-        self._event = event
+        self._event = event.copy() if event is not None else None
 
     def run(self):
         # Submenus don't get a reference to an event and therefore cannot be
         # "ran" by themselves.
         if self._event is None:
-            print_w("Menu has no event")
+            print_w("Menu has no event associated with it")
             return
         self.show_all()
         self.popup(None, None, None, self._event.button, self._event.time)
@@ -293,8 +291,8 @@ class BlaMenu(gtk.Menu):
         self.append(m)
         return m
 
-    def append_item_with_accelerator(self, accel, *args, **kwargs):
-        m = self.append_item(*args, **kwargs)
+    def append_item_with_accelerator(self, accel, label, *args, **kwargs):
+        m = self.append_item(label, *args, **kwargs)
         # XXX: Where do we get the accelerator group from?
         # accel_group = blagui.get_accelerator_group(self)
         accel = None
@@ -302,6 +300,15 @@ class BlaMenu(gtk.Menu):
             mod, key = gtk.accelerator_parse(accel)
             m.add_accelerator(
                 "activate", accel_group, mod, key, gtk.ACCEL_VISIBLE)
+        return m
+
+    def append_check_item(self, label, on_toggled_callback=None, *user_data):
+        def callback_wrapper(_, *args):
+            return on_toggle_callback(*args)
+        m = gtk.CheckMenuItem(label)
+        if on_toggled_callback is not None:
+            m.connect("toggled", callback_wrapper, *user_data)
+        self.append(m)
         return m
 
     def append_separator(self):

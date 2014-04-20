@@ -499,17 +499,15 @@ class _BlaTrackListTreeView(blaguiutil.BlaTreeViewBase):
             self.emit("column-layout-changed", active_column_ids)
 
         active_column_ids = [column.ID for column in self.get_columns()]
-        menu = gtk.Menu()
+        menu = blaguiutil.BlaMenu(event)
         for column_id, column in COLUMNS.items():
             if column_id in self._ignored_column_ids:
                 continue
-            m = gtk.CheckMenuItem(column.TITLE)
+            m = menu.append_check_item(column.TITLE)
             m.set_active(column_id in active_column_ids)
             m.set_sensitive(len(active_column_ids) > 1)
             m.connect("toggled", on_toggled, column_id)
-            menu.append(m)
-        menu.show_all()
-        menu.popup(None, None, None, event.button, event.time)
+        menu.run()
 
     def add_columns(self, column_ids):
         # We have to block the signal handler of the "columns-changed" event
