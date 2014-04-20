@@ -39,6 +39,7 @@ from blaplay.formats._identifiers import *
 
 TIMEOUT = 5
 
+# XXX: Get rid of this.
 scrobbler = None
 
 
@@ -236,7 +237,7 @@ def get_request_token():
 
 def sign_api_call(params):
     params.sort(key=lambda p: p[0].lower())
-    string = "".join(["%s%s" % p for p in params])
+    string = "".join(["%s%s" % (key, value) for key, value in params])
     return blautil.md5("%s%s" % (string, blaconst.LASTFM_SECRET))
 
 @blautil.thread
@@ -244,7 +245,7 @@ def love_unlove_song(track, unlove=False):
     if (not blacfg.getstring("lastfm", "user") or not track[ARTIST] or
         not track[TITLE]):
         return
-    session_key = BlaScrobbler.get_session_key(create=True)
+    session_key = scrobbler.get_session_key(create=True)
     if not session_key:
         return
 
@@ -276,11 +277,11 @@ class BlaScrobbler(object):
         def __init__(self, library):
             Queue.Queue.__init__(self)
             self._library = library
-            self.__restore()
-            self.__submit_scrobbles()
+            self._restore()
+            self._submit_scrobbles()
 
         @blautil.thread
-        def __submit_scrobbles(self):
+        def _submit_scrobbles(self):
             while True:
                 # Block until the first item arrives.
                 items = [self.get()]
@@ -292,7 +293,7 @@ class BlaScrobbler(object):
                         break
 
                 method = "track.scrobble"
-                session_key = BlaScrobbler.get_session_key()
+                session_key = scrobbler.get_session_key()
                 if not session_key:
                     continue
                 params = [
@@ -331,7 +332,7 @@ class BlaScrobbler(object):
                                 n_items)
                 post(params, items)
 
-        def __restore(self):
+        def _restore(self):
             items = blautil.deserialize_from_file(blaconst.SCROBBLES_PATH)
             if items:
                 print_d("Re-submitting %d queued scrobble(s)" % len(items))
@@ -360,14 +361,14 @@ class BlaScrobbler(object):
         self._token = None
         self._time_elapsed = 0
         self._iterations = 0
+        self._thread = None
 
-        self.__queue = BlaScrobbler.SubmissionQueue(library)
+        self._queue = BlaScrobbler.SubmissionQueue(library)
         def pre_shutdown_hook():
-            self.__submit_last_track(True)
+            self._submit_last_track(True)
         blaplay.bla.add_pre_shutdown_hook(pre_shutdown_hook)
 
-    @classmethod
-    def __request_authorization(cls):
+    def _request_authorization(self):
         from blaplay.blagui import blaguiutils
         response = blaguiutils.question_dialog(
             "last.fm authorization required", "In order to submit tracks to "
@@ -376,10 +377,10 @@ class BlaScrobbler(object):
         if response == gtk.RESPONSE_YES:
             blautil.open_url(
                 "http://www.last.fm/api/auth/?api_key=%s&token=%s" % (
-                blaconst.LASTFM_APIKEY, cls._token))
+                blaconst.LASTFM_APIKEY, self._token))
         return False
 
-    def __passes_ignore(self, track):
+    def _passes_ignore(self, track):
         tokens = map(
             str.strip,
             filter(None,
@@ -394,7 +395,7 @@ class BlaScrobbler(object):
         return True
 
     @blautil.thread
-    def __update_now_playing(self):
+    def _update_now_playing(self):
         try:
             track = self._library[self._uri]
         except KeyError:
@@ -426,17 +427,15 @@ class BlaScrobbler(object):
         if isinstance(response, ResponseError):
             print_d("Failed to update nowplaying: %s" % response)
 
-    def __query_status(self):
+    def _query_status(self):
         state = player.get_state()
         self._iterations += 1
         # Wait 10~ seconds in between POSTs. Before actually posting an update
         # kill any remaining thread that still might be running.
         if self._iterations % 10 == 0:
-            try:
-                self.__t.kill()
-            except AttributeError:
-                pass
-            self.__t = self.__update_now_playing()
+            if self._thread is not None:
+                self._thread.kill()
+            self._thread = self._update_now_playing()
             self._iterations = 0
 
         if state == blaconst.STATE_PLAYING:
@@ -446,7 +445,7 @@ class BlaScrobbler(object):
             self._timeout_id = 0
         return should_call_again
 
-    def __submit_last_track(self, shutdown=False):
+    def _submit_last_track(self, shutdown=False):
         if self._uri:
             try:
                 track = self._library[self._uri]
@@ -459,28 +458,28 @@ class BlaScrobbler(object):
             # in paused states).
             if (track[LENGTH] > 30 and track[ARTIST] and track[TITLE] and
                 blacfg.getboolean("lastfm", "scrobble") and
-                (self._time_elapsed > track[LENGTH] / 2 or self._time_elapsed > 240)):
+                (self._time_elapsed > track[LENGTH] / 2 or
+                 self._time_elapsed > 240)):
                 print_d("Submitting track to scrobbler queue")
-                self.__queue.put_nowait((self._uri, self._start_time))
+                self._queue.put_nowait((self._uri, self._start_time))
 
         self._uri = None
         if shutdown:
             print_i("Saving scrobbler queue")
-            self.__queue.save()
+            self._queue.save()
 
-    @classmethod
-    def get_session_key(cls, create=False):
+    def get_session_key(self, create=False):
         session_key = blacfg.getstring("lastfm", "sessionkey")
         if session_key:
             return session_key
-        if not create or cls._requested_authorization:
+        if not create or self._requested_authorization:
             return None
 
-        if not cls._token:
-            cls._token = get_request_token()
-            if not cls._token:
+        if not self._token:
+            self._token = get_request_token()
+            if not self._token:
                 return None
-            cls.__request_authorization()
+            self._request_authorization()
             return None
 
         # FIXME: on start when there are unsubmitted scrobbles and no session
@@ -497,7 +496,7 @@ class BlaScrobbler(object):
         method = "auth.getSession"
         params = [
             ("method", method), ("api_key", blaconst.LASTFM_APIKEY),
-            ("token", cls._token)
+            ("token", self._token)
         ]
         api_signature = sign_api_call(params)
         string = "&".join(["%s=%s" % p for p in params])
@@ -506,7 +505,7 @@ class BlaScrobbler(object):
         response = get_response(url, "session")
         if isinstance(response, ResponseError):
             session_key = None
-            cls._requested_authorization = True
+            self._requested_authorization = True
         else:
             session_key = response.content["key"]
             blacfg.set_("lastfm", "sessionkey", session_key)
@@ -523,7 +522,7 @@ class BlaScrobbler(object):
         # We request track submission on track changes. We don't have to check
         # here if a track passes the ignore settings as this is done when the
         # _uri attribute of the instance is set further down below.
-        self.__submit_last_track()
+        self._submit_last_track()
 
         self._time_elapsed = 0
         self._iterations = 0
@@ -531,10 +530,10 @@ class BlaScrobbler(object):
         if not track or player.video:
             return
 
-        if self.__passes_ignore(track):
+        if self._passes_ignore(track):
             self._uri = track.uri
             self._start_time = int(time.time())
-            self._timeout_id = gobject.timeout_add(1000, self.__query_status)
+            self._timeout_id = gobject.timeout_add(1000, self._query_status)
         else:
             self._uri = None
             artist, title = track[ARTIST], track[TITLE]
