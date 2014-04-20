@@ -21,7 +21,7 @@ import xml.etree.cElementTree as ETree
 from xml.sax.saxutils import escape as xml_escape
 
 from blaplay.formats._identifiers import *
-from .. import blaguiutils
+from .. import blaguiutil
 
 
 # XXX: These routines should be more efficient if playlists wrote to memory
@@ -120,7 +120,7 @@ def xspf_parse(path):
         with open(path, "r") as f:
             tree = ETree.ElementTree(None, f)
     except IOError:
-        blaguiutils.error_dialog("Failed to parse playlist \"%s\"" % path)
+        blaguiutil.error_dialog("Failed to parse playlist \"%s\"" % path)
         return None
 
     ns = "{http://xspf.org/ns/0/}"

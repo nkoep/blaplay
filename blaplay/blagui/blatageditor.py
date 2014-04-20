@@ -30,7 +30,7 @@ from blaplay import blautil, blagui
 from blaplay.formats._blatrack import BlaTrack
 from blaplay.formats._identifiers import *
 from blawindows import BlaWindow, BlaScrolledWindow
-import blaguiutils
+import blaguiutil
 
 
 class BlaMetadataViewer(gtk.VBox):
@@ -38,7 +38,7 @@ class BlaMetadataViewer(gtk.VBox):
         "value_changed": blautil.signal(2)
     }
 
-    class TreeView(blaguiutils.BlaTreeViewBase):
+    class TreeView(blaguiutil.BlaTreeViewBase):
         def __init__(self, *args, **kwargs):
             self.__is_editable = kwargs.pop("is_editable", False)
             super(BlaMetadataViewer.TreeView, self).__init__(*args, **kwargs)
@@ -251,7 +251,7 @@ class BlaTagEditor(BlaMetadataViewer):
             model.append([tag, value])
 
     def __add_tag(self, *args):
-        diag = blaguiutils.BlaDialog(title="Add tag")
+        diag = blaguiutil.BlaDialog(title="Add tag")
         diag.set_size_request(250, -1)
 
         table = gtk.Table(columns=2, rows=2, homogeneous=False)
@@ -383,7 +383,7 @@ class BlaTagEditor(BlaMetadataViewer):
 
         n_modified = len(self._modified)
         if n_modified > 0 and succeeded != n_modified:
-            blaguiutils.warning_dialog(
+            blaguiutil.warning_dialog(
                 "Failed to write tags for %d of %d files." %
                 ((n_modified-succeeded), n_modified))
         self._modified.clear()

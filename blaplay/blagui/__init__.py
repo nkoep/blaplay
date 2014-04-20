@@ -43,7 +43,7 @@ def init(config, library, player):
 
     return window
 
-# TODO: Move these two functions to blaguiutils.
+# TODO: Move these two functions to blaguiutil.
 def get_accelerator_group(widget):
     toplevel = widget.get_toplevel()
     accel_groups = gtk.accel_groups_from_object(toplevel)

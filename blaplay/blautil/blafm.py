@@ -369,8 +369,8 @@ class BlaScrobbler(object):
         blaplay.bla.add_pre_shutdown_hook(pre_shutdown_hook)
 
     def _request_authorization(self):
-        from blaplay.blagui import blaguiutils
-        response = blaguiutils.question_dialog(
+        from blaplay.blagui import blaguiutil
+        response = blaguiutil.question_dialog(
             "last.fm authorization required", "In order to submit tracks to "
             "the last.fm scrobbler, blaplay needs to be authorized to use "
             "your account. Open the last.fm authorization page now?")

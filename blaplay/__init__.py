@@ -82,12 +82,12 @@ class BlaplayState(gobject.GObject):
                     (hook.__module__, hook.__name__))
             hook()
 
-        from blaplay.blagui import blaguiutils
+        from blaplay.blagui import blaguiutil
         # TODO: destroy all additional windows instead of just hiding them.
         #       windows from which dialogs were run (which have their own event
         #       loops) will cause segfaults otherwise. would it be enough to
         #       parent every other window to self.window?
-        blaguiutils.set_visible(False)
+        blaguiutil.set_visible(False)
 
         from blaplay.blacore import blacfg
         blacfg.save()

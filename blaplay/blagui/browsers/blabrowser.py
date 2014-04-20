@@ -19,10 +19,10 @@ import os
 import gtk
 
 from blaplay import blagui, blautil
-from .. import blaguiutils
+from .. import blaguiutil
 
 
-class BlaBrowserTreeView(blaguiutils.BlaTreeViewBase):
+class BlaBrowserTreeView(blaguiutil.BlaTreeViewBase):
     def __init__(self):
         super(BlaBrowserTreeView, self).__init__()
 
@@ -135,7 +135,7 @@ class BlaBrowser(gtk.VBox):
             ("Add to current playlist", "add-to-current-playlist"),
             ("Send to new playlist", "send-to-new-playlist")
         ]
-        menu = blaguiutils.BlaMenu(event)
+        menu = blaguiutil.BlaMenu(event)
         for label, signal in items:
             menu.append_item(label, transfer_uris_to_playlist, signal, name)
         menu.append_separator()

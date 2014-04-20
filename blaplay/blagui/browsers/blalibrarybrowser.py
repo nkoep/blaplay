@@ -26,7 +26,7 @@ import pangocairo
 
 from blaplay.blacore import blaconst
 from blaplay import blautil, blagui
-from .. import blaguiutils
+from .. import blaguiutil
 from ..blawindows import BlaScrolledWindow
 from .blabrowser import BlaBrowser, BlaBrowserTreeView
 
@@ -34,7 +34,7 @@ PADDING_X, PADDING_Y, PADDING_WIDTH, PADDING_HEIGHT = -2, 0, 4, 0
 
 
 
-class _BlaCellRenderer(blaguiutils.BlaCellRendererBase):
+class _BlaCellRenderer(blaguiutil.BlaCellRendererBase):
     __gproperties__ = {
         "text": (gobject.TYPE_STRING, "text", "", "", gobject.PARAM_READWRITE)
     }

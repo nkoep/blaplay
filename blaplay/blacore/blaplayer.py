@@ -81,8 +81,8 @@ class BlaPlayer(gobject.GObject):
     def __init_pipeline(self):
         if not gstreamer_is_working:
             self.stop()
-            from blaplay.blagui import blaguiutils
-            blaguiutils.error_dialog(
+            from blaplay.blagui import blaguiutil
+            blaguiutil.error_dialog(
                 "Error", "Failed to construct GStreamer pipeline. Make sure "
                 "GStreamer 0.10, its Python bindings, and gst-plugins-base "
                 "and gst-plugins-good are installed.")
@@ -168,8 +168,8 @@ class BlaPlayer(gobject.GObject):
         elif message.type == gst.MESSAGE_ERROR:
             self.stop()
             err, debug = message.parse_error()
-            from blaplay.blagui import blaguiutils
-            blaguiutils.error_dialog("Error", str(err))
+            from blaplay.blagui import blaguiutil
+            blaguiutil.error_dialog("Error", str(err))
 
     def __sync_message(self, bus, message):
         if message.structure.get_name() == "prepare-xwindow-id":
@@ -283,10 +283,10 @@ class BlaPlayer(gobject.GObject):
         # for another track we'd potentially end up hitting the interpreter's
         # recursion limit in case lots of tracks turn out to be invalid.
         if not os.path.exists(self.__uri) or not os.path.isfile(self.__uri):
-            from blaplay.blagui import blaguiutils
+            from blaplay.blagui import blaguiutil
             uri = self.__uri
             self.stop()
-            blaguiutils.error_dialog(
+            blaguiutil.error_dialog(
                 "Playback error", "Resource \"%s\" unavailable." % uri)
             return
 

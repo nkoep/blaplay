@@ -291,7 +291,7 @@ class BlaFilesystemBrowser(BlaBrowser):
             if not os.path.isabs(directory):
                 directory = os.path.join(self._directory, directory)
             if not os.path.exists(directory):
-                blaguiutils.error_dialog(
+                blaguiutil.error_dialog(
                     "Could not find \"%s\"." % directory,
                     "Please check the spelling and try again.")
                 return False

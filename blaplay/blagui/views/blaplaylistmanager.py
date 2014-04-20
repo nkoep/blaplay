@@ -25,7 +25,7 @@ from blaplay.blacore import blaconst
 from .blaviewmanager import BlaViewManager
 from .blaplaylist import BlaPlaylist
 from . import blaplaylistutils
-from .. import blaguiutils
+from .. import blaguiutil
 
 
 class BlaPlaylistManager(BlaViewManager):
@@ -66,7 +66,7 @@ class BlaPlaylistManager(BlaViewManager):
             playlist.set_state_icons(stock_id)
 
     def _prompt_for_name(self, title, default=""):
-        diag = blaguiutils.BlaDialog(title=title)
+        diag = blaguiutil.BlaDialog(title=title)
         vbox = gtk.VBox(spacing=5)
         vbox.set_border_width(10)
         entry = gtk.Entry()
@@ -91,7 +91,7 @@ class BlaPlaylistManager(BlaViewManager):
                 #        weird assertion which doesn't seem to have
                 #        anything to do with this line, followed by a
                 #        segfault.
-                blaguiutils.error_dialog(
+                blaguiutil.error_dialog(
                     text="Invalid playlist name",
                     secondary_text="A playlist name must not consist "
                                     "exclusively of whitespace "
@@ -201,7 +201,7 @@ class BlaPlaylistManager(BlaViewManager):
         elif ext == "xspf":
             name, uris = blaplaylistutils.xspf_parse(path)
         else:
-            blaguiutils.error_dialog(
+            blaguiutil.error_dialog(
                 "Failed to open playlist \"%s\"" % path,
                 "Only M3U, PLS, and XSPF playlists are supported.")
             return

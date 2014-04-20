@@ -16,7 +16,7 @@
 
 import abc
 
-from .. import blaguiutils
+from .. import blaguiutil
 
 
 class BlaViewManager(object):
@@ -68,7 +68,7 @@ class BlaViewManager(object):
         """
 
         if view.locked():
-            blaguiutils.error_dialog(
+            blaguiutil.error_dialog(
                 "This tab is locked", "Unlock it first to remove it.")
             return False
         try:

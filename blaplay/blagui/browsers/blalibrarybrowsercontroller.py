@@ -123,7 +123,7 @@ class BlaLibraryBrowserController(object):
         action = self._config.getint("library", "middleclick.action")
         self._forward_playlist_action(action, name, uris)
 
-    # TODO: Move this to blaguiutils.
+    # TODO: Move this to blaguiutil.
     @staticmethod
     def _set_cursor(browser, cursor):
         if cursor is not None:

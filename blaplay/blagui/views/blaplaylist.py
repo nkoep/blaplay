@@ -26,7 +26,7 @@ from blaplay.blacore import blaconst
 from blaplay import blagui, blautil
 from .blaview import BlaView
 from . import blatracklist
-from .. import blaguiutils
+from .. import blaguiutil
 from blaplay.formats._identifiers import *
 
 
@@ -267,7 +267,7 @@ class BlaPlaylist(blatracklist.BlaTrackList):
 
     def _add_context_menu_options(self, menu):
         # New playlist from...
-        submenu = blaguiutils.BlaMenu()
+        submenu = blaguiutil.BlaMenu()
         items = [
             ("selection", blaconst.PLAYLIST_FROM_SELECTION),
             ("selected artist(s)", blaconst.PLAYLIST_FROM_ARTISTS),
@@ -284,7 +284,7 @@ class BlaPlaylist(blatracklist.BlaTrackList):
         multiple_playlists = len(playlists) > 1
 
         # Move to playlist
-        submenu = blaguiutils.BlaMenu()
+        submenu = blaguiutil.BlaMenu()
         for playlist in playlists:
             if playlist == self:
                 continue
@@ -294,7 +294,7 @@ class BlaPlaylist(blatracklist.BlaTrackList):
         m.set_sensitive(multiple_playlists)
 
         # Add to playlist
-        submenu = blaguiutils.BlaMenu()
+        submenu = blaguiutil.BlaMenu()
         for playlist in playlists:
             if playlist == self:
                 continue
@@ -374,7 +374,7 @@ class BlaPlaylist(blatracklist.BlaTrackList):
             # library browser has a weird effect in that the treeview will
             # initiate a DND operation of the row once the dialog is destroyed.
             # Handling the dialog with gobject.idle_add resolves the issue.
-            gobject.idle_add(blaguiutils.error_dialog, text, secondary_text)
+            gobject.idle_add(blaguiutil.error_dialog, text, secondary_text)
             return False
         return True
 

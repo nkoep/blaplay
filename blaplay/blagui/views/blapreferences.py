@@ -23,7 +23,7 @@ import blaplay
 player = blaplay.bla.player
 from blaplay.blacore import blaconst
 from ..blakeys import BlaKeys
-from .. import blaguiutils
+from .. import blaguiutil
 from .blaview import BlaView
 
 ROW_SPACINGS = 3
@@ -410,7 +410,7 @@ class _PlayerSettings(_Page):
         player.enable_equalizer(True)
 
     def _new_profile(self, button, combobox):
-        diag = blaguiutils.BlaDialog(parent=self.get_toplevel(),
+        diag = blaguiutil.BlaDialog(parent=self.get_toplevel(),
                                      title="New EQ profile")
         vbox = gtk.VBox(spacing=5)
         vbox.set_border_width(10)
@@ -429,7 +429,7 @@ class _PlayerSettings(_Page):
 
         if response == gtk.RESPONSE_OK and profile_name:
             if self._config.has_option("equalizer.profiles",  profile_name):
-                diag = blaguiutils.BlaDialog(
+                diag = blaguiutil.BlaDialog(
                     parent=self.get_toplevel(), title="Profile exists!",
                     buttons=(gtk.STOCK_NO, gtk.RESPONSE_NO,
                              gtk.STOCK_YES, gtk.RESPONSE_YES))
@@ -604,6 +604,6 @@ class BlaPreferences(BlaView):
             section = Section(page(config, library))
             vbox.pack_start(section)
 
-        self.add(blaguiutils.wrap_in_viewport(vbox))
+        self.add(blaguiutil.wrap_in_viewport(vbox))
         self.show_all()
 

@@ -19,7 +19,7 @@ import gtk
 import blaplay
 from blaplay.blacore import blaconst, blacfg, blaplayer
 from blaplay.blautil import blafm
-import blaguiutils
+import blaguiutil
 
 
 class BlaTray(gtk.StatusIcon):
@@ -42,7 +42,7 @@ class BlaTray(gtk.StatusIcon):
         self.connect("popup_menu", self.__tray_menu)
 
     def __tray_menu(self, icon, button, activation_time):
-        menu = blaguiutils.create_control_popup_menu()
+        menu = blaguiutil.create_control_popup_menu()
         menu.append(gtk.SeparatorMenuItem())
 
         # Add last.fm submenu.

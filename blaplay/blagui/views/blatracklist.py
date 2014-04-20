@@ -30,7 +30,7 @@ from blaplay.formats._identifiers import *
 from blaplay.blautil import blafm
 from .blaview import BlaView
 from ..blawindows import BlaScrolledWindow
-from .. import blaguiutils
+from .. import blaguiutil
 
 (COLUMN_INDEX, COLUMN_PLAYING, COLUMN_TRACK, COLUMN_ARTIST,
  COLUMN_TITLE, COLUMN_ALBUM, COLUMN_DURATION, COLUMN_ALBUM_ARTIST, COLUMN_YEAR,
@@ -143,7 +143,7 @@ class BlaTrackListItem(object):
     def uri(self):
         return self._track.uri
 
-class _BlaCellRenderer(blaguiutils.BlaCellRendererBase):
+class _BlaCellRenderer(blaguiutil.BlaCellRendererBase):
     """
     Custom cellrenderer class which will render an icon if the stock-id
     property is not None and the text property otherwise. This is used for the
@@ -462,7 +462,7 @@ _classes = (
 )
 COLUMNS = OrderedDict([(cls.ID, cls) for cls in _classes])
 
-class _BlaTrackListTreeView(blaguiutils.BlaTreeViewBase):
+class _BlaTrackListTreeView(blaguiutil.BlaTreeViewBase):
     __gsignals__ = {
         "column-layout-changed": blautil.signal(1),
         "sort-column": blautil.signal(2)
@@ -622,7 +622,7 @@ class BlaTrackList(BlaView):
         vbox.pack_start(self._filter_box, expand=False)
         vbox.pack_start(sw)
 
-        self.add(blaguiutils.wrap_in_viewport(vbox))
+        self.add(blaguiutil.wrap_in_viewport(vbox))
 
         # XXX: This will cause us trouble when restoring track lists.
         def on_map(*args):
@@ -846,7 +846,7 @@ class BlaTrackList(BlaView):
         accel_group = blagui.get_accelerator_group(self)
         clipboard_has_items = len(self._manager.clipboard) > 0
 
-        menu = blaguiutils.BlaMenu(event)
+        menu = blaguiutil.BlaMenu(event)
         try:
             path = treeview.get_path_at_pos(*map(int, [event.x, event.y]))[0]
         except TypeError:
@@ -881,7 +881,7 @@ class BlaTrackList(BlaView):
                 m.set_sensitive(sensitive)
             menu.append_separator()
 
-            submenu = blaguiutils.BlaMenu()
+            submenu = blaguiutil.BlaMenu()
             items = [
                 # TODO: Pull the blaconst.SELECT_* flags into this module.
                 ("all", blaconst.SELECT_ALL),

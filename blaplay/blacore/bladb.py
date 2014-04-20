@@ -32,7 +32,7 @@ import blaplay
 from blaplay.blacore import blaconst
 from blaplay import blautil, formats
 get_track = formats.get_track
-from blaplay.blagui import blaguiutils
+from blaplay.blagui import blaguiutil
 from blaplay.formats._identifiers import *
 
 EVENT_CREATED, EVENT_DELETED, EVENT_MOVED, EVENT_CHANGED = xrange(4)
@@ -635,7 +635,7 @@ class BlaLibrary(gobject.GObject):
         # FIXME: Get rid of `namespace'
         def cancel(namespace):
             namespace["wait"] = False
-        pb = blaguiutils.BlaProgressBar(title="Scanning files...")
+        pb = blaguiutil.BlaProgressBar(title="Scanning files...")
         pb.connect("destroy", lambda *x: cancel(namespace))
         namespace = {"uris": [], "wait": True, "done": False}
         p = process(namespace, uris, pb)

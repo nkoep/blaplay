@@ -21,7 +21,7 @@ import pango
 import blaplay
 player = blaplay.bla.player
 from blaplay.blacore import blacfg
-import blaguiutils
+import blaguiutil
 
 
 class BlaVisualization(gtk.Viewport):
@@ -66,7 +66,7 @@ class BlaVisualization(gtk.Viewport):
         try:
             from blaspectrum import BlaSpectrum
         except ImportError as exc:
-            blaguiutils.error_dialog(
+            blaguiutil.error_dialog(
                 "Failed to enable spectrum visualization", exc.message)
             self.__disable()
             return

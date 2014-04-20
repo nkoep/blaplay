@@ -25,7 +25,7 @@ from blaplay.formats._identifiers import *
 from blawindows import BlaBaseWindow
 from blatoolbar import BlaToolbar
 from . import browsers, blastatusbar
-from .blaguiutils import BlaViewport
+from .blaguiutil import BlaViewport
 from blavisualization import BlaVisualization
 from .views.blatabview import BlaTabView
 from blatray import BlaTray
@@ -201,8 +201,8 @@ class _BlaMainWindow(BlaBaseWindow):
         self._install_global_mouse_hook(player)
 
     def _hide_windows(self, yes):
-        from . import blaguiutils
-        blaguiutils.set_visible(not yes)
+        from . import blaguiutil
+        blaguiutil.set_visible(not yes)
         if yes:
             self.hide()
             self._tray.set_visible(True)
