@@ -20,7 +20,7 @@ import pango
 
 import blaplay
 from blaplay.blacore import blaconst, blacfg
-from blaplay import blautil
+from blaplay import blagui, blautil
 
 
 def _generic_dialog(text, secondary_text, **kwargs):
@@ -80,6 +80,7 @@ def create_control_popup_menu():
 
     return menu
 
+# XXX: Global state, get rid of it.
 def set_visible(state):
     from blawindows import BlaWindow
     if state:
@@ -87,6 +88,13 @@ def set_visible(state):
     else:
         f = gtk.Window.hide
     map(f, BlaWindow.instances)
+
+def wrap_in_viewport(widget):
+    viewport = gtk.Viewport()
+    viewport.set_shadow_type(gtk.SHADOW_NONE)
+    viewport.add(widget)
+    viewport.show_all()
+    return viewport
 
 
 # TODO: Call `set_default_response()' on these dialogs with a suitable response
@@ -259,4 +267,60 @@ class BlaTreeViewBase(gtk.TreeView):
             except TypeError:
                 return True
             self.set_cursor(path, column, 0)
+
+# TODO: Rename this to BlaMenu. We use it for submenus as well which aren't
+#       technically popup menus as we never explicitly call `show()' on them.
+class BlaPopupMenu(gtk.Menu):
+    def __init__(self, event=None):
+        super(BlaPopupMenu, self).__init__()
+        self._event = event
+
+    def run(self):
+        # Submenus don't get a reference to an event and therefore cannot be
+        # "ran" by themselves.
+        if self._event is None:
+            print_w("Menu has no event")
+            return
+        self.show_all()
+        self.popup(None, None, None, self._event.button, self._event.time)
+
+    def append_item(self, label, on_activate_callback=None, *user_data):
+        def callback_wrapper(_, *args):
+            return on_activate_callback(*args)
+        m = gtk.MenuItem(label)
+        if on_activate_callback is not None:
+            m.connect("activate", callback_wrapper, *user_data)
+        self.append(m)
+        return m
+
+    def append_item_with_accelerator(self, accel, *args, **kwargs):
+        m = self.append_item(*args, **kwargs)
+        # XXX: Where do we get the accelerator group from?
+        # accel_group = blagui.get_accelerator_group(self)
+        accel = None
+        if accel is not None:
+            mod, key = gtk.accelerator_parse(accel)
+            m.add_accelerator(
+                "activate", accel_group, mod, key, gtk.ACCEL_VISIBLE)
+        return m
+
+    def append_separator(self):
+        self.append(gtk.SeparatorMenuItem())
+
+    def append_submenu(self, label, submenu):
+        m = gtk.MenuItem(label)
+        m.set_submenu(submenu)
+        self.append(m)
+        return m
+
+    def is_last_item_separator(self):
+        menu_items = self.get_children()
+        if menu_items and isinstance(menu_items[-1], gtk.SeparatorMenuItem):
+            return True
+        return False
+
+class BlaViewport(gtk.Viewport):
+    def __init__(self, *args, **kwargs):
+        super(BlaViewport, self).__init__(*args, **kwargs)
+        self.set_shadow_type(gtk.SHADOW_NONE)
 

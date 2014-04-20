@@ -41,10 +41,10 @@ EVENT_CREATED, EVENT_DELETED, EVENT_MOVED, EVENT_CHANGED = xrange(4)
 pending_save = False
 
 library = None # XXX: Remove this
-def init(path, config):
+def init(config, path):
     print_i("Initializing the database")
     global library
-    library = BlaLibrary(path, config)
+    library = BlaLibrary(config, path)
     return library
 
 def update_library():
@@ -285,10 +285,10 @@ class BlaLibrary(gobject.GObject):
     __playlists = []
     __lock = blautil.BlaLock(strict=True)
 
-    def __init__(self, path, config):
+    def __init__(self, config, path):
         super(BlaLibrary, self).__init__()
-        self._path = path
         self._config = config
+        self._path = path
 
         self.__extension_filter = re.compile(
             r".*\.(%s)$" % "|".join(formats.formats.keys())).match

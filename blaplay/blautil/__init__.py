@@ -33,9 +33,8 @@ from threading import Thread, ThreadError, Lock
 import collections
 import time
 
-import gobject
 import gio
-import gtk
+import gobject
 
 
 def cdll(lib):
@@ -45,7 +44,7 @@ def cdll(lib):
     return ctypes.CDLL(soname)
 
 def thread_id():
-    # 186 == SYS_gettid
+    # From bits/syscall.h: 186 == SYS_gettid
     return cdll("c").syscall(186)
 
 def clamp(min_, max_, value):
@@ -79,7 +78,7 @@ def idle(func=None, **kwargs):
     # looks like the regular use case
     #   @idle
     #   def some_func...
-    # to us. Every other misuse should be handled properly though.
+    # to us. Most other misuses should be handled properly though.
 
     if len(kwargs) > 1:
         raise ValueError("Only one keyword argument allowed")
@@ -108,7 +107,7 @@ def lock(lock_):
         return wrapper
     return wrapper_
 
-def caches_return_value(f):
+def caches_return_value(func):
     """
     Caches the return value of the decorated function. Note that this does not
     support calling the decorated function with keyword arguments. For obvious
@@ -116,18 +115,19 @@ def caches_return_value(f):
     state and only accept immutable argument types.
     """
 
-    if inspect.getargspec(f).keywords is not None:
+    if inspect.getargspec(func).keywords is not None:
         raise ValueError(
             "Decorator does not support functions with keyword arguments")
 
     _cache = {}
-    @functools.wraps(f)
+
+    @functools.wraps(func)
     def wrapper(*args):
         key = args
         try:
             value = _cache[key]
         except KeyError:
-            value = _cache[key] = f(*args)
+            value = _cache[key] = func(*args)
         return value
     return wrapper
 
@@ -142,10 +142,16 @@ def resolve_uris(uris):
     # list so we don't mutate the iterable `uris' references when first calling
     # this function.
     uris = list(uris)
+    parse_url = urlparse.urlparse
+    url2pathname = urllib.url2pathname
+    abspath = os.path.abspath
     for idx, uri in enumerate(uris):
-        uri = urlparse.urlparse(uri).path
-        uri = os.path.abspath(urllib.url2pathname(uri))
-        uris[idx] = uri
+        parse_result = parse_url(uri)
+        # For relative URIs like file://some_file.mp3, the filename appears in
+        # the network location attribute.
+        uri = parse_result.path or parse_result.netloc
+        if uri:
+            uris[idx] = abspath(url2pathname(uri))
     return uris
 
 def filepaths2uris(paths):

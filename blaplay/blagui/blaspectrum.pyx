@@ -386,13 +386,13 @@ cdef class BlaSpectrum(object):
 
             # Draw the label: 0 dB takes up less space than -10 dB etc., hence
             # the distinction between i == 0 and every other case.
-            move_to(w - (21 if i == 0 else 29), y - 8)
-            layout.set_text("%d dB" % (i * (-10)))
-            cr.show_layout(layout)
+            # move_to(w - (21 if i == 0 else 29), y - 8)
+            # layout.set_text("%d dB" % (i * (-10)))
+            # cr.show_layout(layout)
 
             # Draw horizontal level indicator.
             move_to(4, y)
-            line_to(w - right_margin, y)
+            line_to(w - 4, y)
             stroke()
 
         # Draw the frequency bins.

@@ -20,7 +20,7 @@ from collections import OrderedDict
 
 import gtk
 
-VERSION = "0.1"
+VERSION = "0.1.0"
 APPNAME = "blaplay"
 COMMENT = "A bla that plays"
 WEB = "http://nkoep.github.com/blaplay"
@@ -68,32 +68,6 @@ EQUALIZER_BANDS = 10
 BORDER_PADDING = 3
 WIDGET_SPACING = gtk.HPaned().style_get_property("handle_size")
 
-# Main menu
-MENU = """
-<ui>
-  <menubar name="Menu">
-    <menu action="%s">
-      <menuitem action="AddNewPlaylist"/>
-      <menuitem action="OpenPlaylist"/>
-      <menuitem action="SavePlaylist"/>
-      <menuitem action="AddFiles"/>
-      <menuitem action="AddDirectories"/>
-      <separator/>
-      <menuitem action="LockUnlockView"/>
-      <menuitem action="CloseView"/>
-      <separator/>
-      <menuitem action="Search"/>
-      <menuitem action="JumpToPlayingTrack"/>
-      <separator/>
-      <menuitem action="Preferences"/>
-      <menuitem action="About"/>
-      <separator/>
-      <menuitem action="Quit"/>
-    </menu>
-  </menubar>
-</ui>
-""" % APPNAME
-
 # Library and browser constants
 (ORGANIZE_BY_DIRECTORY, ORGANIZE_BY_ARTIST, ORGANIZE_BY_ARTIST_ALBUM,
  ORGANIZE_BY_ALBUM, ORGANIZE_BY_GENRE, ORGANIZE_BY_YEAR) = range(6)
@@ -103,7 +77,9 @@ BROWSER_LIBRARY, BROWSER_FILESYSTEM = range(2)
  ACTION_EXPAND_COLLAPSE) = range(4)
 
 # View constants
-(VIEW_PLAYLISTS, VIEW_QUEUE, VIEW_RADIO, VIEW_VIDEO) = range(4)
+VIEW_PLAYLIST = 0
+(VIEW_PLAYLISTS, VIEW_QUEUE, VIEW_VIDEO, VIEW_TAG_EDITOR,
+ VIEW_PREFERENCES) = range(5)
 (SELECT_ALL, SELECT_COMPLEMENT, SELECT_BY_ARTISTS, SELECT_BY_ALBUMS,
  SELECT_BY_ALBUM_ARTISTS, SELECT_BY_GENRES) = range(6)
 

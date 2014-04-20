@@ -17,116 +17,106 @@
 import gtk
 import gobject
 
-import blaplay
-player = blaplay.bla.player
 from blaplay.blacore import blaconst, blacfg
 from blaplay import blautil, blagui
 
 from blaplay.formats._identifiers import *
 
 
+def create_statusbar(library, player, view_managers):
+    statusbar = BlaStatusbar()
+
+    library.connect("progress", statusbar.update_progress)
+    player.connect("state-changed", statusbar.update_track_info)
+
+    # Register the statusbar as observer for changes to the view.
+    view_managers[blaconst.VIEW_PLAYLIST].register_observer(statusbar)
+
+    return statusbar
+
+
+class _FileScannerBox(gtk.HBox):
+    def __init__(self):
+        super(_FileScannerBox, self).__init__(spacing=10)
+
+        self._progress_bar = gtk.ProgressBar()
+        label = gtk.Label("Scanning files:")
+        self.pack_start(label)
+        self.pack_start(self._progress_bar)
+
+        # Make sure the box is initially hidden.
+        def on_map(*args):
+            self.hide_box()
+            self.disconnect(cid)
+        cid = self.connect("map", on_map)
+
+    def show_box(self):
+        self.set_visible(True)
+
+    def hide_box(self):
+        self.set_visible(False)
+        self.set_text("")
+
+    def pulse(self):
+        self._progress_bar.pulse()
+
+    def set_fraction(self, fraction):
+        self._progress_bar.set_fraction(fraction)
+
+    def set_text(self, text):
+        self._progress_bar.set_text(text)
+
 class BlaStatusbar(gtk.Table):
-    __instance = None
+    _instance = None
 
-    __state = blaconst.STATE_STOPPED
-    __state_string = "Stopped"
-    __format = ""
-    __bitrate = ""
-    __sampling_rate = ""
-    __channel_mode = ""
-    __position = "0:00"
-    __duration_nanoseconds = 0
-    __duration = "0:00"
-
-    __padding = 5
-    __lock = blautil.BlaLock()
-    __tid = None
-
-    def __init__(self, library):
+    def __init__(self):
         super(BlaStatusbar, self).__init__(rows=1, columns=3, homogeneous=True)
-        type(self).__instance = self
+        type(self)._instance = self
 
-        self.__pb = gtk.ProgressBar()
-        self.__pb_label = gtk.Label("Scanning library:")
+        self._state = blaconst.STATE_STOPPED
+        self._state_string = "Stopped"
+        self._format = ""
+        self._bitrate = ""
+        self._sampling_rate = ""
+        self._channel_mode = ""
+        self._position = "0:00"
+        self._duration_nanoseconds = 0
+        self._duration = "0:00"
+        self._timeout_id = None
 
-        self.__track_info = gtk.Label(self.__state_string)
+        self._file_scanner_box = _FileScannerBox()
+        self._track_info = gtk.Label(self._state_string)
 
         hbox = gtk.HBox(spacing=10)
-        hbox.pack_start(self.__pb_label, expand=False)
-        hbox.pack_start(self.__pb, expand=False, fill=True)
-        hbox.pack_start(self.__track_info, expand=True)
+        hbox.pack_start(self._file_scanner_box)
+        hbox.pack_start(self._track_info)
 
-        self.__view_info = gtk.Label("")
+        self._view_info = gtk.Label("")
 
         # Playback order
-        self.__order = gtk.combo_box_new_text()
-        map(self.__order.append_text, blaconst.ORDER_LITERALS.keys())
-        self.__order.set_active(blacfg.getint("general", "play.order"))
+        self._order = gtk.combo_box_new_text()
+        map(self._order.append_text, blaconst.ORDER_LITERALS.keys())
+        self._order.set_active(blacfg.getint("general", "play.order"))
         def order_changed(cb):
             order = cb.get_active_text()
             blacfg.set_("general",
                         "play.order", blaconst.ORDER_LITERALS[order])
-        self.__order.connect("changed", order_changed)
+        self._order.connect("changed", order_changed)
 
-        table = gtk.Table(rows=1, columns=3)
+        table = gtk.Table(rows=1, columns=2)
 
         table.attach(gtk.Label("Order:"), 0, 1, 0, 1, xpadding=10)
-        table.attach(self.__order, 1, 2, 0, 1)
-        button = gtk.Button()
-        button.set_tooltip_text("Clear queue")
-        from blaqueue import queue
-        button.connect("clicked", lambda *x: queue.clear())
-        button.add(gtk.image_new_from_stock(gtk.STOCK_CLEAR,
-                                            gtk.ICON_SIZE_SMALL_TOOLBAR))
-        button.set_relief(gtk.RELIEF_NONE)
-        table.attach(button, 2, 3, 0, 1),
+        table.attach(self._order, 1, 2, 0, 1)
 
         count = 0
-        for widget, xalign in [(hbox, 0.0), (self.__view_info, 0.5),
+        for widget, xalign in [(hbox, 0.0), (self._view_info, 0.5),
                                (table, 1.0)]:
             alignment = gtk.Alignment(xalign, 0.5, 0.0, 0.5)
             alignment.add(widget)
             self.attach(alignment, count, count+1, 0, 1)
             count += 1
 
-        player.connect("state_changed", self.__changed)
-        library.connect("progress", self.update_progress)
-
-        self.show_all()
-        # TODO: group these two
-        self.__pb.set_visible(False)
-        self.__pb_label.set_visible(False)
-
-    def __changed(self, player):
-        self.__state = player.get_state()
-        self.__state_string = player.get_state_string()
-        if self.__state != blaconst.STATE_STOPPED:
-            track = player.get_track()
-            self.__format = track[FORMAT]
-            self.__bitrate = track.bitrate
-            self.__bitrate = ("%s avg." % self.__bitrate if self.__bitrate
-                              else "")
-            self.__sampling_rate = track.sampling_rate
-            self.__channel_mode = track[CHANNEL_MODE]
-            self.__duration_nanoseconds = track[LENGTH] * 1e9
-            self.__duration = self.__convert_time(self.__duration_nanoseconds)
-        self.__update_track_status()
-
-    def __update_track_status(self):
-        with self.__lock:
-            self.__track_info.set_text(self.__state_string)
-            if self.__state != blaconst.STATE_STOPPED:
-                status = [self.__state_string]
-                items = [self.__format, self.__bitrate, self.__sampling_rate,
-                         self.__channel_mode]
-                for value in filter(None, items):
-                    status.append(value)
-                if self.__duration_nanoseconds:
-                    status.append("%s/%s" % (self.__position, self.__duration))
-                status = " | ".join(status)
-                self.__track_info.set_text(status)
-
-    def __convert_time(self, value):
+    def _convert_time(self, value):
         s, ns = divmod(value, 1e9)
         m, s = divmod(s, 60)
 
@@ -135,55 +125,86 @@ class BlaStatusbar(gtk.Table):
         h, m = divmod(m, 60)
         return "%d:%02d:%02d" % (h, m, s)
 
-    @classmethod
-    def set_view_info(cls, view, string):
-        # TODO: get rid of the view argument
-        if view == blacfg.getint("general", "view"):
-            try:
-                cls.__instance.__view_info.set_text(string)
-            except AttributeError:
-                pass
-        return False
-
-    @classmethod
-    def update_position(cls, position):
-        if position > cls.__instance.__duration_nanoseconds:
-            cls.__instance.__position = cls.__instance.__duration
-        else:
-            cls.__instance.__position = cls.__instance.__convert_time(position)
-        cls.__instance.__update_track_status()
+    def _update_track_info_string(self):
+        self._track_info.set_text(self._state_string)
+        if self._state != blaconst.STATE_STOPPED:
+            status = [self._state_string]
+            items = [self._format, self._bitrate, self._sampling_rate,
+                     self._channel_mode]
+            for value in filter(None, items):
+                status.append(value)
+            if self._duration_nanoseconds:
+                status.append("%s/%s" % (self._position, self._duration))
+            status = " | ".join(status)
+            self._track_info.set_text(status)
 
     def update_progress(self, library, arg):
-        def pulse(pb):
-            pb.pulse()
+        def pulse():
+            self._file_scanner_box.pulse()
             return True
 
         if arg == "pulse":
-            self.__tid = gobject.timeout_add(40, pulse, self.__pb)
-            self.__track_info.set_visible(False)
-            self.__pb.set_visible(True)
-            self.__pb_label.set_visible(True)
-
+            self._timeout_id = gobject.timeout_add(40, pulse)
+            self._file_scanner_box.show_box()
         elif arg == "abort":
-            gobject.source_remove(self.__tid)
-            self.__track_info.set_visible(True)
-            self.__pb.set_visible(False)
-            self.__pb_label.set_visible(False)
-            self.__pb.set_text("")
-
-        elif self.__tid:
-            gobject.source_remove(self.__tid)
-            self.__tid = None
+            gobject.source_remove(self._timeout_id)
+            self._file_scanner_box.hide_box()
+        elif self._timeout_id:
+            gobject.source_remove(self._timeout_id)
+            self._timeout_id = None
 
         try:
-            self.__pb.set_fraction(arg)
-            self.__pb.set_text("%d %%" % (arg * 100))
+            self._file_scanner_box.set_fraction(arg)
+            self._file_scanner_box.set_text("%d %%" % (arg * 100))
         except TypeError:
             pass
 
         if arg == 1.0:
-            self.__track_info.set_visible(True)
-            self.__pb.set_visible(False)
-            self.__pb_label.set_visible(False)
-            self.__pb.set_text("")
+            self._file_scanner_box.hide_box()
+
+    def update_track_info(self, player):
+        self._state = player.get_state()
+        self._state_string = player.get_state_string()
+        if self._state != blaconst.STATE_STOPPED:
+            track = player.get_track()
+            self._format = track[FORMAT]
+            self._bitrate = track.bitrate
+            self._bitrate = ("%s avg." % self._bitrate if self._bitrate
+                             else "")
+            self._sampling_rate = track.sampling_rate
+            self._channel_mode = track[CHANNEL_MODE]
+            self._duration_nanoseconds = track[LENGTH] * 1e9
+            self._duration = self._convert_time(self._duration_nanoseconds)
+        self._update_track_info_string()
+
+    @classmethod
+    def update_position(cls, position):
+        if position > cls._instance._duration_nanoseconds:
+            cls._instance._position = cls._instance._duration
+        else:
+            cls._instance._position = cls._instance._convert_time(position)
+        cls._instance._update_track_info_string()
+
+    def set_status_message(self, msg):
+        self.set_view_info(0, msg)
+
+    # XXX: Get rid of this.
+    @classmethod
+    def set_view_info(cls, view, string):
+        if view == blacfg.getint("general", "view"):
+            try:
+                cls._instance._view_info.set_text(string)
+            except AttributeError:
+                pass
+        return False
+
+    def _set_status_message_from_view(self, view):
+        self.set_status_message(view.get_status_message())
+
+    def notify_status(self, view):
+        self._set_status_message_from_view(view)
+
+    def notify_focus(self, view):
+        # FIXME: This doesn't always fire when a view receives focus.
+        self._set_status_message_from_view(view)
 

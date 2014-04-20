@@ -19,215 +19,212 @@ import os
 import gobject
 import gtk
 
-import blaplay
-player = blaplay.bla.player
-from blaplay.blacore import blaconst, blacfg
-from blaplay import blautil, blagui
+from blaplay.blacore import blaconst
+from blaplay import blautil
 from blaplay.formats._identifiers import *
 from blawindows import BlaBaseWindow
 from blatoolbar import BlaToolbar
-from blabrowsers import BlaBrowsers
-from blaplaylist import playlist_manager
+from . import browsers, blastatusbar
+from .blaguiutils import BlaViewport
 from blavisualization import BlaVisualization
-from blaview import BlaView # XXX: We'll rename this in the future.
-from blasidepane import BlaSidePane
-from blastatusbar import BlaStatusbar
-from blapreferences import BlaPreferences
-from blaabout import BlaAbout
+from .views.blatabview import BlaTabView
 from blatray import BlaTray
-import blaguiutils
 
 
-class BlaMainWindow(BlaBaseWindow):
+def create_window(config, library, player):
+    # Create the tab view.
+    tab_view = BlaTabView()
+
+    # Create the view managers.
+    from . import views
+    view_managers = views.create_managers(config, library, player)
+
+    # Create the view delegate that abstracts interactions with the various
+    # view managers.
+    from .views.blaviewdelegate import BlaViewDelegate
+    view_delegate = BlaViewDelegate(tab_view, view_managers)
+
+    # Create the UI manager and register global accelerator actions.
+    from .blauimanager import BlaUIManager
+    ui_manager = BlaUIManager(view_delegate)
+
+    # Create the tab controller. Note that the controller is kept alive as a
+    # result of connecting some of its methods as callback functions. We don't
+    # need an explicit reference to it anywhere else.
+    from .views.blatabcontroller import BlaTabController
+    BlaTabController(tab_view, view_managers)
+
+    # Create the browser view.
+    browser_view = browsers.create_view(config, library, view_delegate)
+
+    # Create the statusbar.
+    statusbar = blastatusbar.create_statusbar(library, player, view_managers)
+
+    # Create the main window and inject the missing components.
+    window = _BlaMainWindow(config, player)
+    window.add_menubar(ui_manager.get_menubar())
+    window.add_browser_view(browser_view)
+    window.add_tab_view(tab_view)
+    window.add_statusbar(statusbar)
+    window.add_accel_group(ui_manager.get_accel_group())
+    window.show_all()
+
+    def on_library_updated(library):
+        window.update_title(player)
+    library.connect("library-updated", on_library_updated)
+    player.connect("state-changed", window.update_title)
+
+    return window
+
+
+class _BlaMainWindow(BlaBaseWindow):
     class StateManager(BlaBaseWindow.StateManager):
+        def __init__(self, config):
+            self._config = config
+
         def size(self, *args):
             if args:
                 (size,) = args
-                blacfg.set_("general", "size", "%d, %d" % size)
+                self._config.set_("general", "size", "%d, %d" % size)
             else:
-                return blacfg.getlistint("general", "size")
+                return self._config.getlistint("general", "size")
 
         def position(self, *args):
             if args:
                 (position,) = args
-                blacfg.set_("general", "position", "%d, %d" % position)
+                self._config.set_("general", "position", "%d, %d" % position)
             else:
-                return blacfg.getlistint("general", "position")
+                return self._config.getlistint("general", "position")
 
         def maximized(self, *args):
             if args:
                 (state,) = args
-                blacfg.setboolean("general", "maximized", state)
+                self._config.setboolean("general", "maximized", state)
             else:
-                return blacfg.getboolean("general", "maximized")
+                return self._config.getboolean("general", "maximized")
 
-    def __init__(self, ui_manager, library):
-        super(BlaMainWindow, self).__init__(
-            BlaMainWindow.StateManager(), gtk.WINDOW_TOPLEVEL)
-        self.connect("delete_event", self.__delete_event)
+    def _create_browser_container(self, browsers):
+        vbox = gtk.VBox(spacing=blaconst.WIDGET_SPACING)
+        vbox.pack_start(browsers)
+        vbox.pack_start(BlaVisualization(), expand=False)
+        return vbox
 
-        # Set up the fullscreen window.
-        self.__is_fullscreen = False
-        # TODO: Derive this from BlaBaseWindow.
-        self.__fullscreen_window = gtk.Window()
-        def map_(window):
+    def _create_lyrics_container(self):
+        from blaplay.blautil.blametadata import BlaFetcher as BlaMetadataFetcher
+        from blalyricsviewer import BlaLyricsViewer
+        from blatrackinfo import BlaTrackInfo
+
+        vbox = gtk.VBox(spacing=blaconst.WIDGET_SPACING)
+        metadata_fetcher = BlaMetadataFetcher()
+        vbox.pack_start(BlaLyricsViewer(metadata_fetcher))
+        vbox.pack_start(BlaTrackInfo(metadata_fetcher), expand=False)
+        return vbox
+
+    def _create_pane(self, widget1, widget2, key):
+        key = "pane.pos.%s" % key
+        pane = gtk.HPaned()
+        pane.pack1(widget1, shrink=False)
+        pane.pack2(widget2, resize=False, shrink=False)
+        try:
+            pane.set_position(self._config.getint("general", key))
+        except TypeError:
             pass
-        self.__fullscreen_window.connect("map", map_)
-        self.__fullscreen_window.set_modal(True)
-        self.__fullscreen_window.set_transient_for(self)
-        self.__fullscreen_window.connect_object(
-            "window_state_event", BlaMainWindow.__window_state_event, self)
-        def key_press_event(window, event):
-            if blagui.is_accel(event, "Escape"):
-                window.child.emit("toggle_fullscreen")
-            elif blagui.is_accel(event, "space"):
-                player.play_pause()
-            elif blagui.is_accel(event, "<Ctrl>Q"):
-                blaplay.shutdown()
-        self.__fullscreen_window.connect_object(
-            "key_press_event", key_press_event, self.__fullscreen_window)
-        # Realize the fullscreen window. If we don't do this here and reparent
-        # the drawingarea to it later that in turn will get unrealized again,
-        # causing bad X window errors.
-        self.__fullscreen_window.realize()
+        def on_notify_position(pane, propspec):
+            position = pane.get_property(propspec.name)
+            self._config.set_("general", key, str(position))
+        pane.connect("notify::position", on_notify_position)
+        return pane
 
-        # Install a global mouse hook. If connected callbacks don't consume the
-        # event by returning True this hook gets called for every widget in the
-        # hierarchy that re-emits the event. We therefore cache the event's
-        # timestamp to detect and ignore signal re-emissions.
-        def button_press_hook(receiver, event):
+    def _install_global_mouse_hook(self, player):
+        # If connected callbacks don't consume the event by returning True,
+        # this hook gets called for every connected handler. We therefore cache
+        # the event's timestamp to detect and ignore successive invocations.
+        def on_button_press_event_hook(receiver, event):
             event_time = event.get_time()
-            if event_time != self.__previous_event_time:
-                self.__previous_event_time = event_time
+            if event_time != self._last_event_time:
+                self._last_event_time = event_time
                 if event.button == 8:
                     player.previous()
                 elif event.button == 9:
                     player.next()
             # This behaves like gobject.{timeout,idle}_add: if the callback
-            # doesn't return True it's only called once. It does NOT prevent
-            # signal callbacks from executing.
+            # doesn't return True it's only called once.
             return True
-        self.__previous_event_time = -1
-        gobject.add_emission_hook(self, "button_press_event",
-                                  button_press_hook)
+        self._last_event_time = -1
+        gobject.add_emission_hook(
+            self, "button-press-event", on_button_press_event_hook)
 
-        # Main menu
-        self.add_accel_group(ui_manager.get_accel_group())
-        actions = [
-            # Menu root
-            (blaconst.APPNAME, None, "_%s" % blaconst.APPNAME),
+    def __init__(self, config, player):
+        super(_BlaMainWindow, self).__init__(
+            _BlaMainWindow.StateManager(config), gtk.WINDOW_TOPLEVEL)
 
-            # Menu items
-            ("OpenPlaylist", None, "Open playlist...", None, "",
-             self.__open_playlist),
-            ("SavePlaylist", None, "_Save playlist...", None, "",
-             self.__save_playlist),
-            ("AddFiles", None, "Add _files...", None, "",
-             lambda *x: self.__add_tracks()),
-            ("AddDirectories", None, "_Add directories...", None, "",
-             lambda *x: self.__add_tracks(files=False)),
-            ("Preferences", None, "Pre_ferences...", None, "",
-             lambda *x: BlaPreferences(library)),
-            ("About", None, "_About...", None, "", BlaAbout),
-            ("Quit", gtk.STOCK_QUIT, "_Quit", "<Ctrl>Q", "",
-             lambda *x: blaplay.shutdown())
-        ]
-        ui_manager.add_actions(actions)
+        self._config = config
 
-        # This is the topmost box that holds all the other components.
         self.add(gtk.VBox())
 
-        # Create instances of the main parts of the GUI.
-        toolbar = BlaToolbar()
-        browsers = BlaBrowsers(library)
-        self._visualization = BlaVisualization()
-        self._view = BlaView.create_view_manager(ui_manager)
-        statusbar = BlaStatusbar(library)
+        # Create placeholders for widgets we want to inject later.
+        self._tab_view_slot = BlaViewport()
+        self._browser_view_slot = BlaViewport()
+        self._menubar_slot = BlaViewport()
+        self._statusbar_slot = BlaViewport()
 
-        # Group the browsers and the visualization widget.
-        vbox = gtk.VBox(spacing=blaconst.WIDGET_SPACING)
-        vbox.pack_start(browsers)
-        vbox.pack_start(self._visualization, expand=False)
-        vbox.show()
-
-        pane_right = gtk.HPaned()
-        pane_right.pack1(self._view, shrink=False)
-        pane_right.pack2(BlaSidePane(), resize=False, shrink=False)
-        pane_right.show()
+        # Create the main view outlet and place it in a pane with the lyrics
+        # and track info side pane.
+        lyrics_container = self._create_lyrics_container()
+        pane_right = self._create_pane(
+            self._tab_view_slot, lyrics_container, "right")
 
         # Pack the browser + view-widget into a paned widget.
-        pane_left = gtk.HPaned()
-        pane_left.pack1(vbox, shrink=False)
-        pane_left.pack2(pane_right, shrink=False)
-        pane_left.show()
+        browser_container = self._create_browser_container(
+            self._browser_view_slot)
+        pane_left = self._create_pane(browser_container, pane_right, "left")
 
-        # Restore the pane positions.
-        def notify(pane, propspec, key):
-            blacfg.set_("general", key, str(pane.get_position()))
-        for pane, side in [(pane_left, "left"), (pane_right, "right")]:
-            key = "pane.pos.%s" % side
-            try:
-                pane.set_position(blacfg.getint("general", key))
-            except TypeError:
-                pass
-            pane.connect("notify", notify, key)
-
-        # Create a vbox for the pane and the statusbar. This allows for
-        # setting a border around those items which excludes the menubar and
-        # the toolbar.
+        # Create a vbox for the middle pane and the statusbar. This allows for
+        # using a border around those items which excludes the menubar and the
+        # toolbar.
         vbox = gtk.VBox(spacing=blaconst.BORDER_PADDING)
         vbox.set_border_width(blaconst.BORDER_PADDING)
         vbox.pack_start(pane_left)
-        vbox.pack_start(statusbar, expand=False)
-        vbox.show()
+        vbox.pack_start(self._statusbar_slot, expand=False)
 
         # Pack everything up together in the main window's vbox.
-        self.child.pack_start(ui_manager.get_widget("/Menu"), expand=False)
-        self.child.pack_start(toolbar, expand=False)
+        self.child.pack_start(self._menubar_slot, expand=False)
+        self.child.pack_start(BlaToolbar(), expand=False)
         self.child.pack_start(vbox)
-        self.child.show()
 
-        self.__tray = BlaTray()
+        # TODO: Move this out of this class.
+        self._tray = BlaTray()
 
-        def update_title(*args):
-            self.__update_title()
-        player.connect("state_changed", update_title)
-        library.connect("library_updated", update_title)
-        self.__update_title()
+        self.connect_object(
+            "delete-event", _BlaMainWindow._on_delete_event, self)
 
-    def set_fullscreen(self, da, parent):
-        # TODO: when minimizing to tray during fullscreen, reparent the da so
-        #       that when we call raise_window() again we won't be in
-        #       fullscreen anymore.
+        self._install_global_mouse_hook(player)
 
-        # When parent is None we want to go into fullscreen mode.
-        go_to_fullscreen = parent is None
-        if go_to_fullscreen:
-            self.__fullscreen_window.fullscreen()
-            da.reparent(self.__fullscreen_window)
-            self.__fullscreen_window.show_all()
+    def _hide_windows(self, yes):
+        from . import blaguiutils
+        blaguiutils.set_visible(not yes)
+        if yes:
+            self.hide()
+            self._tray.set_visible(True)
         else:
-            self.__fullscreen_window.unfullscreen()
-            da.reparent(parent)
-            self.__fullscreen_window.hide()
-        self.set_maximized(go_to_fullscreen)
+            self.raise_window()
+
+    def _on_delete_event(self, event):
+        if self._config.getboolean("general", "close.to.tray"):
+            self.toggle_hide()
+            return True
+        blaplay.shutdown()
+        return False
 
     def raise_window(self):
         self.present()
-        if not blacfg.getboolean("general", "always.show.tray"):
-            self.__tray.set_visible(False)
-        # XXX: This is SO ugly!!
-        self._visualization.flush_buffers()
+        if not self._config.getboolean("general", "always.show.tray"):
+            self._tray.set_visible(False)
 
     def toggle_hide(self):
-        self.__hide_windows(self.get_visible())
+        self._hide_windows(self.get_visible())
 
-    def destroy_(self, *args):
-        self.__tray.set_visible(False)
-        self.hide()
-        self.__fullscreen_window.hide()
-
-    def __update_title(self):
+    def update_title(self, player):
         track = player.get_track()
         state = player.get_state()
 
@@ -249,132 +246,21 @@ class BlaMainWindow(BlaBaseWindow):
             tooltip = title
 
         self.set_title(title)
-        self.__tray.set_tooltip(tooltip)
+        self._tray.set_tooltip(tooltip)
 
-    def __hide_windows(self, yes):
-        blaguiutils.set_visible(not yes)
-        if yes:
-            self.hide()
-            self.__tray.set_visible(True)
-        else:
-            self.raise_window()
+    def add_menubar(self, menubar):
+        assert self._menubar_slot.child is None
+        self._menubar_slot.add(menubar)
 
-    def __window_state_event(self, event):
-        self.__is_fullscreen = bool(
-            event.new_window_state & gtk.gdk.WINDOW_STATE_FULLSCREEN)
+    def add_browser_view(self, browser_view):
+        assert self._browser_view_slot.child is None
+        self._browser_view_slot.add(browser_view)
 
-    @property
-    def is_fullscreen(self):
-        return self.__is_fullscreen
+    def add_tab_view(self, tab_view):
+        assert self._tab_view_slot.child is None
+        self._tab_view_slot.add(tab_view)
 
-    def __delete_event(self, window, event):
-        if blacfg.getboolean("general", "close.to.tray"):
-            self.toggle_hide()
-            return True
-        blaplay.shutdown()
-        return False
-
-    def __set_file_chooser_directory(self, diag):
-        directory = blacfg.getstring("general", "filechooser.directory")
-        if not directory or not os.path.isdir:
-            directory = os.path.expanduser("~")
-        diag.set_current_folder(directory)
-
-    def __open_playlist(self, window):
-        diag = gtk.FileChooserDialog(
-            "Select playlist", buttons=(gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL,
-                                        gtk.STOCK_OPEN, gtk.RESPONSE_OK))
-        diag.set_local_only(True)
-        self.__set_file_chooser_directory(diag)
-
-        response = diag.run()
-        path = diag.get_filename()
-        diag.destroy()
-
-        if response == gtk.RESPONSE_OK and path:
-            path = path.strip()
-            if playlist_manager.open_playlist(path):
-                self._view.set_view(blaconst.VIEW_PLAYLISTS)
-                blacfg.set_("general", "filechooser.directory",
-                            os.path.dirname(path))
-
-    def __add_tracks(self, files=True):
-        if files:
-            action = gtk.FILE_CHOOSER_ACTION_OPEN
-        else:
-            action = gtk.FILE_CHOOSER_ACTION_SELECT_FOLDER
-        diag = gtk.FileChooserDialog(
-            "Select files", action=action,
-            buttons=(gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL, gtk.STOCK_OPEN,
-                     gtk.RESPONSE_OK))
-        diag.set_select_multiple(True)
-        diag.set_local_only(True)
-        self.__set_file_chooser_directory(diag)
-
-        response = diag.run()
-        filenames = diag.get_filenames()
-        diag.destroy()
-
-        if response == gtk.RESPONSE_OK and filenames:
-            filenames = map(str.strip, filenames)
-            playlist_manager.add_to_current_playlist(filenames, resolve=True)
-            blacfg.set_("general", "filechooser.directory",
-                        os.path.dirname(filenames[0]))
-
-    def __save_playlist(self, window):
-        diag = gtk.FileChooserDialog(
-            "Save playlist", action=gtk.FILE_CHOOSER_ACTION_SAVE,
-            buttons=(gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL, gtk.STOCK_SAVE,
-                     gtk.RESPONSE_OK))
-        diag.set_do_overwrite_confirmation(True)
-        self.__set_file_chooser_directory(diag)
-
-        items = [
-            ("M3U", "audio/x-mpegurl", "m3u"),
-            ("PlS", "audio/x-scpls", "pls", ),
-            ("XSPF", "application/xspf+xml", "xspf"),
-            ("Decide by extension", None, None)
-        ]
-        for label, mime_type, extension in items:
-            filt = gtk.FileFilter()
-            filt.set_name(label)
-            filt.add_pattern("*.%s" % extension)
-            if mime_type:
-                filt.add_mime_type(mime_type)
-            diag.add_filter(filt)
-
-        # Add combobox to the dialog to choose whether to save relative or
-        # absolute paths in the playlist.
-        box = diag.child
-        hbox = gtk.HBox()
-        cb = gtk.combo_box_new_text()
-        hbox.pack_end(cb, expand=False, fill=False)
-        box.pack_start(hbox, expand=False, fill=False)
-        box.show_all()
-        map(cb.append_text, ["Relative paths", "Absolute paths"])
-        cb.set_active(0)
-
-        def filter_changed(diag, filt):
-            filt = diag.get_filter()
-            if diag.list_filters().index(filt) == 2:
-                sensitive = False
-            else:
-                sensitive = True
-            cb.set_sensitive(sensitive)
-        diag.connect("notify::filter", filter_changed)
-
-        response = diag.run()
-        path = diag.get_filename()
-
-        if response == gtk.RESPONSE_OK and path:
-            filt = diag.get_filter()
-            type_ = items[diag.list_filters().index(filt)][-1]
-            path = path.strip()
-            if type_ is None:
-                type_ = blautil.get_extension(path)
-            playlist_manager.save(path, type_, cb.get_active() == 0)
-            blacfg.set_("general", "filechooser.directory",
-                        os.path.dirname(path))
-
-        diag.destroy()
+    def add_statusbar(self, statusbar):
+        assert self._statusbar_slot.child is None
+        self._statusbar_slot.add(statusbar)
 

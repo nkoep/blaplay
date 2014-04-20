@@ -48,7 +48,6 @@ class BlaCfg(RawConfigParser, gobject.GObject):
                 "close.to.tray": "yes",
                 "filesystem.directory": "",
                 "filechooser.directory": "",
-                "view": blaconst.VIEW_PLAYLISTS,
                 "browser.view": blaconst.BROWSER_LIBRARY,
                 "metadata.view": blaconst.METADATA_LYRICS,
                 "play.order": blaconst.ORDER_NORMAL,

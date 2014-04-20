@@ -176,7 +176,6 @@ class BlaPlayer(gobject.GObject):
                 from blaplay.blagui.blastatusbar import BlaStatusbar
             percentage = message.parse_buffering()
             s = "Buffering: %d %%" % percentage
-            BlaStatusbar.set_view_info(blaconst.VIEW_RADIO, s)
             if percentage == 0:
                 print_d("Start buffering...")
             elif percentage == 100:
@@ -184,8 +183,6 @@ class BlaPlayer(gobject.GObject):
                 self.__state = blaconst.STATE_PLAYING
                 self.emit("track_changed")
                 self.emit("state_changed")
-                gobject.timeout_add(
-                    2000, BlaStatusbar.set_view_info, blaconst.VIEW_RADIO, "")
                 print_d("Finished buffering")
         elif message.type == gst.MESSAGE_ERROR:
             self.stop()
@@ -306,10 +303,9 @@ class BlaPlayer(gobject.GObject):
             return "Paused"
         return "Stopped"
 
-    # TODO: remove the playlist argument
-    def play_track(self, playlist, uri):
-        # FIXME: it's weird to set the uri here and play the track afterwards.
-        #        maybe compose these two methods differently
+    def play_track(self, uri):
+        # FIXME: It's weird to set the uri here and play the track afterwards.
+        #        Maybe we should compose these two methods differently.
 
         if uri:
             self.__uri = uri
@@ -319,10 +315,7 @@ class BlaPlayer(gobject.GObject):
 
     def play(self):
         if not self.__uri:
-            if blacfg.getint("general", "view") == blaconst.VIEW_RADIO:
-                args = ("get_station", blaconst.TRACK_PLAY)
-            else:
-                args = ("get_track", blaconst.TRACK_PLAY, True)
+            args = ("get_track", blaconst.TRACK_PLAY, True)
             return self.emit(*args)
 
         # Check if the resource is available. If it's not it's best to stop
@@ -333,8 +326,8 @@ class BlaPlayer(gobject.GObject):
             from blaplay.blagui import blaguiutils
             uri = self.__uri
             self.stop()
-            blaguiutils.error_dialog("Playback error",
-                                     "Resource \"%s\" unavailable." % uri)
+            blaguiutils.error_dialog(
+                "Playback error", "Resource \"%s\" unavailable." % uri)
             return
 
         # If `update_track' returns None it means the track needed updating,

@@ -28,13 +28,20 @@ class TagParseError(Exception):
 def get_track(path):
     ext = blautil.get_extension(path).lower()
     try:
-        track = formats[ext](path)
-    except (KeyError, TagParseError):
-        track = None
+        format_cls = formats[ext]
+    except KeyError:
+        return None
+
+    track = None
+    try:
+        track = format_cls(path)
+    except TagParseError:
+        pass
+    except Exception as exc:
+        print_w(exc)
     return track
 
 def _is_py_file(s):
-    # TODO: move this to blautil since we also use it for visualizations
     return not (s.endswith("pyc") or s.startswith("_"))
 
 def _check_module_integrity(module, name):

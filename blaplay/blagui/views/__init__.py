@@ -1,4 +1,4 @@
-# blaplay, Copyright (C) 2012  Niklas Koep
+# blaplay, Copyright (C) 2012-2014  Niklas Koep
 
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -13,4 +13,16 @@
 # You should have received a copy of the GNU General Public License
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+
+from collections import OrderedDict
+
+from .blaplaylistmanager import BlaPlaylistManager
+from .blapreferencesmanager import BlaPreferencesManager
+
+
+def create_managers(config, library, player):
+    classes = [BlaPlaylistManager, BlaPreferencesManager]
+    managers = OrderedDict([(cls.ID, cls(config, library, player))
+                            for cls in classes])
+    return managers
 

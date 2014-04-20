@@ -14,19 +14,24 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-# import gtk
-#
-# from blaplay.blacore import blaconst
-# from blaplay.blautil.blametadata import BlaFetcher as BlaMetadataFetcher
-# from blalyricsviewer import BlaLyricsViewer
-# from blatrackinfo import BlaTrackInfo
-#
-#
-# class BlaSidePane(gtk.VBox):
-#     def __init__(self):
-#         super(BlaSidePane, self).__init__(spacing=blaconst.WIDGET_SPACING)
-#         metadata_fetcher = BlaMetadataFetcher()
-#         self.pack_start(BlaLyricsViewer(metadata_fetcher))
-#         self.pack_start(BlaTrackInfo(metadata_fetcher), expand=False)
-#         self.show_all()
-#
+import gtk
+
+from blaplay.blacore import blaconst
+from .blaviewmanager import BlaViewManager
+from .blapreferences import BlaPreferences
+
+
+class BlaPreferencesManager(BlaViewManager):
+    ID = blaconst.VIEW_PREFERENCES
+
+    def show_preferences(self):
+        if self.views == []:
+            self.views.append(
+                BlaPreferences(self._config, self._library, self))
+        preferences = self.views[0]
+        self._notify_add(preferences)
+        self._notify_focus(preferences)
+
+    def create_view(self):
+        self.show_preferences()
+

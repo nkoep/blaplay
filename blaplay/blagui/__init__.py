@@ -15,14 +15,12 @@
 # Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
 import gobject
-import pygtk
-pygtk.require("2.0")
 import gtk
 
 from blaplay.blacore import blaconst
 
 # DND constants
-DND_LIBRARY, DND_PLAYLIST, DND_URIS = xrange(3)
+DND_LIBRARY, DND_PLAYLIST, DND_URIS = range(3)
 DND_TARGETS = {
     DND_LIBRARY: ("tracks/library", gtk.TARGET_SAME_APP, DND_LIBRARY),
     DND_PLAYLIST: ("tracks/playlist", gtk.TARGET_SAME_APP, DND_PLAYLIST),
@@ -30,18 +28,22 @@ DND_TARGETS = {
 }
 
 
-def init(library):
-    from blamainwindow import BlaMainWindow
-
+def _gtk_init():
+    import pygtk
+    pygtk.require("2.0")
     gtk.icon_theme_get_default().append_search_path(blaconst.ICONS_PATH)
-    theme = gtk.icon_theme_get_default()
     gtk.window_set_default_icon_name(blaconst.APPNAME)
 
-    from blaplay.blagui.blauimanager import BlaUIManager
-    ui_manager = BlaUIManager()
+def init(config, library, player):
+    _gtk_init()
 
-    return BlaMainWindow(ui_manager, library)
+    # Create and populate the main window.
+    from . import blamainwindow
+    window = blamainwindow.create_window(config, library, player)
 
+    return window
+
+# TODO: Move these two functions to blaguiutils.
 def get_accelerator_group(widget):
     toplevel = widget.get_toplevel()
     accel_groups = gtk.accel_groups_from_object(toplevel)

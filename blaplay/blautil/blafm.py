@@ -51,6 +51,7 @@ def init(library):
 def quote_url(url):
     return urllib2.quote(url.encode("utf-8"), safe=":/?=+&")
 
+# TODO: Rename this to create_context_menu.
 def create_popup_menu(track=None):
     user = blacfg.getstring("lastfm", "user")
     if not user:

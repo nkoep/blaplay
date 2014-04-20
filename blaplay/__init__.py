@@ -24,16 +24,15 @@ from blaplay.blacore import blaconst
 from blaplay import blautil
 
 
-class Blaplay(gobject.GObject):
-    __metaclass__ = blautil.BlaSingletonMeta
-    __slots__ = ("_pre_shutdown_hooks", "library", "player", "window")
+class BlaplayState(gobject.GObject):
+    __slots__ = "_pre_shutdown_hooks config library player window".split()
 
     __gsignals__ = {
-        "startup_complete": blautil.signal(0)
+        "startup-complete": blautil.signal(0)
     }
 
     def __init__(self):
-        super(Blaplay, self).__init__()
+        super(BlaplayState, self).__init__()
         self.library = self.player = self.window = None
         self._pre_shutdown_hooks = []
 
@@ -43,13 +42,13 @@ class Blaplay(gobject.GObject):
         # make sure no one reassigns to one of the allowed fields here.
         if hasattr(self, attr) and getattr(self, attr) is not None:
             raise ValueError("Attribute '%s' already has a value" % attr)
-        return super(Blaplay, self).__setattr__(attr, value)
+        return super(BlaplayState, self).__setattr__(attr, value)
 
-    def main(self):
-        def map_event(window, event):
-            self.emit("startup_complete")
-            self.window.disconnect(cid)
-        cid = self.window.connect("map_event", map_event)
+    def run(self):
+        def on_map_event(window, event):
+            self.emit("startup-complete")
+            self.window.disconnect(callback_id)
+        callback_id = self.window.connect("map-event", on_map_event)
         gobject.idle_add(self.window.show)
         print_d("Entering the main loop")
         gtk.main()
@@ -76,7 +75,6 @@ class Blaplay(gobject.GObject):
         #        occasionally, these wake up to find their containing module's
         #        globals() dict wiped clean and start spitting out exceptions +
         #        segfaults.
-        from blaplay import blautil
         blautil.BlaThread.kill_threads()
 
         for hook in self._pre_shutdown_hooks:
@@ -91,41 +89,40 @@ class Blaplay(gobject.GObject):
         #       parent every other window to self.window?
         blaguiutils.set_visible(False)
 
-        # Get rid of the main window.
-        try:
-            self.window.destroy_()
-        except AttributeError:
-            pass
-
         from blaplay.blacore import blacfg
         blacfg.save()
 
         print_d("Stopping the main loop")
         gtk.main_quit()
 
-bla = Blaplay()
+# TODO: Rename to app_state and pass this along in place config, library,
+#       player, etc.
+bla = BlaplayState()
 
 
 def finish_startup():
     from blaplay.blacore import blacfg, bladb
 
     # Initialize the config.
+    # XXX config = blacfg.init(blaconst.CONFIG_PATH)
     blacfg.init()
+    config = bla.config = blacfg
 
     # Initialize the library.
-    library = bla.library = bladb.init(blaconst.LIBRARY_PATH, blacfg)
+    library = bla.library = bladb.init(config, blaconst.LIBRARY_PATH)
 
     # Create an instance of the playback device.
     from blaplay.blacore import blaplayer
-    bla.player = blaplayer.init(library)
+    player = bla.player = blaplayer.init(library)
 
     # Initialize the GUI.
     from blaplay import blagui
-    bla.window = blagui.init(library)
+    bla.window = blagui.init(config, library, player)
 
     from blaplay.blagui import blakeys
     blakeys.BlaKeys()
 
+    # TODO: Make python2-dbus a hard dependency.
     # Set up the D-Bus interface.
     try:
         from blaplay.blautil import bladbus
@@ -167,11 +164,11 @@ def finish_startup():
 
     # Set process name for programs like top or gnome-system-monitor.
     gobject.set_prgname(blaconst.APPNAME)
-    # 15 == PR_SET_NAME
+    # linux/prctl.h: 15 == PR_SET_NAME
     blautil.cdll("c").prctl(15, blaconst.APPNAME, 0, 0, 0)
 
     # Finally, start the main loop.
-    bla.main()
+    bla.run()
 
 def shutdown():
     bla.shutdown()
