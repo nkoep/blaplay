@@ -187,9 +187,6 @@ class BlaWindow(BlaBaseWindow):
     def do_close_accel(self):
         self.__clicked()
 
-class BlaUniqueWindow(BlaWindow):
-    __metaclass__ = blautil.BlaSingletonMeta
-
 class BlaScrolledWindow(gtk.ScrolledWindow):
     def __init__(self):
         super(BlaScrolledWindow, self).__init__()

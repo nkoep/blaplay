@@ -21,19 +21,17 @@ import pango
 import blaplay
 player = blaplay.bla.player
 from blaplay.blacore import blacfg
-from blaplay import blautil, blagui
 import blaguiutils
 
 
 class BlaVisualization(gtk.Viewport):
-    __metaclass__ = blautil.BlaSingletonMeta
-
-    __tid_draw = __tid_consume = -1
-    # TODO: Make this configurable in the preferences dialog.
-    __rate = 35 # frames per second
-
     def __init__(self):
         super(BlaVisualization, self).__init__()
+
+        self._draw_timeout_id = -1
+        self._consume_buffer_timeout_id = -1
+        # TODO: Make this configurable in the preferences dialog.
+        self._rate = 35 # frames per second
 
         self.__drawing_area = gtk.DrawingArea()
         self.add(self.__drawing_area)
@@ -85,11 +83,11 @@ class BlaVisualization(gtk.Viewport):
         def queue_draw():
             self.__drawing_area.queue_draw()
             return True
-        gobject.source_remove(self.__tid_draw)
-        self.__tid_draw = gobject.timeout_add(
-            int(1000 / self.__rate), queue_draw)
-        self.__tid_consume = gobject.timeout_add(
-            int(1000 / self.__rate), self.__spectrum.consume_buffer)
+        gobject.source_remove(self._draw_timeout_id)
+        self._draw_timeout_id = gobject.timeout_add(
+            int(1000 / self._rate), queue_draw)
+        self._consume_buffer_timeout_id = gobject.timeout_add(
+            int(1000 / self._rate), self.__spectrum.consume_buffer)
 
         blacfg.setboolean("general", "show.visualization", True)
 
@@ -98,7 +96,8 @@ class BlaVisualization(gtk.Viewport):
             player.disconnect(self.__cid)
         except AttributeError:
             pass
-        map(gobject.source_remove, [self.__tid_draw, self.__tid_consume])
+        map(gobject.source_remove,
+            (self._draw_timeout_id, self._consume_buffer_timeout_id))
         self.__spectrum = None
         self.__set_visible(False)
         blacfg.setboolean("general", "show.visualization", False)

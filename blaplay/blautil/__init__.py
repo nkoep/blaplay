@@ -477,23 +477,3 @@ class BlaFrozenDict(dict):
             raise ValueError("Entry for key '%s' already exists" % key)
         super(BlaFrozenDict, self).__setitem__(key, value)
 
-class BlaSingletonMeta(gobject.GObjectMeta):
-    __instances = {}
-
-    def __call__(cls, *args, **kwargs):
-        try:
-            instance = cls.__instances[cls]
-        except KeyError:
-            instance = cls.__instances[cls] = super(
-                BlaSingletonMeta, cls).__call__(*args, **kwargs)
-            def destroy(instance):
-                try:
-                    del cls.__instances[instance.__class__]
-                except KeyError:
-                    pass
-            try:
-                instance.connect("destroy", destroy)
-            except TypeError:
-                pass
-        return instance
-

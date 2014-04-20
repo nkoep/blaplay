@@ -34,8 +34,6 @@ import blaguiutils
 
 
 class BlaMetadataViewer(gtk.VBox):
-    __metaclass__ = blautil.BlaSingletonMeta
-
     __gsignals__= {
         "value_changed": blautil.signal(2)
     }
@@ -173,8 +171,6 @@ class BlaMetadataViewer(gtk.VBox):
             renderer.set_property("text", value)
 
 class BlaTagEditor(BlaMetadataViewer):
-    __metaclass__ = blautil.BlaSingletonMeta
-
     def __init__(self, playlist_manager):
         super(BlaTagEditor, self).__init__(is_editable=True,
                                            playlist_manager=playlist_manager)

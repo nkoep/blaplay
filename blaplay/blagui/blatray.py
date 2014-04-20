@@ -18,14 +18,11 @@ import gtk
 
 import blaplay
 from blaplay.blacore import blaconst, blacfg, blaplayer
-from blaplay import blautil
 from blaplay.blautil import blafm
 import blaguiutils
 
 
 class BlaTray(gtk.StatusIcon):
-    __metaclass__ = blautil.BlaSingletonMeta
-
     def __init__(self):
         # TODO: Add support for scroll-events.
 

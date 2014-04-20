@@ -23,16 +23,15 @@ from blaplay import blautil
 
 
 class BlaCfg(RawConfigParser, gobject.GObject):
-    __metaclass__ = blautil.BlaSingletonMeta
     __gsignals__ = {
         "changed": blautil.signal(2)
     }
 
-    __tid = -1
-
     def __init__(self):
         RawConfigParser.__init__(self)
         gobject.GObject.__init__(self)
+
+        self._timeout_id = -1
 
     def init(self):
         print_i("Loading config")
@@ -106,8 +105,8 @@ class BlaCfg(RawConfigParser, gobject.GObject):
             self.read("%s.bak" % blaconst.CFG_PATH)
 
         def schedule_save(*args):
-            gobject.source_remove(self.__tid)
-            self.__tid = gobject.timeout_add(15000, self.save)
+            gobject.source_remove(self._timeout_id)
+            self._timeout_id = gobject.timeout_add(15000, self.save)
         self.connect("changed", schedule_save)
 
     # getter

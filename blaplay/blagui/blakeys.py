@@ -23,12 +23,9 @@ except ImportError:
 import blaplay
 player = blaplay.bla.player
 from blaplay.blacore import blacfg
-from blaplay import blautil
 
 
 class BlaKeys(gobject.GObject):
-    __metaclass__ = blautil.BlaSingletonMeta
-
     __ACTIONS = {
         "playpause": lambda *x: player.play_pause(),
         "pause": lambda *x: player.pause(),
