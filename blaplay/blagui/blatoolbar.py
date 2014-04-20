@@ -30,14 +30,16 @@ CMD_PLAYPAUSE, CMD_STOP, CMD_PREVIOUS, CMD_NEXT, CMD_NEXT_RANDOM = xrange(5)
 
 
 class PositionSlider(gtk.HScale):
-    __seek_interval = 100
-    __scroll_delay = 10
-    __scrollid = None
-    __seeking = False
-    __changed = False
+    _SEEK_INTERVAL = 100
+    _SCROLL_DELAY = 10
 
     def __init__(self):
         super(PositionSlider, self).__init__()
+
+        self._scroll_timeout_id = 0
+        self.__seeking = False
+        self.__changed = False
+
         self.set_draw_value(False)
         self.set_sensitive(False)
 
@@ -49,22 +51,24 @@ class PositionSlider(gtk.HScale):
         player.connect("state_changed", self.__state_changed)
         player.connect("track_changed", self.__track_changed)
 
-        self.__seekid = gobject.timeout_add(
-            self.__seek_interval, self.__update_position)
+        self._seek_timeout_id = gobject.timeout_add(
+            self._SEEK_INTERVAL, self.__update_position)
 
     def __scroll_timeout(self):
         player.seek(self.get_value())
         self.__seeking = False
+        self._scroll_timeout_id = 0
         return False
 
     def __scroll(self, scale, event):
         if self.__seeking or player.get_state() == blaconst.STATE_STOPPED:
             return True
-        if self.__scrollid:
-            gobject.source_remove(self.__scrollid)
+        if self._scroll_timeout_id:
+            gobject.source_remove(self._scroll_timeout_id)
+            self._scroll_timeout_id = 0
         self.__seeking = True
-        self.__scrollid = gobject.timeout_add(
-            self.__scroll_delay, self.__scroll_timeout)
+        self._scroll_timeout_id = gobject.timeout_add(
+            self._SCROLL_DELAY, self.__scroll_timeout)
         return False
 
     def __value_changed(self, scale):
@@ -93,12 +97,13 @@ class PositionSlider(gtk.HScale):
             # proportional to the track length (in fact, it's the length of the
             # track in nanoseconds). The offset we should add to the position
             # (number of units the slider would move in one update step) can
-            # thus be calculated to 1e6 * __seek_interval.
-            player.seek(self.get_value() + 1e6 * self.__seek_interval)
+            # thus be calculated to 1e6 * _SEEK_INTERVAL.
+            player.seek(self.get_value() + 1e6 * self._SEEK_INTERVAL)
             self.__changed = False
 
     def __update_position(self):
         state = player.get_state()
+        # XXX: Simplify these conditions.
         if state == blaconst.STATE_STOPPED:
             self.set_value(0)
         elif (not state == blaconst.STATE_PAUSED and
@@ -120,13 +125,14 @@ class PositionSlider(gtk.HScale):
         # We need to remove the timer on track changes to make sure the slider
         # really resets properly.
         self.set_value(0)
-        gobject.source_remove(self.__seekid)
         track = player.get_track()
         duration = track[LENGTH] * 1e9
         self.set_range(0, max(1, duration))
         self.set_increments(-int(duration / 100.0), -int(duration / 10.0))
-        self.__seekid = gobject.timeout_add(
-            self.__seek_interval, self.__update_position)
+        if self._seek_timeout_id:
+            gobject.source_remove(self._seek_timeout_id)
+        self._seek_timeout_id = gobject.timeout_add(
+            self._SEEK_INTERVAL, self.__update_position)
 
 class VolumeControl(gtk.HBox):
     __states = ["muted", "low", "medium", "high"]

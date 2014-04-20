@@ -22,8 +22,8 @@ import pango
 
 import blaplay
 player = blaplay.bla.player
-from blaplay.blacore import blaconst
 from blaplay import blautil
+from blaplay.blacore import blaconst
 from blaplay.formats._identifiers import *
 from blawindows import BlaScrolledWindow
 
@@ -34,8 +34,8 @@ class BlaLyricsViewer(gtk.Notebook):
 
         self._metadata_fetcher = metadata_fetcher
         self._track = None
-        self._timestamp = -1
-        self._timeout_id = -1
+        self._timestamp = 0
+        self._timeout_id = 0
 
         sw = BlaScrolledWindow()
         sw.set_shadow_type(gtk.SHADOW_NONE)
@@ -93,7 +93,13 @@ class BlaLyricsViewer(gtk.Notebook):
         self._tb.delete(self._tb.get_start_iter(), self._tb.get_end_iter())
 
     def _on_player_state_changed(self, player):
-        gobject.source_remove(self._timeout_id)
+        def fetch_lyrics():
+            self._metadata_fetcher.fetch_lyrics(track, self._timestamp)
+            self._timeout_id = 0
+            return False
+
+        if self._timeout_id:
+            gobject.source_remove(self._timeout_id)
 
         track = player.get_track()
         if track == self._track:
@@ -107,7 +113,5 @@ class BlaLyricsViewer(gtk.Notebook):
             self._track = None
         else:
             self._track = track
-            self._timeout_id = gobject.timeout_add(
-                250, self._metadata_fetcher.fetch_lyrics, track,
-                self._timestamp)
+            self._timeout_id = gobject.timeout_add(250, fetch_lyrics)
 

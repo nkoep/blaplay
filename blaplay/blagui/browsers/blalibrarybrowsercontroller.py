@@ -35,7 +35,7 @@ class BlaLibraryBrowserController(object):
         self._library = library
         self._browser = browser
         self._view_delegate = view_delegate
-        self._callback_id = -1
+        self._timeout_id = 0
 
         self._config.connect_object(
             "changed", BlaLibraryBrowserController._on_config_changed, self)
@@ -74,17 +74,23 @@ class BlaLibraryBrowserController(object):
             self._update_browser_style()
 
     def _on_model_requested(self, browser, filter_string):
+        def source_remove():
+            if self._timeout_id:
+                gobject.source_remove(self._timeout_id)
+                self._timeout_id = 0
+
         print_d("Updating library browser...")
-        gobject.source_remove(self._callback_id)
         self._config.set_("library", "organize.by", browser.get_organize_by())
 
         model = BlaLibraryModel(self._config.getint("library", "organize.by"))
         def on_populated(model):
             browser.set_model(model)
+            source_remove()
             self._set_cursor(browser, None)
         model.connect("populated", on_populated)
         generator = model.populate(
             self._config, self._library, filter_string).next
+        source_remove()
         self._callback_id = gobject.idle_add(generator)
         self._set_cursor(browser, gtk.gdk.WATCH)
 

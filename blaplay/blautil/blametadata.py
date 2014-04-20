@@ -29,8 +29,8 @@ from HTMLParser import HTMLParser as HTMLParser_
 import gobject
 
 import blaplay
-from blaplay import blaconst
 from blaplay import blautil
+from blaplay.blacore import blaconst
 from blaplay.blautil import blafm
 from blaplay.formats._identifiers import *
 
@@ -124,7 +124,7 @@ class BlaFetcher(gobject.GObject):
         self.__json_parser = BlaFetcher.JSONParser()
         self.__html_parser = BlaFetcher.HTMLParser()
 
-        self._timeout_id = -1
+        self._timeout_id = 0
         self._lyrics_thread = None
         self._cover_thread = None
 
@@ -273,12 +273,14 @@ class BlaFetcher(gobject.GObject):
 
     @blautil.thread
     def __fetch_cover(self, track, timestamp):
-        def emit(cover):
-            gobject.source_remove(self._timeout_id)
+        def emit_timeout(cover):
             gobject.idle_add(self.emit, "cover", timestamp, cover)
+            self._timeout_id = 0
             return False
 
-        gobject.source_remove(self._timeout_id)
+        if self._timeout_id:
+            gobject.source_remove(self._timeout_id)
+            self._timeout_id = 0
         cover = None
 
         image_base = track.get_cover_basepath()
@@ -291,9 +293,11 @@ class BlaFetcher(gobject.GObject):
             cover = "%s.png" % image_base
 
         if cover is not None:
-            return emit(cover)
+            gobject.idle_add(self.emit, "cover", timestamp, cover)
+            return
 
-        self._timeout_id = gobject.timeout_add(2000, emit, blaconst.COVER)
+        self._timeout_id = gobject.timeout_add(
+            2000, emit_timeout, blaconst.COVER)
         cover = blafm.get_cover(track, image_base)
         if cover is None:
             base = os.path.dirname(track.uri)
@@ -316,25 +320,15 @@ class BlaFetcher(gobject.GObject):
                     shutil.copy(path, cover)
                     break
         if cover is not None:
-            emit(cover)
+            gobject.idle_add(self.emit, "cover", timestamp, cover)
 
     def fetch_cover(self, track, timestamp):
-        # This convenience method makes sure we keep a reference to the thread
-        # that retrieves the cover so we're able to kill it once the method is
-        # called again. Covers ought to be able to be fetched independently of
-        # the lyrics so we wrap the thread creation here.
-        try:
+        if self._cover_thread is not None:
             self._cover_thread.kill()
-        except AttributeError:
-            pass
         self._cover_thread = self.__fetch_cover(track, timestamp)
 
     def fetch_lyrics(self, track, timestamp):
-        for thread in [self._lyrics_thread, self._cover_thread]:
-            try:
-                thread.kill()
-            except AttributeError:
-                pass
-
+        if self._lyrics_thread is not None:
+            self._lyrics_thread.kill()
         self._lyrics_thread = self.__fetch_lyrics(track, timestamp)
 

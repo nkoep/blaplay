@@ -33,8 +33,8 @@ import gobject
 
 import blaplay
 player = blaplay.bla.player
-from blaplay.blacore import blacfg, blaconst
 from blaplay import blautil
+from blaplay.blacore import blacfg, blaconst
 from blaplay.formats._identifiers import *
 
 TIMEOUT = 5
@@ -354,7 +354,7 @@ class BlaScrobbler(object):
         self._library = library
 
         self._requested_authorization = False
-        self._timeout_id = -1
+        self._timeout_id = 0
         self._uri = None
         self._start_time = 0
         self._token = None
@@ -441,7 +441,10 @@ class BlaScrobbler(object):
 
         if state == blaconst.STATE_PLAYING:
             self._time_elapsed += 1
-        return state != blaconst.STATE_STOPPED
+        should_call_again = state != blaconst.STATE_STOPPED
+        if not should_call_again:
+            self._timeout_id = 0
+        return should_call_again
 
     def __submit_last_track(self, shutdown=False):
         if self._uri:
@@ -513,7 +516,9 @@ class BlaScrobbler(object):
         if (not blacfg.getstring("lastfm", "user") or
             not self.get_session_key(create=True)):
             return
-        gobject.source_remove(self._timeout_id)
+        if self._timeout_id:
+            gobject.source_remove(self._timeout_id)
+            self._timeout_id = 0
 
         # We request track submission on track changes. We don't have to check
         # here if a track passes the ignore settings as this is done when the

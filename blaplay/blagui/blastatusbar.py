@@ -18,7 +18,7 @@ import gtk
 import gobject
 
 from blaplay.blacore import blaconst, blacfg
-from blaplay import blautil, blagui
+from blaplay import blagui
 
 from blaplay.formats._identifiers import *
 
@@ -82,7 +82,7 @@ class BlaStatusbar(gtk.Table):
         self._position = "0:00"
         self._duration_nanoseconds = 0
         self._duration = "0:00"
-        self._timeout_id = None
+        self._timeout_id = 0
 
         self._file_scanner_box = _FileScannerBox()
         self._track_info = gtk.Label(self._state_string)
@@ -142,16 +142,19 @@ class BlaStatusbar(gtk.Table):
         def pulse():
             self._file_scanner_box.pulse()
             return True
+        def source_remove():
+            if self._timeout_id:
+                gobject.source_remove(self._timeout_id)
+                self._timeout_id = 0
 
         if arg == "pulse":
             self._timeout_id = gobject.timeout_add(40, pulse)
             self._file_scanner_box.show_box()
         elif arg == "abort":
-            gobject.source_remove(self._timeout_id)
+            source_remove()
             self._file_scanner_box.hide_box()
         elif self._timeout_id:
-            gobject.source_remove(self._timeout_id)
-            self._timeout_id = None
+            source_remove()
 
         try:
             self._file_scanner_box.set_fraction(arg)

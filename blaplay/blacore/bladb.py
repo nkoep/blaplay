@@ -61,15 +61,18 @@ class BlaLibraryMonitor(gobject.GObject):
         "initialized": blautil.signal(1)
     }
 
-    __monitors = {}
-    __lock = blautil.BlaLock()
-    __queue = Queue.Queue()
-    __processing = False
     ignore = set()
 
     def __init__(self, config):
         super(BlaLibraryMonitor, self).__init__()
         self._config = config
+
+        self.__monitors = {}
+        self.__lock = blautil.BlaLock()
+        self.__queue = Queue.Queue()
+        self.__processing = False
+        self._timeout_id = 0
+
         self.__process_events()
 
     def __queue_event(self, monitor, path_from, path_to, type_):
@@ -104,16 +107,16 @@ class BlaLibraryMonitor(gobject.GObject):
             EVENT_MOVED: "EVENT_MOVED"
         }
 
-        timeout_id = -1
-
         while True:
             event, path_from, path_to = self.__queue.get()
             print_d("New event of type `%s' for file %s (%r)" %
                     (EVENTS[event], path_from, path_to))
 
-            # TODO: Rename this.
+            # TODO: Rename `update' to something more meaningful.
             update = True
-            gobject.source_remove(timeout_id)
+            if self._timeout_id:
+                gobject.source_remove(self._timeout_id)
+                self._timeout_id = 0
 
             if event == EVENT_CREATED:
                 if path_from in BlaLibraryMonitor.ignore:
@@ -147,12 +150,12 @@ class BlaLibraryMonitor(gobject.GObject):
                 # minimum we use str.startswith to see if we should remove a
                 # track. We then check if the strings have the same length as
                 # this indicates an exact match so we can stop iterating.
-                l = len(path_from)
+                len_ = len(path_from)
                 try:
                     # iterating over a BlaLibrary instance uses a generator so
                     # we have to make a list of tracks to remove first
                     for uri in library:
-                        if uri.startswith(path_from) and uri[l] == "/":
+                        if uri.startswith(path_from) and uri[len_] == "/":
                             library.remove_track(uri)
                 except IndexError:
                     # IndexError will only be raised for exact matches, meaning
@@ -190,7 +193,14 @@ class BlaLibraryMonitor(gobject.GObject):
             if update:
                 global pending_save
                 pending_save = True
-                timeout_id = gobject.timeout_add(3000, update_library)
+                # XXX: The timeout has to be handled elsewhere.
+                self._timeout_id = gobject.timeout_add(
+                    3000, self._update_library)
+
+    def _update_library(self):
+        self._timeout_id = 0
+        update_library()
+        return False
 
     def __get_subdirectories(self, directories):
         # The heavy lifting here is actually just getting a list of all the
@@ -277,30 +287,28 @@ class BlaLibrary(gobject.GObject):
         "library_updated": blautil.signal(0)
     }
 
-    __monitored_directories = []
-    __scan_queue = []
-    __currently_scanning = None
-    __tracks = {}
-    __tracks_ool = {}
-    __playlists = []
-    __lock = blautil.BlaLock(strict=True)
-
     def __init__(self, config, path):
         super(BlaLibrary, self).__init__()
         self._config = config
         self._path = path
 
+        self.__monitored_directories = []
+        self.__scan_queue = []
+        self.__currently_scanning = None
+        self.__tracks = {}
+        self.__tracks_ool = {}
+        self.__playlists = []
+        self.__lock = blautil.BlaLock(strict=True)
+        self._timeout_id = 0
         self.__extension_filter = re.compile(
             r".*\.(%s)$" % "|".join(formats.formats.keys())).match
 
         def config_changed(cfg, section, key):
             if (section == "library" and
                 (key == "restrict.to" or key == "exclude")):
-                try:
-                    gobject.source_remove(self.__sync_timeout_id)
-                except AttributeError:
-                    pass
-                self.__sync_timeout_id = gobject.timeout_add(2500, self.sync)
+                if self._timeout_id:
+                    gobject.source_remove(self._timeout_id)
+                self._timeout_id = gobject.timeout_add(2500, self.sync)
         self._config.connect("changed", config_changed)
 
         # Restore the library.
@@ -552,6 +560,7 @@ class BlaLibrary(gobject.GObject):
             os.path.realpath,
             self._config.getdotliststr("library", "directories"))
         self.emit("library_updated")
+        self._timeout_id = 0
         return False
 
     def save_ool_tracks(self, uris):

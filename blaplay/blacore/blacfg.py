@@ -31,7 +31,7 @@ class BlaCfg(RawConfigParser, gobject.GObject):
         RawConfigParser.__init__(self)
         gobject.GObject.__init__(self)
 
-        self._timeout_id = -1
+        self._timeout_id = 0
 
     def init(self):
         print_i("Loading config")
@@ -105,7 +105,9 @@ class BlaCfg(RawConfigParser, gobject.GObject):
             self.read("%s.bak" % blaconst.CFG_PATH)
 
         def schedule_save(*args):
-            gobject.source_remove(self._timeout_id)
+            if self._timeout_id:
+                gobject.source_remove(self._timeout_id)
+                self._timeout_id = 0
             self._timeout_id = gobject.timeout_add(15000, self.save)
         self.connect("changed", schedule_save)
 
@@ -210,6 +212,7 @@ class BlaCfg(RawConfigParser, gobject.GObject):
             except OSError:
                 pass
 
+        self._timeout_id = 0
         return False
 
     def delete_option(self, section, key):

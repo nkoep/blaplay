@@ -28,8 +28,8 @@ class BlaVisualization(gtk.Viewport):
     def __init__(self):
         super(BlaVisualization, self).__init__()
 
-        self._draw_timeout_id = -1
-        self._consume_buffer_timeout_id = -1
+        self._draw_timeout_id = 0
+        self._consume_buffer_timeout_id = 0
         # TODO: Make this configurable in the preferences dialog.
         self._rate = 35 # frames per second
 
@@ -83,7 +83,6 @@ class BlaVisualization(gtk.Viewport):
         def queue_draw():
             self.__drawing_area.queue_draw()
             return True
-        gobject.source_remove(self._draw_timeout_id)
         self._draw_timeout_id = gobject.timeout_add(
             int(1000 / self._rate), queue_draw)
         self._consume_buffer_timeout_id = gobject.timeout_add(
@@ -96,8 +95,14 @@ class BlaVisualization(gtk.Viewport):
             player.disconnect(self._callback_id)
         except AttributeError:
             pass
-        map(gobject.source_remove,
-            (self._draw_timeout_id, self._consume_buffer_timeout_id))
+
+        if self._draw_timeout_id:
+            gobject.source_remove(self._draw_timeout_id)
+            self._draw_timeout_id = 0
+        if self._consume_buffer_timeout_id:
+            gobject.source_remove(self._consume_buffer_timeout_id)
+            self._consume_buffer_timeout_id = 0
+
         self.__spectrum = None
         self.__set_visible(False)
         blacfg.setboolean("general", "show.visualization", False)

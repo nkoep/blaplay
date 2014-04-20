@@ -25,8 +25,8 @@ import pango
 
 import blaplay
 player = blaplay.bla.player
-from blaplay.blacore import blaconst
 from blaplay import blautil
+from blaplay.blacore import blaconst
 from blaplay.formats._identifiers import *
 
 COVER_SIZE = 75 # Width and height
@@ -43,9 +43,9 @@ class _CoverDisplay(gtk.DrawingArea):
         self._alpha = 1.0
         self._cover_pixbuf = None
         self._border_color = gtk.gdk.color_parse("#808080")
-        self._timestamp = -1
-        self._fetch_timeout_id = -1
-        self._draw_timeout_id = -1
+        self._timestamp = 0
+        self._fetch_timeout_id = 0
+        self._draw_timeout_id = 0
 
         metadata_fetcher.connect_object(
             "cover", _CoverDisplay._display_cover, self)
@@ -114,6 +114,7 @@ class _CoverDisplay(gtk.DrawingArea):
             if self._alpha < 1.0:
                 self.queue_draw()
                 return True
+            self._draw_timeout_id = 0
             return False
 
         if timestamp != self._timestamp or cover == self._cover:
@@ -122,7 +123,8 @@ class _CoverDisplay(gtk.DrawingArea):
         self._cover = cover
         self._cover_pixbuf = self._prepare_cover(cover)
         self._alpha = 0.0
-        gobject.source_remove(self._draw_timeout_id)
+        if self._draw_timeout_id:
+            gobject.source_remove(self._draw_timeout_id)
         # Use 25 ms intervals for an update rate of 40 fps.
         self._draw_timeout_id = gobject.timeout_add(25, crossfade)
 
@@ -140,13 +142,16 @@ class _CoverDisplay(gtk.DrawingArea):
         return pb.scale_simple(height, height, gtk.gdk.INTERP_HYPER)
 
     def update_cover(self, track):
+        def fetch_cover():
+            self._metadata_fetcher.fetch_cover(track, self._update_timestamp())
+            self._fetch_timeout_id = 0
+
         if track is None:
             self._display_cover(self._update_timestamp(), blaconst.COVER)
         else:
-            gobject.source_remove(self._fetch_timeout_id)
-            self._fetch_timeout_id = gobject.timeout_add(
-                250, self._metadata_fetcher.fetch_cover, track,
-                self._update_timestamp())
+            if self._fetch_timeout_id:
+                gobject.source_remove(self._fetch_timeout_id)
+            self._fetch_timeout_id = gobject.timeout_add( 250, fetch_cover)
 
 class BlaTrackInfo(gtk.Viewport):
     def __init__(self, metadata_fetcher):
