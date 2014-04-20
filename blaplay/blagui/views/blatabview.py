@@ -44,24 +44,20 @@ class BlaTabView(gtk.Notebook):
 
         self.show_all()
 
-    def _find_view_at(self, x_root, y_root):
+    def _find_view_at(self, x_ev, y_ev):
         for view in self:
             label = self.get_tab_label(view)
-            x0, y0 = self.window.get_origin()
             x, y, w, h = label.get_allocation()
-            xp = self.get_property("tab_hborder")
-            yp = self.get_property("tab_vborder")
-            x_min = x0 + x - 2 * xp
-            x_max = x0 + x + w + 2 * xp
-            y_min = y0 + y - 2 * yp
-            y_max = y0 + y + h + 2 * yp
-            if (x_root >= x_min and x_root <= x_max and
-                y_root >= y_min and y_root <= y_max):
+            xp = self.get_property("tab-hborder")
+            yp = self.get_property("tab-vborder")
+            if (x_ev >= x-xp and x_ev <= x+w+xp and
+                y_ev >= y-yp and y_ev <= y+h+yp):
                 return view
         return None
 
     def _on_button_press_event(self, event):
-        view = self._find_view_at(event.x_root, event.y_root)
+        x, y = event.window.get_position()
+        view = self._find_view_at(x+event.x, y+event.y)
         if view is not None:
             if event.button == 2 and event.type == gtk.gdk.BUTTON_PRESS:
                 self.emit("remove-view-request", view)
