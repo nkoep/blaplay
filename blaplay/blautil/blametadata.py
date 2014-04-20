@@ -67,9 +67,6 @@ class BlaFetcher(gobject.GObject):
         "lyrics": blautil.signal(2)
     }
 
-    __tid = -1
-    __thread_lyrics = __thread_cover = None
-
     class JSONParser(object):
         def feed(self, feed, **kwargs):
             s = json.loads(feed)
@@ -126,6 +123,10 @@ class BlaFetcher(gobject.GObject):
         super(BlaFetcher, self).__init__()
         self.__json_parser = BlaFetcher.JSONParser()
         self.__html_parser = BlaFetcher.HTMLParser()
+
+        self._timeout_id = -1
+        self._lyrics_thread = None
+        self._cover_thread = None
 
     def __download_feed(self, baseurl, separator, erase, replace, safe, artist,
                         title):
@@ -273,11 +274,11 @@ class BlaFetcher(gobject.GObject):
     @blautil.thread
     def __fetch_cover(self, track, timestamp):
         def emit(cover):
-            gobject.source_remove(self.__tid)
+            gobject.source_remove(self._timeout_id)
             gobject.idle_add(self.emit, "cover", timestamp, cover)
             return False
 
-        gobject.source_remove(self.__tid)
+        gobject.source_remove(self._timeout_id)
         cover = None
 
         image_base = track.get_cover_basepath()
@@ -292,7 +293,7 @@ class BlaFetcher(gobject.GObject):
         if cover is not None:
             return emit(cover)
 
-        self.__tid = gobject.timeout_add(2000, emit, blaconst.COVER)
+        self._timeout_id = gobject.timeout_add(2000, emit, blaconst.COVER)
         cover = blafm.get_cover(track, image_base)
         if cover is None:
             base = os.path.dirname(track.uri)
@@ -323,17 +324,17 @@ class BlaFetcher(gobject.GObject):
         # called again. Covers ought to be able to be fetched independently of
         # the lyrics so we wrap the thread creation here.
         try:
-            self.__thread_cover.kill()
+            self._cover_thread.kill()
         except AttributeError:
             pass
-        self.__thread_cover = self.__fetch_cover(track, timestamp)
+        self._cover_thread = self.__fetch_cover(track, timestamp)
 
     def fetch_lyrics(self, track, timestamp):
-        for thread in [self.__thread_lyrics, self.__thread_cover]:
+        for thread in [self._lyrics_thread, self._cover_thread]:
             try:
                 thread.kill()
             except AttributeError:
                 pass
 
-        self.__thread_lyrics = self.__fetch_lyrics(track, timestamp)
+        self._lyrics_thread = self.__fetch_lyrics(track, timestamp)
 

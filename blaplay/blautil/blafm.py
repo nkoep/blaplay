@@ -272,14 +272,6 @@ class ResponseError(Response):
         return str(self.content)
 
 class BlaScrobbler(object):
-    __requested_authorization = False
-    __tid = -1
-    __uri = None
-    __start_time = 0
-    __token = None
-    __elapsed = 0
-    __iterations = 0
-
     class SubmissionQueue(Queue.Queue):
         def __init__(self, library):
             Queue.Queue.__init__(self)
@@ -360,6 +352,15 @@ class BlaScrobbler(object):
     def __init__(self, library):
         super(BlaScrobbler, self).__init__()
         self._library = library
+
+        self._requested_authorization = False
+        self._timeout_id = -1
+        self._uri = None
+        self._start_time = 0
+        self._token = None
+        self._time_elapsed = 0
+        self._iterations = 0
+
         self.__queue = BlaScrobbler.SubmissionQueue(library)
         def pre_shutdown_hook():
             self.__submit_last_track(True)
@@ -375,7 +376,7 @@ class BlaScrobbler(object):
         if response == gtk.RESPONSE_YES:
             blautil.open_url(
                 "http://www.last.fm/api/auth/?api_key=%s&token=%s" % (
-                blaconst.LASTFM_APIKEY, cls.__token))
+                blaconst.LASTFM_APIKEY, cls._token))
         return False
 
     def __passes_ignore(self, track):
@@ -395,7 +396,7 @@ class BlaScrobbler(object):
     @blautil.thread
     def __update_now_playing(self):
         try:
-            track = self._library[self.__uri]
+            track = self._library[self._uri]
         except KeyError:
             return
         if (not track[ARTIST] or not track[TITLE] or track[LENGTH] < 30 or
@@ -427,25 +428,25 @@ class BlaScrobbler(object):
 
     def __query_status(self):
         state = player.get_state()
-        self.__iterations += 1
+        self._iterations += 1
         # Wait 10~ seconds in between POSTs. Before actually posting an update
         # kill any remaining thread that still might be running.
-        if self.__iterations % 10 == 0:
+        if self._iterations % 10 == 0:
             try:
                 self.__t.kill()
             except AttributeError:
                 pass
             self.__t = self.__update_now_playing()
-            self.__iterations = 0
+            self._iterations = 0
 
         if state == blaconst.STATE_PLAYING:
-            self.__elapsed += 1
+            self._time_elapsed += 1
         return state != blaconst.STATE_STOPPED
 
     def __submit_last_track(self, shutdown=False):
-        if self.__uri:
+        if self._uri:
             try:
-                track = self._library[self.__uri]
+                track = self._library[self._uri]
             except KeyError:
                 return
             # According to the last.fm API docs, only tracks longer than 30
@@ -455,11 +456,11 @@ class BlaScrobbler(object):
             # in paused states).
             if (track[LENGTH] > 30 and track[ARTIST] and track[TITLE] and
                 blacfg.getboolean("lastfm", "scrobble") and
-                (self.__elapsed > track[LENGTH] / 2 or self.__elapsed > 240)):
+                (self._time_elapsed > track[LENGTH] / 2 or self._time_elapsed > 240)):
                 print_d("Submitting track to scrobbler queue")
-                self.__queue.put_nowait((self.__uri, self.__start_time))
+                self.__queue.put_nowait((self._uri, self._start_time))
 
-        self.__uri = None
+        self._uri = None
         if shutdown:
             print_i("Saving scrobbler queue")
             self.__queue.save()
@@ -469,12 +470,12 @@ class BlaScrobbler(object):
         session_key = blacfg.getstring("lastfm", "sessionkey")
         if session_key:
             return session_key
-        if not create or cls.__requested_authorization:
+        if not create or cls._requested_authorization:
             return None
 
-        if not cls.__token:
-            cls.__token = get_request_token()
-            if not cls.__token:
+        if not cls._token:
+            cls._token = get_request_token()
+            if not cls._token:
                 return None
             cls.__request_authorization()
             return None
@@ -493,7 +494,7 @@ class BlaScrobbler(object):
         method = "auth.getSession"
         params = [
             ("method", method), ("api_key", blaconst.LASTFM_APIKEY),
-            ("token", cls.__token)
+            ("token", cls._token)
         ]
         api_signature = sign_api_call(params)
         string = "&".join(["%s=%s" % p for p in params])
@@ -502,7 +503,7 @@ class BlaScrobbler(object):
         response = get_response(url, "session")
         if isinstance(response, ResponseError):
             session_key = None
-            cls.__requested_authorization = True
+            cls._requested_authorization = True
         else:
             session_key = response.content["key"]
             blacfg.set_("lastfm", "sessionkey", session_key)
@@ -512,25 +513,25 @@ class BlaScrobbler(object):
         if (not blacfg.getstring("lastfm", "user") or
             not self.get_session_key(create=True)):
             return
-        gobject.source_remove(self.__tid)
+        gobject.source_remove(self._timeout_id)
 
         # We request track submission on track changes. We don't have to check
         # here if a track passes the ignore settings as this is done when the
-        # __uri attribute of the instance is set further down below.
+        # _uri attribute of the instance is set further down below.
         self.__submit_last_track()
 
-        self.__elapsed = 0
-        self.__iterations = 0
+        self._time_elapsed = 0
+        self._iterations = 0
         track = player.get_track()
         if not track or player.radio or player.video:
             return
 
         if self.__passes_ignore(track):
-            self.__uri = track.uri
-            self.__start_time = int(time.time())
-            self.__tid = gobject.timeout_add(1000, self.__query_status)
+            self._uri = track.uri
+            self._start_time = int(time.time())
+            self._timeout_id = gobject.timeout_add(1000, self.__query_status)
         else:
-            self.__uri = None
+            self._uri = None
             artist, title = track[ARTIST], track[TITLE]
             if artist and title:
                 item = "%s - %s" % (artist, title)

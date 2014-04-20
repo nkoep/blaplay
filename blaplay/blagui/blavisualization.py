@@ -76,7 +76,7 @@ class BlaVisualization(gtk.Viewport):
         self.__spectrum.update_colors(self.__drawing_area.get_style())
         self.set_size_request(-1, self.__spectrum.height)
         self.__set_visible(True)
-        self.__cid = player.connect_object(
+        self._callback_id = player.connect_object(
             "new_buffer", BlaSpectrum.new_buffer, self.__spectrum)
 
         # TODO: Suspend during paused and stopped states.
@@ -93,7 +93,7 @@ class BlaVisualization(gtk.Viewport):
 
     def __disable(self):
         try:
-            player.disconnect(self.__cid)
+            player.disconnect(self._callback_id)
         except AttributeError:
             pass
         map(gobject.source_remove,

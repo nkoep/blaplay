@@ -104,7 +104,7 @@ class BlaLibraryMonitor(gobject.GObject):
             EVENT_MOVED: "EVENT_MOVED"
         }
 
-        tid = -1
+        timeout_id = -1
 
         while True:
             event, path_from, path_to = self.__queue.get()
@@ -113,7 +113,7 @@ class BlaLibraryMonitor(gobject.GObject):
 
             # TODO: Rename this.
             update = True
-            gobject.source_remove(tid)
+            gobject.source_remove(timeout_id)
 
             if event == EVENT_CREATED:
                 if path_from in BlaLibraryMonitor.ignore:
@@ -190,7 +190,7 @@ class BlaLibraryMonitor(gobject.GObject):
             if update:
                 global pending_save
                 pending_save = True
-                tid = gobject.timeout_add(3000, update_library)
+                timeout_id = gobject.timeout_add(3000, update_library)
 
     def __get_subdirectories(self, directories):
         # The heavy lifting here is actually just getting a list of all the
@@ -297,10 +297,10 @@ class BlaLibrary(gobject.GObject):
             if (section == "library" and
                 (key == "restrict.to" or key == "exclude")):
                 try:
-                    gobject.source_remove(self.__sync_tid)
+                    gobject.source_remove(self.__sync_timeout_id)
                 except AttributeError:
                     pass
-                self.__sync_tid = gobject.timeout_add(2500, self.sync)
+                self.__sync_timeout_id = gobject.timeout_add(2500, self.sync)
         self._config.connect("changed", config_changed)
 
         # Restore the library.
@@ -331,9 +331,10 @@ class BlaLibrary(gobject.GObject):
                 # it does not clean up missing tracks.
                 # for md in self.__monitored_directories:
                 #     self.scan_directory(md)
-            self.__library_monitor.disconnect(cid)
+            self.__library_monitor.disconnect(callback_id)
         self.__library_monitor = BlaLibraryMonitor(config)
-        cid = self.__library_monitor.connect("initialized", initialized)
+        callback_id = self.__library_monitor.connect(
+            "initialized", initialized)
         # FIXME: Pass in `initialized' as a callback function instead of using
         #        a single-purpose-single-use signal.
         self.__library_monitor.update_directories()
@@ -579,7 +580,7 @@ class BlaLibrary(gobject.GObject):
 
         def process(namespace, uris, pb):
             # Update every 40 ms (25 fps).
-            tid = gobject.timeout_add(40, pb.pulse)
+            timeout_id = gobject.timeout_add(40, pb.pulse)
 
             files = []
             filt = self.__extension_filter
@@ -593,7 +594,7 @@ class BlaLibrary(gobject.GObject):
                     files.append(uri)
                     yield True
 
-            gobject.source_remove(tid)
+            gobject.source_remove(timeout_id)
 
             pb.switch_mode()
             uris = sorted(files, cmp=locale.strcoll)

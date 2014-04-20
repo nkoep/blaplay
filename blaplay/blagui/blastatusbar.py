@@ -47,8 +47,8 @@ class _FileScannerBox(gtk.HBox):
         # Make sure the box is initially hidden.
         def on_map(*args):
             self.hide_box()
-            self.disconnect(cid)
-        cid = self.connect("map", on_map)
+            self.disconnect(callback_id)
+        callback_id = self.connect("map", on_map)
 
     def show_box(self):
         self.set_visible(True)
