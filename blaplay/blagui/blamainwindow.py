@@ -232,17 +232,12 @@ class _BlaMainWindow(BlaBaseWindow):
             title = "%s %s" % (blaconst.APPNAME, blaconst.VERSION)
             tooltip = "Stopped"
         else:
-            if player.radio:
-                title = track[TITLE] or "%s - %s" % (
-                    blaconst.APPNAME, track["organization"])
+            artist = track[ARTIST]
+            title = track[TITLE] or "?"
+            if artist and title:
+                title = "%s - %s" % (artist, title)
             else:
-                artist = track[ARTIST]
-                title = track[TITLE] or "?"
-                if artist and title:
-                    title = "%s - %s" % (artist, title)
-                else:
-                    title = track.basename
-
+                title = track.basename
             tooltip = title
 
         self.set_title(title)

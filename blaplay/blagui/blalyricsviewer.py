@@ -109,7 +109,7 @@ class BlaLyricsViewer(gtk.Notebook):
         self._clear_text_buffer()
         self._timestamp = gobject.get_current_time()
 
-        if state == blaconst.STATE_STOPPED or player.radio:
+        if state == blaconst.STATE_STOPPED:
             self._track = None
         else:
             self._track = track

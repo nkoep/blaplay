@@ -165,25 +165,6 @@ class BlaPlayer(gobject.GObject):
     def __message(self, bus, message):
         if message.type == gst.MESSAGE_EOS:
             self.next(force_advance=False)
-        elif message.type == gst.MESSAGE_TAG:
-            self.__parse_tags(message.parse_tag())
-        elif message.type == gst.MESSAGE_BUFFERING:
-            # TODO: Emit "buffering" message for the statusbar to listen for.
-            # We can't import from blastatusbar on module level as it'd create
-            # circular imports.
-            global BlaStatusbar
-            if BlaStatusbar is None:
-                from blaplay.blagui.blastatusbar import BlaStatusbar
-            percentage = message.parse_buffering()
-            s = "Buffering: %d %%" % percentage
-            if percentage == 0:
-                print_d("Start buffering...")
-            elif percentage == 100:
-                self.__bin.set_state(gst.STATE_PLAYING)
-                self.__state = blaconst.STATE_PLAYING
-                self.emit("track_changed")
-                self.emit("state_changed")
-                print_d("Finished buffering")
         elif message.type == gst.MESSAGE_ERROR:
             self.stop()
             err, debug = message.parse_error()
@@ -199,26 +180,6 @@ class BlaPlayer(gobject.GObject):
             else:
                 self.set_xwindow_id(xid)
             return False
-
-    def __parse_tags(self, tags):
-        MAPPING = {
-            "location": "station",
-            "organization": "organization",
-            "title": TITLE
-        }
-
-        if not self.radio:
-            return
-        for key in tags.keys():
-            value = tags[key]
-            try:
-                value = unicode(value.decode("utf-8", "replace"))
-            except AttributeError:
-                pass
-            if key in ["organization", "location", "title"]:
-                self.__station[MAPPING[key]] = value
-        # FIXME: does it make sense to emit state_changed here?
-        gobject.idle_add(self.emit, "state_changed")
 
     def set_sync_handler(self, handler):
         self.__sync_handler = handler
@@ -279,11 +240,10 @@ class BlaPlayer(gobject.GObject):
         self.emit("seeked", pos)
 
     def get_position(self):
-        if not self.radio:
-            try:
-                return self.__bin.query_position(gst.FORMAT_TIME, None)[0]
-            except (AttributeError, gst.QueryError):
-                pass
+        try:
+            return self.__bin.query_position(gst.FORMAT_TIME, None)[0]
+        except (AttributeError, gst.QueryError):
+            pass
         return 0
 
     def get_track(self):
@@ -396,33 +356,17 @@ class BlaPlayer(gobject.GObject):
     def previous(self):
         if self.__bin:
             self.__bin.set_state(gst.STATE_NULL)
-        if self.radio:
-            args = ("get_station", blaconst.TRACK_PREVIOUS)
-        else:
-            args = ("get_track", blaconst.TRACK_PREVIOUS, True)
-        self.emit(*args)
+        self.emit("get_track", blaconst.TRACK_PREVIOUS, True)
 
     def next(self, force_advance=True):
         if self.__bin:
             self.__bin.set_state(gst.STATE_NULL)
-        if self.radio:
-            args = ("get_station", blaconst.TRACK_NEXT)
-        else:
-            args = ("get_track", blaconst.TRACK_NEXT, force_advance)
-        self.emit(*args)
+        self.emit("get_track", blaconst.TRACK_NEXT, force_advance)
 
     def random(self):
         if self.__bin:
             self.__bin.set_state(gst.STATE_NULL)
-        if self.radio:
-            args = ("get_station", blaconst.TRACK_RANDOM)
-        else:
-            args = ("get_track", blaconst.TRACK_RANDOM, True)
-        self.emit(*args)
-
-    @property
-    def radio(self):
-        return bool(self.__station)
+        self.emit("get_track", blaconst.TRACK_RANDOM, True)
 
     @property
     def video(self):

@@ -116,7 +116,7 @@ class PositionSlider(gtk.HScale):
         return True
 
     def __state_changed(self, player):
-        if player.get_state() == blaconst.STATE_STOPPED or player.radio:
+        if player.get_state() == blaconst.STATE_STOPPED:
             self.set_sensitive(False)
         else:
             self.set_sensitive(True)

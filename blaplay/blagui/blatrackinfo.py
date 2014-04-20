@@ -220,7 +220,7 @@ class BlaTrackInfo(gtk.Viewport):
             return
         state = player.get_state()
 
-        if state == blaconst.STATE_STOPPED or player.radio:
+        if state == blaconst.STATE_STOPPED:
             self._track = None
         else:
             self._track = track

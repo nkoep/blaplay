@@ -105,10 +105,7 @@ class BlaDBus(dbus.service.Object):
         ret = track[identifier]
         if not ret:
             if identifier == ARTIST:
-                if self.__player.radio:
-                    ret = track["organization"]
-                else:
-                    ret = "?"
+                ret = "?"
             elif identifier == TITLE:
                 ret = os.path.basename(track.uri)
             else:
