@@ -846,7 +846,7 @@ class BlaTrackList(BlaView):
         accel_group = blagui.get_accelerator_group(self)
         clipboard_has_items = len(self._manager.clipboard) > 0
 
-        menu = blaguiutils.BlaPopupMenu(event)
+        menu = blaguiutils.BlaMenu(event)
         try:
             path = treeview.get_path_at_pos(*map(int, [event.x, event.y]))[0]
         except TypeError:
@@ -881,7 +881,7 @@ class BlaTrackList(BlaView):
                 m.set_sensitive(sensitive)
             menu.append_separator()
 
-            submenu = blaguiutils.BlaPopupMenu()
+            submenu = blaguiutils.BlaMenu()
             items = [
                 # TODO: Pull the blaconst.SELECT_* flags into this module.
                 ("all", blaconst.SELECT_ALL),

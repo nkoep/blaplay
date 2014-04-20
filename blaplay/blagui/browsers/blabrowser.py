@@ -135,7 +135,7 @@ class BlaBrowser(gtk.VBox):
             ("Add to current playlist", "add-to-current-playlist"),
             ("Send to new playlist", "send-to-new-playlist")
         ]
-        menu = blaguiutils.BlaPopupMenu(event)
+        menu = blaguiutils.BlaMenu(event)
         for label, signal in items:
             menu.append_item(label, transfer_uris_to_playlist, signal, name)
         menu.append_separator()

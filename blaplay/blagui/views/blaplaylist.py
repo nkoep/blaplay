@@ -267,7 +267,7 @@ class BlaPlaylist(blatracklist.BlaTrackList):
 
     def _add_context_menu_options(self, menu):
         # New playlist from...
-        submenu = blaguiutils.BlaPopupMenu()
+        submenu = blaguiutils.BlaMenu()
         items = [
             ("selection", blaconst.PLAYLIST_FROM_SELECTION),
             ("selected artist(s)", blaconst.PLAYLIST_FROM_ARTISTS),
@@ -284,7 +284,7 @@ class BlaPlaylist(blatracklist.BlaTrackList):
         multiple_playlists = len(playlists) > 1
 
         # Move to playlist
-        submenu = blaguiutils.BlaPopupMenu()
+        submenu = blaguiutils.BlaMenu()
         for playlist in playlists:
             if playlist == self:
                 continue
@@ -294,7 +294,7 @@ class BlaPlaylist(blatracklist.BlaTrackList):
         m.set_sensitive(multiple_playlists)
 
         # Add to playlist
-        submenu = blaguiutils.BlaPopupMenu()
+        submenu = blaguiutils.BlaMenu()
         for playlist in playlists:
             if playlist == self:
                 continue

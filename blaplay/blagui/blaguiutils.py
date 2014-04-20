@@ -270,9 +270,9 @@ class BlaTreeViewBase(gtk.TreeView):
 
 # TODO: Rename this to BlaMenu. We use it for submenus as well which aren't
 #       technically popup menus as we never explicitly call `show()' on them.
-class BlaPopupMenu(gtk.Menu):
+class BlaMenu(gtk.Menu):
     def __init__(self, event=None):
-        super(BlaPopupMenu, self).__init__()
+        super(BlaMenu, self).__init__()
         self._event = event
 
     def run(self):

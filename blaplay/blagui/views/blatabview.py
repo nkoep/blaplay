@@ -90,7 +90,7 @@ class BlaTabView(gtk.Notebook):
         return False
 
     def _show_context_menu(self, event, view=None):
-        menu = blaguiutils.BlaPopupMenu(event)
+        menu = blaguiutils.BlaMenu(event)
         if view is None:
             menu.append_item("New playlist", self.emit, "view-requested")
         else:
