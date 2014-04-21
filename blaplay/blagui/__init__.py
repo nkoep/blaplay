@@ -18,6 +18,7 @@ import gobject
 import gtk
 
 from blaplay.blacore import blaconst
+from blaplay.formats._identifiers import *
 
 # DND constants
 DND_LIBRARY, DND_PLAYLIST, DND_URIS = range(3)
@@ -40,6 +41,39 @@ def init(config, library, player):
     # Create and populate the main window.
     from . import blamainwindow
     window = blamainwindow.create_window(config, library, player)
+
+    # Set up the system tray icon.
+    from blatray import BlaTray
+    tray = BlaTray(config)
+    def on_hide(window):
+        tray.set_visible(True)
+    window.connect("hide", on_hide)
+    def on_map(window):
+        if not config.getboolean("general", "always.show.tray"):
+            tray.set_visible(False)
+    window.connect("map", on_map)
+
+    # Update the window title and tray tooltip on player state changes.
+    def on_state_changed(player):
+        state = player.get_state()
+        if state == blaconst.STATE_STOPPED:
+            title = "%s %s" % (blaconst.APPNAME, blaconst.VERSION)
+            tooltip = "Stopped"
+        else:
+            track = player.get_track()
+            artist = track[ARTIST]
+            title = track[TITLE] or "?"
+            if artist and title:
+                title = "%s - %s" % (artist, title)
+            else:
+                title = track.basename
+            tooltip = title
+
+        window.set_title(title)
+        tray.set_tooltip(tooltip)
+
+    library.connect_object("library-updated", on_state_changed, player)
+    player.connect("state-changed", on_state_changed)
 
     return window
 

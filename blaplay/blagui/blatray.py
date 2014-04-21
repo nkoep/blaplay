@@ -24,8 +24,6 @@ import blaguiutil
 
 class BlaTray(gtk.StatusIcon):
     def __init__(self, config):
-        # TODO: Add support for scroll-events.
-
         super(BlaTray, self).__init__()
         self.set_from_icon_name(blaconst.APPNAME)
         self.set_visible(
@@ -40,6 +38,8 @@ class BlaTray(gtk.StatusIcon):
             blaplay.bla.window.toggle_hide()
         self.connect("activate", activate)
         self.connect("popup-menu", self._tray_menu)
+
+        # TODO: Add support for scroll-events.
 
     def _tray_menu(self, icon, button, activation_time):
         menu = blaguiutil.create_control_popup_menu()

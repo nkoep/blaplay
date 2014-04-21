@@ -14,21 +14,17 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-import os
-
 import gobject
 import gtk
 
 from blaplay.blacore import blaconst
 from blaplay import blautil
-from blaplay.formats._identifiers import *
 from blawindows import BlaBaseWindow
 from blatoolbar import BlaToolbar
 from . import browsers, blastatusbar
 from .blaguiutil import BlaViewport
 from blavisualization import BlaVisualization
 from .views.blatabview import BlaTabView
-from blatray import BlaTray
 
 
 def create_window(config, library, player):
@@ -68,11 +64,6 @@ def create_window(config, library, player):
     window.add_statusbar(statusbar)
     window.add_accel_group(ui_manager.get_accel_group())
     window.show_all()
-
-    def on_library_updated(library):
-        window.update_title(player)
-    library.connect("library-updated", on_library_updated)
-    player.connect("state-changed", window.update_title)
 
     return window
 
@@ -192,9 +183,6 @@ class _BlaMainWindow(BlaBaseWindow):
         self.child.pack_start(BlaToolbar(), expand=False)
         self.child.pack_start(vbox)
 
-        # TODO: Move this out of this class.
-        self._tray = BlaTray(config)
-
         self.connect_object(
             "delete-event", _BlaMainWindow._on_delete_event, self)
 
@@ -205,7 +193,6 @@ class _BlaMainWindow(BlaBaseWindow):
         blaguiutil.set_visible(not yes)
         if yes:
             self.hide()
-            self._tray.set_visible(True)
         else:
             self.raise_window()
 
@@ -218,30 +205,9 @@ class _BlaMainWindow(BlaBaseWindow):
 
     def raise_window(self):
         self.present()
-        if not self._config.getboolean("general", "always.show.tray"):
-            self._tray.set_visible(False)
 
     def toggle_hide(self):
         self._hide_windows(self.get_visible())
-
-    def update_title(self, player):
-        track = player.get_track()
-        state = player.get_state()
-
-        if state == blaconst.STATE_STOPPED or not track:
-            title = "%s %s" % (blaconst.APPNAME, blaconst.VERSION)
-            tooltip = "Stopped"
-        else:
-            artist = track[ARTIST]
-            title = track[TITLE] or "?"
-            if artist and title:
-                title = "%s - %s" % (artist, title)
-            else:
-                title = track.basename
-            tooltip = title
-
-        self.set_title(title)
-        self._tray.set_tooltip(tooltip)
 
     def add_menubar(self, menubar):
         assert self._menubar_slot.child is None
