@@ -272,14 +272,20 @@ class BlaMenu(gtk.Menu):
     def _wrap_callback(_, callback, *user_data):
         return callback(*user_data)
 
-    def run(self):
+    def run(self, *args):
         # Submenus don't get a reference to an event and therefore cannot be
         # "ran" by themselves.
-        if self._event is None:
-            print_w("Menu has no event associated with it")
+        if self._event is not None:
+            button = self._event.button
+            activation_time = self._event.time
+        elif args:
+            button, activation_time = args
+        else:
+            print_w("Need button and activation time to display menu")
             return
+
         self.show_all()
-        self.popup(None, None, None, self._event.button, self._event.time)
+        self.popup(None, None, None, button, activation_time)
 
     def append_item(self, label, on_activate_callback=None, *user_data):
         m = gtk.MenuItem(label)

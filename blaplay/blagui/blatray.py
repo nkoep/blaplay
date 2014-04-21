@@ -43,21 +43,16 @@ class BlaTray(gtk.StatusIcon):
 
     def __tray_menu(self, icon, button, activation_time):
         menu = blaguiutil.create_control_popup_menu()
-        menu.append(gtk.SeparatorMenuItem())
+        menu.append_separator()
 
         # Add last.fm submenu.
         submenu = blafm.create_popup_menu()
         if submenu:
-            m = gtk.MenuItem("last.fm")
-            m.set_submenu(submenu)
-            menu.append(m)
-            menu.append(gtk.SeparatorMenuItem())
+            menu.append_submenu("last.fm", submenu)
+            menu.append_separator()
 
         # Add quit option.
-        m = gtk.MenuItem("Quit")
-        m.connect("activate", lambda *x: blaplay.shutdown())
-        menu.append(m)
+        menu.append_item("Quit", blaplay.shutdown)
 
-        menu.show_all()
-        menu.popup(None, None, None, button, activation_time)
+        menu.run(button, activation_time)
 

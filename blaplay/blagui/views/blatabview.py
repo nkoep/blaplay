@@ -67,7 +67,7 @@ class BlaTabView(gtk.Notebook):
                 # events.
                 return True
 
-        # No tab hit.
+        # No tab hit
         elif (event.button == 2 and event.type == gtk.gdk.BUTTON_PRESS or
               (event.button == 1 and event.type == gtk.gdk._2BUTTON_PRESS)):
             self.emit("view-requested")
