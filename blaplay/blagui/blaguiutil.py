@@ -57,27 +57,22 @@ def create_control_popup_menu():
     import blaplay
     player = blaplay.bla.player
 
-    menu = gtk.Menu()
+    menu = BlaMenu()
 
     if player.get_state() in [blaconst.STATE_PAUSED, blaconst.STATE_STOPPED]:
         label = "Play"
-        stock = gtk.STOCK_MEDIA_PLAY
+        stock_id = gtk.STOCK_MEDIA_PLAY
     else:
         label = "Pause"
-        stock = gtk.STOCK_MEDIA_PAUSE
+        stock_id = gtk.STOCK_MEDIA_PAUSE
     items = [
-        (label, stock, player.play_pause),
+        (label, stock_id, player.play_pause),
         ("Stop", gtk.STOCK_MEDIA_STOP, player.stop),
         ("Previous", gtk.STOCK_MEDIA_PREVIOUS, player.previous),
         ("Next", gtk.STOCK_MEDIA_NEXT, player.next)
     ]
-    for label, stock, callback in items:
-        m = gtk.ImageMenuItem(stock)
-        m.set_label(label)
-        # Force early binding of `callback' by using default arguments.
-        m.connect("activate", lambda x, c=callback: c())
-        menu.append(m)
-
+    for label, stock_id, callback in items:
+        menu.append_image_item(label, stock_id, callback)
     return menu
 
 # XXX: Global state, get rid of it.
@@ -273,6 +268,10 @@ class BlaMenu(gtk.Menu):
         super(BlaMenu, self).__init__()
         self._event = event.copy() if event is not None else None
 
+    @staticmethod
+    def _wrap_callback(_, callback, *user_data):
+        return callback(*user_data)
+
     def run(self):
         # Submenus don't get a reference to an event and therefore cannot be
         # "ran" by themselves.
@@ -283,11 +282,10 @@ class BlaMenu(gtk.Menu):
         self.popup(None, None, None, self._event.button, self._event.time)
 
     def append_item(self, label, on_activate_callback=None, *user_data):
-        def callback_wrapper(_, *args):
-            return on_activate_callback(*args)
         m = gtk.MenuItem(label)
         if on_activate_callback is not None:
-            m.connect("activate", callback_wrapper, *user_data)
+            m.connect("activate", self._wrap_callback, on_activate_callback,
+                      *user_data)
         self.append(m)
         return m
 
@@ -303,11 +301,20 @@ class BlaMenu(gtk.Menu):
         return m
 
     def append_check_item(self, label, on_toggled_callback=None, *user_data):
-        def callback_wrapper(_, *args):
-            return on_toggle_callback(*args)
         m = gtk.CheckMenuItem(label)
         if on_toggled_callback is not None:
-            m.connect("toggled", callback_wrapper, *user_data)
+            m.connect("toggled", self._wrap_callback, on_toggle_callback,
+                      *user_data)
+        self.append(m)
+        return m
+
+    def append_image_item(self, label, stock_id, on_activate_callback=None,
+                          *user_data):
+        m = gtk.ImageMenuItem(stock_id)
+        m.set_label(label)
+        if on_activate_callback is not None:
+            m.connect("activate", self._wrap_callback, on_activate_callback,
+                      *user_data)
         self.append(m)
         return m
 
