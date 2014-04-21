@@ -35,6 +35,7 @@ import blaplay
 player = blaplay.bla.player
 from blaplay import blautil
 from blaplay.blacore import blacfg, blaconst
+from blaplay.blagui import blaguiutil
 from blaplay.formats._identifiers import *
 
 TIMEOUT = 5
@@ -46,25 +47,20 @@ scrobbler = None
 def init(library):
     global scrobbler
     scrobbler = BlaScrobbler(library)
-    player.connect("track_changed", scrobbler.submit_track)
-    player.connect("track_stopped", scrobbler.submit_track)
+    player.connect("track-changed", scrobbler.submit_track)
+    player.connect("track-stopped", scrobbler.submit_track)
 
-def quote_url(url):
-    return urllib2.quote(url.encode("utf-8"), safe=":/?=+&")
-
-# TODO: Rename this to create_context_menu.
+# TODO: Rename this to create_submenu.
 def create_popup_menu(track=None):
     user = blacfg.getstring("lastfm", "user")
     if not user:
         return None
 
-    menu = gtk.Menu()
+    menu = blaguiutil.BlaMenu()
 
     # User profile
-    m = gtk.MenuItem("View your profile")
-    m.connect("activate",
-              lambda *x: blautil.open_url("http://last.fm/user/%s" % user))
-    menu.append(m)
+    menu.append_item("View your profile", blautil.open_url,
+                     "http://last.fm/user/%s" % user)
 
     # Love/Unlove song
     artist = title = track_label = None
@@ -80,48 +76,34 @@ def create_popup_menu(track=None):
     track_label = "%s - %s" % (track[ARTIST], track[TITLE])
     if len(track_label) > limit:
         track_label = "%s..." % track_label[:limit]
-
-    m = gtk.MenuItem("Love song \"%s\"" % track_label)
-    m.connect("activate", lambda *x: love_unlove_song(track, unlove=False))
-    menu.append(m)
-
-    m = gtk.MenuItem("Unlove song \"%s\"" % track_label)
-    m.connect("activate", lambda *x: love_unlove_song(track, unlove=True))
-    menu.append(m)
-
-    m = gtk.MenuItem("View song profile of \"%s\"" % track_label)
-    m.connect(
-        "activate",
-        lambda *x: blautil.open_url("http://last.fm/music/%s/_/%s" %
-                                    (artist, title)))
-    menu.append(m)
-
-    m = gtk.MenuItem("View artist profile of \"%s\"" % track[ARTIST])
-    m.connect(
-        "activate",
-        lambda *x: blautil.open_url("http://last.fm/music/%s" % artist))
-    menu.append(m)
+    menu.append_item("Love song \"%s\"" % track_label, _love_song, track)
+    menu.append_item("Unlove song \"%s\"" % track_label, _unlove_song, track)
+    menu.append_item(
+        "View song profile of \"%s\"" % track_label, blautil.open_url,
+        "http://last.fm/music/%s/_/%s" % (artist, title))
+    menu.append_item("View artist profile of \"%s\"" % track[ARTIST],
+                     blautil.open_url, "http://last.fm/music/%s" % artist)
 
     return menu
 
-def parse_response(response, key):
+def _parse_response(response, key):
     try:
-        response = Response(response[key])
+        response = _Response(response[key])
     except TypeError:
-        response = ResponseError("Invalid key")
+        response = _ResponseError("Invalid key")
     except KeyError:
-        response = ResponseError(response["message"])
+        response = _ResponseError(response["message"])
     return response
 
-def parse_socket_error_exception(exc):
+def _parse_socket_error_exception(exc):
     if not isinstance(exc, socket.error):
         raise TypeError("Expected socket.error, got %s" % type(exc))
     if isinstance(exc, socket.timeout):
-        return ResponseError("%s" % exc)
+        return _ResponseError("%s" % exc)
     errno, errmsg = exc
-    return ResponseError("%d: %s" % (errno, errmsg))
+    return _ResponseError("%d: %s" % (errno, errmsg))
 
-def post_message(params, key=None):
+def _post_message(params, key=None):
     class HTTPConnection(httplib.HTTPConnection):
         def __init__(self, *args, **kwargs):
             kwargs.setdefault("timeout", TIMEOUT)
@@ -137,13 +119,13 @@ def post_message(params, key=None):
         try:
             return func()
         except socket.error as exc:
-            return parse_socket_error_exception(exc)
+            return _parse_socket_error_exception(exc)
         except httplib.HTTPException as exc:
-            return ResponseError(exc)
+            return _ResponseError(exc)
         except ValueError as exc:
             # XXX: This could possibly catch errors in the BlaThread class'
             #      d'tor. Something to look into...
-            return ResponseError(exc)
+            return _ResponseError(exc)
 
     params.append(("format", "json"))
     header = {"Content-type": "application/x-www-form-urlencoded"}
@@ -152,62 +134,65 @@ def post_message(params, key=None):
         r = try_(
             lambda: conn.request(
                 "POST", "/2.0/?", urllib.urlencode(dict(params)), header))
-        if isinstance(r, ResponseError):
+        if isinstance(r, _ResponseError):
             return r
 
         response = try_(lambda: conn.getresponse())
-        if isinstance(response, ResponseError):
+        if isinstance(response, _ResponseError):
             return response
 
         response = try_(lambda: json.loads(response.read()))
-        if isinstance(response, ResponseError):
+        if isinstance(response, _ResponseError):
             return response
 
     if key is not None:
-        response = parse_response(response, key)
+        response = _parse_response(response, key)
     else:
-        response = Response(response)
+        response = _Response(response)
 
     return response
 
-def get_response(url, key):
+def _get_response(url, key):
     try:
         f = urllib2.urlopen(url, timeout=TIMEOUT)
     except socket.error as exc:
-        return parse_socket_error_exception(exc)
+        return _parse_socket_error_exception(exc)
     except urllib2.URLError as exc:
-        return ResponseError(exc.reason)
+        return _ResponseError(exc.reason)
 
     try:
         content = f.read()
         f.close()
         response = json.loads(content)
     except (socket.timeout, ValueError) as exc:
-        return ResponseError(exc.message)
+        return _ResponseError(exc.message)
 
-    return parse_response(response, key)
+    return _parse_response(response, key)
 
-def get_image_url(image_urls):
+def _get_image_url(image_urls):
     for dict_ in image_urls:
         if dict_["size"] == "extralarge":
             return dict_["#text"]
     return None
 
-def retrieve_image(image_base, image_urls):
+def _retrieve_image(image_base, image_urls):
     image = None
-    url = get_image_url(image_urls)
+    url = _get_image_url(image_urls)
     if url:
         image, _ = urllib.urlretrieve(
             url, "%s.%s" % (image_base, blautil.get_extension(url)))
     return image
 
+def _quote_url(url):
+    return urllib2.quote(url.encode("utf-8"), safe=":/?=+&")
+
 def get_cover(track, image_base):
     url = "%s&method=album.getinfo&album=%s&artist=%s&autocorrect=1" % (
         blaconst.LASTFM_BASEURL, track[ALBUM].replace("&", "and"),
         track[ARTIST].replace("&", "and"))
-    url = quote_url(url)
-    response = get_response(url, "album")
-    if isinstance(response, ResponseError):
+    url = _quote_url(url)
+    response = _get_response(url, "album")
+    if isinstance(response, _ResponseError):
         print_d("Failed to retrieve cover: %s" % response)
         return None
     response = response.content
@@ -224,24 +209,23 @@ def get_cover(track, image_base):
         image_urls = response["image"]
     except (TypeError, KeyError):
         return None
-    return retrieve_image(image_base, image_urls)
+    return _retrieve_image(image_base, image_urls)
 
-def get_request_token():
+def _get_request_token():
     url = "%s&method=auth.gettoken" % blaconst.LASTFM_BASEURL
-    response = get_response(url, "token")
-    if isinstance(response, ResponseError):
+    response = _get_response(url, "token")
+    if isinstance(response, _ResponseError):
         print_d("Failed to retrieve request token: %s" % response)
         return None
-
     return response.content
 
-def sign_api_call(params):
+def _sign_api_call(params):
     params.sort(key=lambda p: p[0].lower())
     string = "".join(["%s%s" % (key, value) for key, value in params])
     return blautil.md5("%s%s" % (string, blaconst.LASTFM_SECRET))
 
 @blautil.thread
-def love_unlove_song(track, unlove=False):
+def _love_unlove_song(track, method):
     if (not blacfg.getstring("lastfm", "user") or not track[ARTIST] or
         not track[TITLE]):
         return
@@ -249,7 +233,7 @@ def love_unlove_song(track, unlove=False):
     if not session_key:
         return
 
-    method = "track.unlove" if unlove else "track.love"
+    method = "track.%s" % method
     params = [
         ("method", method), ("api_key", blaconst.LASTFM_APIKEY),
         ("artist", track[ARTIST]), ("track", track[TITLE]),
@@ -257,99 +241,104 @@ def love_unlove_song(track, unlove=False):
     ]
 
     # Sign API call.
-    api_signature = sign_api_call(params)
+    api_signature = _sign_api_call(params)
     params.append(("api_sig", api_signature))
-    response = post_message(params)
-    if isinstance(response, ResponseError):
+    response = _post_message(params)
+    if isinstance(response, _ResponseError):
         print_d("Failed to love/unlove song: %s" %  response)
 
+def _love_song(track):
+    _love_unlove_song(track, "love")
 
-class Response(object):
+def _unlove_song(track):
+    _love_unlove_song(track, "unlove")
+
+class _Response(object):
     def __init__(self, response):
         self.content = response
 
-class ResponseError(Response):
+class _ResponseError(_Response):
     def __repr__(self):
         return str(self.content)
 
-class BlaScrobbler(object):
-    class SubmissionQueue(Queue.Queue):
-        def __init__(self, library):
-            Queue.Queue.__init__(self)
-            self._library = library
-            self._restore()
-            self._submit_scrobbles()
+class _SubmissionQueue(Queue.Queue):
+    def __init__(self, library):
+        Queue.Queue.__init__(self)
+        self._library = library
+        self._restore()
+        self._submit_scrobbles()
 
-        @blautil.thread
-        def _submit_scrobbles(self):
-            while True:
-                # Block until the first item arrives.
-                items = [self.get()]
-                # The API allows submission of up to 50 scrobbles in one POST.
-                while len(items) <= 50:
-                    try:
-                        items.append(self.get_nowait())
-                    except Queue.Empty:
-                        break
-
-                method = "track.scrobble"
-                session_key = scrobbler.get_session_key()
-                if not session_key:
-                    continue
-                params = [
-                    ("method", method), ("api_key", blaconst.LASTFM_APIKEY),
-                    ("sk", session_key)
-                ]
-                for idx, item in enumerate(items):
-                    uri, start_time = item
-                    try:
-                        track = self._library[uri]
-                    except KeyError:
-                        continue
-                    params.extend(
-                        [("artist[%d]" % idx, track[ARTIST]),
-                         ("track[%d]" % idx, track[TITLE]),
-                         ("timestamp[%d]" % idx, str(start_time))])
-                    if track[ALBUM]:
-                        params.append(("album[%d]" % idx, track[ALBUM]))
-                    if track[ALBUM_ARTIST]:
-                        params.append(
-                            ("album_artist[%d]" % idx, track[ALBUM_ARTIST]))
-
-                api_signature = sign_api_call(params)
-                params.append(("api_sig", api_signature))
-
-                @blautil.thread
-                def post(params, items):
-                    n_items = len(items)
-                    response = post_message(params)
-                    if isinstance(response, ResponseError):
-                        print_w(
-                            "Failed to submit %d scrobble(s) to last.fm: %s" %
-                            (n_items, response))
-                    else:
-                        print_d("Submitted %d scrobble(s) to last.fm" %
-                                n_items)
-                post(params, items)
-
-        def _restore(self):
-            items = blautil.deserialize_from_file(blaconst.SCROBBLES_PATH)
-            if items:
-                print_d("Re-submitting %d queued scrobble(s)" % len(items))
-                for item in items:
-                    self.put_nowait(item)
-
-        def save(self):
-            items = []
-            while True:
+    @blautil.thread
+    def _submit_scrobbles(self):
+        while True:
+            # Block until the first item arrives.
+            items = [self.get()]
+            # The API allows submission of up to 50 scrobbles in one POST.
+            while len(items) <= 50:
                 try:
                     items.append(self.get_nowait())
                 except Queue.Empty:
                     break
-            if items:
-                print_d("Saving %d unsubmitted scrobble(s)" % len(items))
-            blautil.serialize_to_file(items, blaconst.SCROBBLES_PATH)
 
+            method = "track.scrobble"
+            session_key = scrobbler.get_session_key()
+            if not session_key:
+                continue
+            params = [
+                ("method", method), ("api_key", blaconst.LASTFM_APIKEY),
+                ("sk", session_key)
+            ]
+            for idx, item in enumerate(items):
+                uri, start_time = item
+                try:
+                    track = self._library[uri]
+                except KeyError:
+                    continue
+                params.extend(
+                    [("artist[%d]" % idx, track[ARTIST]),
+                     ("track[%d]" % idx, track[TITLE]),
+                     ("timestamp[%d]" % idx, str(start_time))])
+                if track[ALBUM]:
+                    params.append(("album[%d]" % idx, track[ALBUM]))
+                if track[ALBUM_ARTIST]:
+                    params.append(
+                        ("album_artist[%d]" % idx, track[ALBUM_ARTIST]))
+
+            api_signature = _sign_api_call(params)
+            params.append(("api_sig", api_signature))
+
+            @blautil.thread
+            def post(params, items):
+                n_items = len(items)
+                response = _post_message(params)
+                if isinstance(response, _ResponseError):
+                    print_w(
+                        "Failed to submit %d scrobble(s) to last.fm: %s" %
+                        (n_items, response))
+                else:
+                    print_d("Submitted %d scrobble(s) to last.fm" %
+                            n_items)
+            post(params, items)
+
+    def _restore(self):
+        items = blautil.deserialize_from_file(blaconst.SCROBBLES_PATH)
+        if items:
+            print_d("Re-submitting %d queued scrobble(s)" % len(items))
+            for item in items:
+                self.put_nowait(item)
+
+    def save(self):
+        items = []
+        while True:
+            try:
+                items.append(self.get_nowait())
+            except Queue.Empty:
+                break
+        if items:
+            print_d("Saving %d unsubmitted scrobble(s)" % len(items))
+        blautil.serialize_to_file(items, blaconst.SCROBBLES_PATH)
+
+class BlaScrobbler(object):
     def __init__(self, library):
         super(BlaScrobbler, self).__init__()
         self._library = library
@@ -363,7 +352,7 @@ class BlaScrobbler(object):
         self._iterations = 0
         self._thread = None
 
-        self._queue = BlaScrobbler.SubmissionQueue(library)
+        self._queue = _SubmissionQueue(library)
         def pre_shutdown_hook():
             self._submit_last_track(True)
         blaplay.bla.add_pre_shutdown_hook(pre_shutdown_hook)
@@ -421,10 +410,10 @@ class BlaScrobbler(object):
             params.append(("album_artist", track[ALBUM_ARTIST]))
 
         # Sign API call.
-        api_signature = sign_api_call(params)
+        api_signature = _sign_api_call(params)
         params.append(("api_sig", api_signature))
-        response = post_message(params)
-        if isinstance(response, ResponseError):
+        response = _post_message(params)
+        if isinstance(response, _ResponseError):
             print_d("Failed to update nowplaying: %s" % response)
 
     def _query_status(self):
@@ -476,7 +465,7 @@ class BlaScrobbler(object):
             return None
 
         if not self._token:
-            self._token = get_request_token()
+            self._token = _get_request_token()
             if not self._token:
                 return None
             self._request_authorization()
@@ -498,12 +487,12 @@ class BlaScrobbler(object):
             ("method", method), ("api_key", blaconst.LASTFM_APIKEY),
             ("token", self._token)
         ]
-        api_signature = sign_api_call(params)
+        api_signature = _sign_api_call(params)
         string = "&".join(["%s=%s" % p for p in params])
         url = "%s&api_sig=%s&%s" % (
             blaconst.LASTFM_BASEURL, api_signature, string)
-        response = get_response(url, "session")
-        if isinstance(response, ResponseError):
+        response = _get_response(url, "session")
+        if isinstance(response, _ResponseError):
             session_key = None
             self._requested_authorization = True
         else:
