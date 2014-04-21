@@ -17,31 +17,31 @@
 import gtk
 
 import blaplay
-from blaplay.blacore import blaconst, blacfg, blaplayer
+from blaplay.blacore import blaconst
 from blaplay.blautil import blafm
 import blaguiutil
 
 
 class BlaTray(gtk.StatusIcon):
-    def __init__(self):
+    def __init__(self, config):
         # TODO: Add support for scroll-events.
 
         super(BlaTray, self).__init__()
         self.set_from_icon_name(blaconst.APPNAME)
         self.set_visible(
-            blacfg.getboolean("general", "always.show.tray"))
+            config.getboolean("general", "always.show.tray"))
         self.set_tooltip_text("Stopped")
         def config_changed(cfg, section, key):
             if section == "general" and key == "always.show.tray":
-                self.set_visible(blacfg.getboolean(section, key))
-        blacfg.connect("changed", config_changed)
+                self.set_visible(config.getboolean(section, key))
+        config.connect("changed", config_changed)
 
         def activate(status_icon):
             blaplay.bla.window.toggle_hide()
         self.connect("activate", activate)
-        self.connect("popup_menu", self.__tray_menu)
+        self.connect("popup-menu", self._tray_menu)
 
-    def __tray_menu(self, icon, button, activation_time):
+    def _tray_menu(self, icon, button, activation_time):
         menu = blaguiutil.create_control_popup_menu()
         menu.append_separator()
 

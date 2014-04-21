@@ -193,7 +193,7 @@ class _BlaMainWindow(BlaBaseWindow):
         self.child.pack_start(vbox)
 
         # TODO: Move this out of this class.
-        self._tray = BlaTray()
+        self._tray = BlaTray(config)
 
         self.connect_object(
             "delete-event", _BlaMainWindow._on_delete_event, self)
