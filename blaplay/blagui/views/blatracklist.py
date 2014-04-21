@@ -580,7 +580,6 @@ class BlaTrackList(BlaView):
         hbox.pack_start(regex_button, expand=False)
         hbox.pack_start(entry)
         hbox.pack_start(search_button, expand=False)
-        hbox.show_all()
         hbox.set_visible(False)
         return hbox
 
@@ -622,11 +621,8 @@ class BlaTrackList(BlaView):
 
         self.add(blaguiutil.wrap_in_viewport(vbox))
 
-        # XXX: This will cause us trouble when restoring track lists.
-        def on_map(*args):
-            self.disable_search()
-            self.disconnect(callback_id)
-        callback_id = self.connect("map", on_map)
+        self.show_all()
+        self.disable_search()
 
     def _populate_model(self, scroll_item=None, row_align=0.5,
                         selected_items=[]):

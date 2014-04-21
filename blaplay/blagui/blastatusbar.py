@@ -116,6 +116,8 @@ class BlaStatusbar(gtk.Table):
             self.attach(alignment, count, count+1, 0, 1)
             count += 1
 
+        self.show_all()
+
     def _convert_time(self, value):
         s, ns = divmod(value, 1e9)
         m, s = divmod(s, 60)

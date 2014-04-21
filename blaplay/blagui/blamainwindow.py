@@ -63,7 +63,6 @@ def create_window(config, library, player):
     window.add_tab_view(tab_view)
     window.add_statusbar(statusbar)
     window.add_accel_group(ui_manager.get_accel_group())
-    window.show_all()
 
     return window
 
@@ -187,6 +186,8 @@ class _BlaMainWindow(BlaBaseWindow):
             "delete-event", _BlaMainWindow._on_delete_event, self)
 
         self._install_global_mouse_hook(player)
+
+        self.show_all()
 
     def _hide_windows(self, yes):
         from . import blaguiutil
