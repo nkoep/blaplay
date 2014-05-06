@@ -184,8 +184,8 @@ class BlaLibraryMonitor(gobject.GObject):
                     self.add_directory(path_to)
                 # TODO: Add a `library_entries_moved' signal for this so we
                 #       don't need to call methods on the playlist manager.
-                from blaplay.blagui.blaplaylist import BlaPlaylistManager
-                BlaPlaylistManager().update_uris(uris)
+                # from blaplay.blagui.blaplaylist import BlaPlaylistManager
+                # BlaPlaylistManager().update_uris(uris)
 
             # Schedule an update for the library browser, etc. The timeout
             # might be removed immediately at the beginning of this loop if

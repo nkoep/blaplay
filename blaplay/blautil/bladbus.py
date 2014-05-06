@@ -14,6 +14,9 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
+# XXX: Remove this and add appropriate wrapper functions to supply the previous
+#      functionality on top of blampris.
+
 import sys
 import os
 
@@ -151,12 +154,5 @@ class BlaDBus(dbus.service.Object):
     @dbus.service.method(
         dbus_interface=INTERFACE, in_signature="sas", out_signature="")
     def parse_uris(self, action, uris):
-        # TODO: do this via pipe
-        from blaplay.blagui.blaplaylist import playlist_manager
-        if action == "append":
-            playlist_manager.add_to_current_playlist(uris, resolve=True)
-        elif action == "new":
-            playlist_manager.send_to_new_playlist(uris, resolve=True)
-        else:
-            f = playlist_manager.send_to_current_playlist(uris, resolve=True)
+        print_w("TODO")
 
