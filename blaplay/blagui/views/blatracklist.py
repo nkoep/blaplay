@@ -468,13 +468,13 @@ class _BlaTrackListTreeView(blaguiutil.BlaTreeViewBase):
         "sort-column": blautil.signal(2)
     }
 
-    def __init__(self, ignored_column_ids=[]):
+    def __init__(self, ignored_column_ids=None):
         super(_BlaTrackListTreeView, self).__init__()
         self.set_fixed_height_mode(True)
         self.set_rubber_banding(True)
         self.set_property("rules-hint", True)
 
-        self._ignored_column_ids = ignored_column_ids
+        self._ignored_column_ids = ignored_column_ids or []
 
         self._callback_id = self.connect_object(
             "columns-changed", _BlaTrackListTreeView._on_columns_changed, self)
@@ -625,7 +625,7 @@ class BlaTrackList(BlaView):
         self.disable_search()
 
     def _populate_model(self, scroll_item=None, row_align=0.5,
-                        selected_items=[]):
+                        selected_items=None):
         items = self._get_visible_items()
 
         # Determine new track list metadata.
@@ -1205,7 +1205,7 @@ class BlaTrackList(BlaView):
             for path in range(low[0], high[0]+1):
                 row_changed(path, get_iter(path))
 
-    def set_row(self, path, paths=[], row_align=0.5):
+    def set_row(self, path, paths=None, row_align=0.5):
         # Wrap the actual heavy lifting in gobject.idle_add. If we decorate the
         # instance method itself we can't use kwargs anymore which is rather
         # annoying for this particular method.
@@ -1214,7 +1214,7 @@ class BlaTrackList(BlaView):
             if path is not None:
                 self._scroll_to_cell(path, row_align)
                 self._treeview.set_cursor(path)
-            if paths:
+            if paths is not None:
                 select_path = self._treeview.get_selection().select_path
                 map(select_path, paths)
         set_row()
