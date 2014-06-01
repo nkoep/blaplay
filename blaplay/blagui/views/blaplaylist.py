@@ -86,7 +86,7 @@ class _History(gtk.ListStore):
         return item
 
     def clear(self):
-        self.clear()
+        super(_History, self).clear()
         self._iterator = None
 
     def _iter_previous(self, iterator):
