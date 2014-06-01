@@ -153,9 +153,10 @@ class _CoverDisplay(gtk.DrawingArea):
                 gobject.source_remove(self._fetch_timeout_id)
             self._fetch_timeout_id = gobject.timeout_add( 250, fetch_cover)
 
-class BlaTrackInfo(gtk.Viewport):
+class BlaTrackInfo(gtk.Viewport, blautil.BlaInitiallyHidden):
     def __init__(self, metadata_fetcher):
         super(BlaTrackInfo, self).__init__()
+        blautil.BlaInitiallyHidden.__init__(self)
         self.set_shadow_type(gtk.SHADOW_IN)
 
         self._track = None
@@ -220,10 +221,12 @@ class BlaTrackInfo(gtk.Viewport):
             return
         state = player.get_state()
 
-        if state == blaconst.STATE_STOPPED:
+        player_stopped = state == blaconst.STATE_STOPPED
+        if player_stopped:
             self._track = None
         else:
             self._track = track
+        self.set_visible(player_stopped)
         self._cover_display.update_cover(self._track)
         self._update_track_info(self._track)
 

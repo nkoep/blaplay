@@ -477,3 +477,21 @@ class BlaFrozenDict(dict):
             raise ValueError("Entry for key '%s' already exists" % key)
         super(BlaFrozenDict, self).__setitem__(key, value)
 
+class BlaInitiallyHidden(object):
+    """
+    Class hides  guarantees
+    """
+
+    def __new__(cls):
+        if not gtk.Widget in cls.__bases__:
+            raise TypeError("Class must have gtk.Widget in its bases")
+        return super(BlaInitiallyHidden, cls).__new__(cls)
+
+    def __init__(self):
+        self._callback_id = self.connect_object(
+            "map", BlaInitiallyHidden._on_map, self)
+
+    def _on_map(self):
+        self.disconnect(self._callback_id)
+        self.set_visible(False)
+
