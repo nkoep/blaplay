@@ -555,6 +555,17 @@ class BlaTrackList(BlaView):
         gobject.TYPE_STRING     # Stock item id
     )
 
+    def _reset(self):
+        self._length = 0
+        self._size = 0
+        self._all_items = []            # Unfiltered, unsorted tracks
+        self._all_sorted = []           # Unfiltered, sorted tracks
+        self._items = []                # Visible tracks when unsorted
+        self._sorted = []               # Visible tracks when sorted
+        self._sort_parameters = None
+        self._filter_callback_id = -1
+        self._mode = MODE_NORMAL
+
     def _create_filter_entry(self):
         entry = gtk.Entry()
         entry.set_icon_from_stock(gtk.ENTRY_ICON_SECONDARY, gtk.STOCK_CANCEL)
@@ -586,15 +597,7 @@ class BlaTrackList(BlaView):
     def __init__(self, name, *args, **kwargs):
         super(BlaTrackList, self).__init__(name, *args, **kwargs)
 
-        self._length = 0
-        self._size = 0
-        self._all_items = []            # Unfiltered, unsorted tracks
-        self._all_sorted = []           # Unfiltered, sorted tracks
-        self._items = []                # Visible tracks when unsorted
-        self._sorted = []               # Visible tracks when sorted
-        self._sort_parameters = None
-        self._filter_callback_id = -1
-        self._mode = MODE_NORMAL
+        self._reset()
 
         # Set up the filter box.
         self._entry = self._create_filter_entry()
@@ -1220,9 +1223,7 @@ class BlaTrackList(BlaView):
         set_row()
 
     def clear(self):
-        if not self.can_modify():
-            return
-        self._all_items = self._items = self._all_sorted = self._sorted = []
+        self._reset()
         self._treeview.get_model().clear()
         self.disable_search()
 
