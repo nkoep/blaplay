@@ -392,7 +392,7 @@ class BlaPlaylistManager(BlaViewManager):
     def send_uris_to_playlist(self, playlist, uris):
         if not uris:
             return
-        if not playlist.can_modify():
+        if not playlist.can_modify(check_filter_state=False):
             return
         # We want to start playing from this playlist immediately so mark the
         # the playlist holding the currently playing track as inactive.
