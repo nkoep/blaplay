@@ -226,7 +226,7 @@ class BlaTrackInfo(gtk.Viewport, blautil.BlaInitiallyHidden):
             self._track = None
         else:
             self._track = track
-        self.set_visible(player_stopped)
+        self.set_visible(not player_stopped)
         self._cover_display.update_cover(self._track)
         self._update_track_info(self._track)
 
