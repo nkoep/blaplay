@@ -27,10 +27,6 @@ from blaplay import blautil
 class BlaplayState(gobject.GObject):
     __slots__ = "_pre_shutdown_hooks config library player window".split()
 
-    __gsignals__ = {
-        "startup-complete": blautil.signal(0)
-    }
-
     def __init__(self):
         super(BlaplayState, self).__init__()
         self.library = self.player = self.window = None
@@ -45,10 +41,6 @@ class BlaplayState(gobject.GObject):
         return super(BlaplayState, self).__setattr__(attr, value)
 
     def run(self):
-        def on_map_event(window, event):
-            self.emit("startup-complete")
-            self.window.disconnect(callback_id)
-        callback_id = self.window.connect("map-event", on_map_event)
         gobject.idle_add(self.window.show)
         print_d("Entering the main loop")
         gtk.main()

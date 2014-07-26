@@ -93,13 +93,14 @@ class _BlaMainWindow(BlaBaseWindow):
             else:
                 return self._config.getboolean("general", "maximized")
 
-    def _create_browser_container(self, browsers):
+    def _create_browser_container(self, config, player, browsers):
         vbox = gtk.VBox(spacing=blaconst.WIDGET_SPACING)
         vbox.pack_start(browsers)
-        vbox.pack_start(BlaVisualization(), expand=False)
+        vbox.pack_start(BlaVisualization(config, player), expand=False)
         return vbox
 
     def _create_lyrics_container(self):
+        # TODO: Rename BlaFetcher to BlaMetadataFetcher.
         from blaplay.blautil.blametadata import BlaFetcher as BlaMetadataFetcher
         from blalyricsviewer import BlaLyricsViewer
         from blatrackinfo import BlaTrackInfo
@@ -166,7 +167,7 @@ class _BlaMainWindow(BlaBaseWindow):
 
         # Pack the browser + view-widget into a paned widget.
         browser_container = self._create_browser_container(
-            self._browser_view_slot)
+            config, player, self._browser_view_slot)
         pane_left = self._create_pane(browser_container, pane_right, "left")
 
         # Create a vbox for the middle pane and the statusbar. This allows for
