@@ -227,13 +227,15 @@ class BlaMpris(dbus.service.Object):
             return False
         player.connect("seeked", seeked)
 
-        # TODO: roll this into a generic callback
-        def state_changed(player):
-            property_name = "PlaybackStatus"
+        # TODO: Roll this into a generic callback.
+        def emit_properties_changed_signal(player, property_name):
             value = self.Get(INTERFACE_PLAYER, property_name)
             self.PropertiesChanged(
                 INTERFACE_PLAYER, {property_name: value}, [])
-        player.connect("state_changed", state_changed)
+        player.connect("state-changed", emit_properties_changed_signal,
+                       "PlaybackStatus")
+        player.connect("track-changed", emit_properties_changed_signal,
+                       "Metadata")
 
     def __get_interface_properties(self, interface_name):
         try:
