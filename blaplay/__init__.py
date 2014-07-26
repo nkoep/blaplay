@@ -67,14 +67,14 @@ class BlaplayState(gobject.GObject):
         except AttributeError:
             pass
 
-        # FIXME: this is our gateway routine for shutting down blaplay, i.e.
-        #        shutdown always starts here. just calling the kill_threads
-        #        classmethod isn't enough to actually stop the threads. we also
-        #        need to join them. otherwise interpreter shutdown might be
-        #        initiated after leaving this function with threads still running.
-        #        occasionally, these wake up to find their containing module's
-        #        globals() dict wiped clean and start spitting out exceptions +
-        #        segfaults.
+        # FIXME: This is our gateway routine for shutting down blaplay, i.e.
+        #        shutdown always starts here. Just calling the kill_threads
+        #        classmethod isn't enough to actually stop the threads. We also
+        #        need to join them. Otherwise, an interpreter shutdown might be
+        #        initiated after leaving this function with threads still
+        #        running. Occasionally, these wake up to find their containing
+        #        module's globals() dict wiped clean and start spitting out
+        #        exceptions or even segfaults.
         blautil.BlaThread.kill_threads()
 
         for hook in self._pre_shutdown_hooks:
@@ -95,7 +95,7 @@ class BlaplayState(gobject.GObject):
         print_d("Stopping the main loop")
         gtk.main_quit()
 
-# TODO: Rename to app_state and pass this along in place config, library,
+# TODO: Rename to app_state and pass this along in place of config, library,
 #       player, etc.
 bla = BlaplayState()
 
@@ -156,15 +156,15 @@ def finish_startup():
 
     # Initialize last.fm services.
     from blaplay.blautil import blafm
-    blafm.init(library)
+    blafm.init(library, player)
 
-    # Initialize metadata module.
+    # Initialize the metadata module.
     from blaplay.blautil import blametadata
     blametadata.init()
 
-    # Set process name for programs like top or gnome-system-monitor.
+    # Set the process name for programs like top or gnome-system-monitor.
     gobject.set_prgname(blaconst.APPNAME)
-    # linux/prctl.h: 15 == PR_SET_NAME
+    # From linux/prctl.h: 15 == PR_SET_NAME
     blautil.cdll("c").prctl(15, blaconst.APPNAME, 0, 0, 0)
 
     # Finally, start the main loop.

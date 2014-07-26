@@ -32,6 +32,7 @@ import gtk
 import gobject
 
 import blaplay
+# XXX: Get rid of this.
 player = blaplay.bla.player
 from blaplay import blautil
 from blaplay.blacore import blacfg, blaconst
@@ -44,11 +45,11 @@ TIMEOUT = 5
 scrobbler = None
 
 
-def init(library):
+def init(library, player):
     global scrobbler
     scrobbler = BlaScrobbler(library)
-    player.connect("track-changed", scrobbler.submit_track)
-    player.connect("track-stopped", scrobbler.submit_track)
+
+    BlaFm(library, player, scrobbler)
 
 # TODO: Rename this to create_submenu.
 def create_popup_menu(track=None):
@@ -266,6 +267,12 @@ class _SubmissionQueue(Queue.Queue):
         Queue.Queue.__init__(self)
         self._library = library
         self._restore()
+        # XXX: Here's the thing: _SubmissionQueue gets created in the c'tor of
+        #      BlaScrobbler. This means that by the time we call
+        #      `submit_scrobbles' here, the global variable `scrobbler' isn't
+        #      assigned yet. However, to get a last.fm session key we already
+        #      need `scrobbler' in said method. Bottom line: we need to rethink
+        #      the whole dependency graph of classes in this module.
         self._submit_scrobbles()
 
     @blautil.thread
@@ -281,7 +288,12 @@ class _SubmissionQueue(Queue.Queue):
                     break
 
             method = "track.scrobble"
-            session_key = scrobbler.get_session_key()
+            # XXX: This is an artifact of having `scrobbler' be defined as a
+            #      global. See comment in `__init__'.
+            try:
+                session_key = scrobbler.get_session_key()
+            except AttributeError:
+                continue
             if not session_key:
                 continue
             params = [
@@ -531,4 +543,13 @@ class BlaScrobbler(object):
             else:
                 item = os.path.basename(track.uri)
             print_d("Not submitting \"%s\" to the scrobbler queue" % item)
+
+class BlaFm(object):
+    def __init__(self, library, player, scrobbler):
+        self._library = library
+        self._player = player
+        self._scrobbler = scrobbler
+
+        player.connect("track-changed", scrobbler.submit_track)
+        player.connect("track-stopped", scrobbler.submit_track)
 
