@@ -441,7 +441,7 @@ class BlaOrderedSet(collections.MutableSet):
         self.clear()
 
 class BlaNotifyDict(dict):
-    __slots__ = ("__callbacks")
+    __slots__ = "__callbacks"
 
     def __init__(self, *args, **kwargs):
         super(BlaNotifyDict, self).__init__(*args, **kwargs)
@@ -466,8 +466,8 @@ class BlaNotifyDict(dict):
     clear = __notify_wrap(dict.clear)
 
 # Note that assignment to an existing key is still possible by deleting the
-# relevant entry first. It's still a decent precautionary measure to avoid
-# accidental overrides of existing keys.
+# relevant entry first. The class still offers a decent precautionary measure
+# against accidental overrides of existing keys.
 class BlaFrozenDict(dict):
     def setdefault(self, keys, default=None):
         raise NotImplementedError("Method not supported")
@@ -479,7 +479,8 @@ class BlaFrozenDict(dict):
 
 class BlaInitiallyHidden(object):
     """
-    Class hides  guarantees
+    Mixin to guarantee that a widget gets hidden once after its first `map'
+    event.
     """
 
     def __new__(cls):
@@ -488,10 +489,10 @@ class BlaInitiallyHidden(object):
         return super(BlaInitiallyHidden, cls).__new__(cls)
 
     def __init__(self):
-        self._callback_id = self.connect_object(
+        self.__callback_id = self.connect_object(
             "map", BlaInitiallyHidden._on_map, self)
 
     def _on_map(self):
-        self.disconnect(self._callback_id)
+        self.disconnect(self.__callback_id)
         self.set_visible(False)
 
