@@ -51,12 +51,15 @@ class BlaKeys(gobject.GObject):
         return keybinder is not None
 
     def bind(self, action, accel):
-        self.unbind(accel)
-        return keybinder.bind(accel, self.__ACTIONS[action], None)
+        if self.can_bind():
+            self.unbind(accel)
+            return keybinder.bind(accel, self.__ACTIONS[action], None)
+        return False
 
     def unbind(self, accel):
-        try:
-            keybinder.unbind(accel)
-        except KeyError:
-            pass
+        if self.can_bind():
+            try:
+                keybinder.unbind(accel)
+            except KeyError:
+                pass
 
