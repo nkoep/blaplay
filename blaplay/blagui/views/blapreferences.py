@@ -26,12 +26,12 @@ from ..blakeys import BlaKeys
 from .. import blaguiutil
 from .blaview import BlaView
 
-ROW_SPACINGS = 3
+ROW_SPACING = 3
 
 
 class _Page(gtk.VBox):
     def __init__(self, name, config, library):
-        super(_Page, self).__init__(spacing=ROW_SPACINGS)
+        super(_Page, self).__init__(spacing=ROW_SPACING)
         self.set_border_width(10)
 
         self._name = name
@@ -82,8 +82,6 @@ class _LibrarySettings(_Page):
     def __init__(self, *args, **kwargs):
         super(_LibrarySettings, self).__init__("Library", *args, **kwargs)
 
-        hbox = gtk.HBox(spacing=ROW_SPACINGS)
-
         # Set up the directory selector.
         model = gtk.ListStore(gobject.TYPE_STRING)
         treeview = gtk.TreeView(model)
@@ -101,7 +99,7 @@ class _LibrarySettings(_Page):
             model.append([d])
 
         table = gtk.Table(rows=2, columns=1)
-        table.set_row_spacings(ROW_SPACINGS)
+        table.set_row_spacings(ROW_SPACING)
         items = [
             ("Add...", self._add_directory),
             ("Remove", self._remove_directory),
@@ -112,8 +110,10 @@ class _LibrarySettings(_Page):
             button.connect("clicked", callback, treeview)
             table.attach(button, 0, 1, idx, idx+1)
 
+        hbox = gtk.HBox(spacing=ROW_SPACING)
         hbox.pack_start(viewport, expand=False)
         hbox.pack_start(table, expand=False)
+        self.pack_start(hbox, expand=False)
 
         # Update library checkbutton
         cb = gtk.CheckButton("Update library on startup")
@@ -121,36 +121,43 @@ class _LibrarySettings(_Page):
         cb.connect(
             "toggled",
             lambda cb: self._config.setboolean("library", "update.on.startup",
-                                         cb.get_active()))
+                                               cb.get_active()))
+        self.pack_start(cb)
 
         # Set up file restriction and exclusion options.
-        def changed(entry, key):
-            self._config.set_("library", key, entry.get_text())
+        def create_entry_box(tooltip, key):
+            def on_entry_changed(entry, key):
+                self._config.set_("library", key, entry.get_text())
+            entry = gtk.Entry()
+            entry.set_size_request(250, -1)
+            entry.set_tooltip_text(tooltip)
+            entry.set_text(self._config.getstring("library", key))
+            entry.connect("changed", on_entry_changed, key)
+            return entry
+
+        # TODO: Display an icon behind the entry indicating whether the
+        #       expression can be compiled with re.compile.
         options = [
-            ("Restrict to", "Comma-separated list, works on filenames",
-             "restrict.to"),
-            ("Exclude", "Comma-separated list, works on filenames",
-             "exclude")
+            ("Ignore", "Ignore inotify events emitted for filenames matching "
+             "this regular expression", "ignore.pattern"),
+            ("Restrict to", "Restrict tracks in the library browser to "
+             "filenames matching this regular expression",
+             "restrict.to.pattern"),
+            ("Exclude", "Exclude tracks from the library browser whose "
+             "filenames match this regular expression", "exclude.pattern")
         ]
         table = gtk.Table(rows=len(options), columns=2, homogeneous=False)
-        table.set_row_spacings(ROW_SPACINGS)
+        table.set_row_spacings(ROW_SPACING)
         for idx, (label, tooltip, key) in enumerate(options):
             # Add the label.
             label = gtk.Label("%s:" % label)
             label.set_alignment(xalign=0.0, yalign=0.5)
             table.attach(label, 0, 1, idx, idx+1, xoptions=gtk.FILL,
                          xpadding=5)
-
             # Add the input field.
-            entry = gtk.Entry()
-            entry.set_size_request(250, -1)
-            entry.set_tooltip_text(tooltip)
-            entry.set_text(self._config.getstring("library", key))
-            entry.connect("changed", changed, key)
-            table.attach(entry, 1, 2, idx, idx+1, xoptions=gtk.FILL)
+            table.attach(create_entry_box(tooltip, key), 1, 2, idx, idx+1,
+                         xoptions=gtk.FILL)
 
-        self.pack_start(hbox, expand=False)
-        self.pack_start(cb)
         self.pack_start(table)
 
     def _add_directory(self, button, treeview):
@@ -224,7 +231,7 @@ class _BrowserSettings(_Page):
         options = [("Double-click", "doubleclick"),
                    ("Middle-click", "middleclick"), ("Return", "return")]
         table = gtk.Table(rows=len(options), columns=2, homogeneous=False)
-        table.set_row_spacings(ROW_SPACINGS)
+        table.set_row_spacings(ROW_SPACING)
         for idx, (label, key) in enumerate(options):
             # Add the label.
             label = gtk.Label("%s:" % label)
@@ -304,7 +311,7 @@ class _PlayerSettings(_Page):
         button_box.pack_start(button_table, expand=False, padding=16)
 
         table = gtk.Table(rows=2, columns=1, homogeneous=False)
-        table.set_row_spacings(ROW_SPACINGS)
+        table.set_row_spacings(ROW_SPACING)
         table.attach(logarithmic_volume_scale, 0, 2, 0, 1, xpadding=2)
         table.attach(use_equalizer, 0, 1, 1, 2, xpadding=2)
 
@@ -545,7 +552,7 @@ class _LastfmSettings(_Page):
             ("Ignore pattern", "ignore.pattern", "Comma-separated list")
         ]
         table = gtk.Table(rows=len(options), columns=2, homogeneous=False)
-        table.set_row_spacings(ROW_SPACINGS)
+        table.set_row_spacings(ROW_SPACING)
         for idx, (label, key, tooltip) in enumerate(options):
             # Add the label.
             label = gtk.Label("%s:" % label)

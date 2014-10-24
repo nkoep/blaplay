@@ -78,8 +78,8 @@ class BlaLibraryModel(gtk.TreeStore):
             return re.compile(r"(%s)" % "|".join(tokens))
 
         restrict_re = get_regexp(
-            config.getstring("library", "restrict.to").strip())
-        exclude_string = config.getstring("library", "exclude").strip()
+            config.getstring("library", "restrict.to.pattern").strip())
+        exclude_string = config.getstring("library", "exclude.pattern").strip()
         if exclude_string:
             exclude_re = get_regexp(exclude_string)
             def filt(s):

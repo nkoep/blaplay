@@ -36,6 +36,12 @@ class BlaCfg(RawConfigParser, gobject.GObject):
     def init(self):
         print_i("Loading config")
 
+        # TODO: - Use a metaclass to register these values as gproperties. That
+        #         way we can simply connect to their "changed::" signals and
+        #         use detail arguments to filter for relevant events.
+        #       - Define constants for these keys to avoid problems caused by
+        #         renaming a config key and not adjusting the rest of the code
+        #         accordingly.
         default = {
             "general": {
                 "size": "",
@@ -67,9 +73,10 @@ class BlaCfg(RawConfigParser, gobject.GObject):
             "equalizer.profiles": {
             },
             "library": {
+                "ignore.pattern": "",
                 "directories": "",
-                "restrict.to": "*",
-                "exclude": "",
+                "restrict.to.pattern": "",
+                "exclude.pattern": "",
                 "organize.by": blaconst.ORGANIZE_BY_DIRECTORY,
                 "doubleclick.action": blaconst.ACTION_SEND_TO_CURRENT,
                 "middleclick.action": blaconst.ACTION_ADD_TO_CURRENT,

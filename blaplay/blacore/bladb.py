@@ -56,6 +56,9 @@ def update_library():
     return False
 
 
+# TODO: - Derive this class from Queue.Queue, too, so we can drop the __queue
+#         attribute.
+#       - Move this to its own file.
 class BlaLibraryMonitor(gobject.GObject):
     __gsignals__ = {
         "initialized": blautil.signal(1)
@@ -66,6 +69,24 @@ class BlaLibraryMonitor(gobject.GObject):
     def __init__(self, config):
         super(BlaLibraryMonitor, self).__init__()
         self._config = config
+
+        def create_filter_function(expression):
+            if expression:
+                try:
+                    r = re.compile(r"%s" % expression, re.UNICODE)
+                except:
+                    pass
+                else:
+                    return r.search
+            return lambda *x: False
+
+        def on_config_changed(config, section, key):
+            if section == "library" and key == "ignore.pattern":
+                self._file_ignored = create_filter_function(
+                    config.getstring(section, key))
+        config.connect("changed", on_config_changed)
+        self._file_ignored = create_filter_function(
+            config.getstring("library", "ignore.pattern"))
 
         self.__monitors = {}
         self.__lock = blautil.BlaLock()
@@ -96,6 +117,10 @@ class BlaLibraryMonitor(gobject.GObject):
                 path_to = path_to.get_path()
             except AttributeError:
                 pass
+            # Note that this is a callable attribute, not a bound method, i.e.,
+            # we don't actually dispatch on self.
+            if self._file_ignored(path_from):
+                return
             self.__queue.put((event, path_from, path_to))
 
     @blautil.thread
@@ -303,13 +328,18 @@ class BlaLibrary(gobject.GObject):
         self.__extension_filter = re.compile(
             r".*\.(%s)$" % "|".join(formats.formats.keys())).match
 
-        def config_changed(cfg, section, key):
+        def on_config_changed(config, section, key):
+            # TODO: It seems illogical to do this here since BlaLibrary doesn't
+            #       use the restrict.to or exclude patterns. It only signals to
+            #       the library browser that something changed and the model
+            #       should be regenerated. Instead, let the library browser
+            #       listen for changes.
             if (section == "library" and
-                (key == "restrict.to" or key == "exclude")):
+                (key == "restrict.to.pattern" or key == "exclude.pattern")):
                 if self._timeout_id:
                     gobject.source_remove(self._timeout_id)
                 self._timeout_id = gobject.timeout_add(2500, self.sync)
-        self._config.connect("changed", config_changed)
+        self._config.connect("changed", on_config_changed)
 
         # Restore the library.
         tracks = blautil.deserialize_from_file(self._path)
