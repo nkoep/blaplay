@@ -74,7 +74,7 @@ class BlaBaseWindow(gtk.Window):
             event.new_window_state & gtk.gdk.WINDOW_STATE_MAXIMIZED)
         if event.new_window_state & gtk.gdk.WINDOW_STATE_WITHDRAWN:
             return
-        self._state_manager.maximized(self._maximized and self.__was_maximized)
+        self._state_manager.maximized(self._maximized and self._was_maximized)
 
     def _map(self, *args):
         self._restore_window_state()
