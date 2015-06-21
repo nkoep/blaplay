@@ -22,19 +22,23 @@ import blaconst
 from blaplay import blautil
 
 
+def init(config_path):
+    # print_i("Loading config")
+    return BlaCfg(config_path)
+
+
 class BlaCfg(RawConfigParser, gobject.GObject):
     __gsignals__ = {
         "changed": blautil.signal(2)
     }
 
-    def __init__(self):
+    def __init__(self, config_path):
         RawConfigParser.__init__(self)
         gobject.GObject.__init__(self)
 
-        self._timeout_id = 0
+        self._config_path = config_path
 
-    def init(self):
-        print_i("Loading config")
+        self._timeout_id = 0
 
         # TODO: - Use a metaclass to register these values as gproperties. That
         #         way we can simply connect to their "changed::" signals and
@@ -108,8 +112,8 @@ class BlaCfg(RawConfigParser, gobject.GObject):
             for key, value in values.iteritems():
                 self.set_(section, key, value)
 
-        if not self.read(blaconst.CFG_PATH):
-            self.read("%s.bak" % blaconst.CFG_PATH)
+        if not self.read(self._config_path):
+            self.read("%s.bak" % self._config_path)
 
         def schedule_save(*args):
             if self._timeout_id:
@@ -203,19 +207,19 @@ class BlaCfg(RawConfigParser, gobject.GObject):
 
         # Move the old file.
         try:
-            shutil.move(blaconst.CFG_PATH, "%s.bak" % blaconst.CFG_PATH)
+            shutil.move(self._config_path, "%s.bak" % self._config_path)
         except IOError:
             pass
 
         # Move the tempfile to the actual location and remove the backup file
         # on success.
         try:
-            shutil.move(tmp_path, blaconst.CFG_PATH)
+            shutil.move(tmp_path, self._config_path)
         except IOError:
             pass
         else:
             try:
-                os.unlink("%s.bak" % blaconst.CFG_PATH)
+                os.unlink("%s.bak" % self._config_path)
             except OSError:
                 pass
 

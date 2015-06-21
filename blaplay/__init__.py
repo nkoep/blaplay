@@ -29,8 +29,8 @@ class BlaplayState(gobject.GObject):
 
     def __init__(self):
         super(BlaplayState, self).__init__()
-        self.library = self.player = self.window = None
         self._pre_shutdown_hooks = []
+        self.config = self.library = self.player = self.window = None
 
     def __setattr__(self, attr, value):
         # The attributes for this class are frozen. That is, we only allow the
@@ -42,11 +42,19 @@ class BlaplayState(gobject.GObject):
 
     def run(self):
         gobject.idle_add(self.window.show)
-        print_d("Entering the main loop")
+        print_d("Starting the main loop")
         gtk.main()
 
+    def _hook_repr(self, hook):
+        return "{:s}.{:s}".format(hook.__module__, hook.__name__)
+
     def add_pre_shutdown_hook(self, hook):
-        self._pre_shutdown_hooks.append(hook)
+        # TODO: Implement a `Hook` class for this.
+        if callable(hook):
+            self._pre_shutdown_hooks.append(hook)
+        else:
+            print_w("Shutdown hook '{:s}' ignored as it isn't callable".format(
+                self._hook_repr(hook)))
 
     def shutdown(self):
         print_d("Shutting down %s..." % blaconst.APPNAME)
@@ -70,8 +78,8 @@ class BlaplayState(gobject.GObject):
         blautil.BlaThread.kill_threads()
 
         for hook in self._pre_shutdown_hooks:
-            print_d("Calling pre-shutdown hook '%s.%s'" %
-                    (hook.__module__, hook.__name__))
+            print_d("Calling pre-shutdown hook '{:s}'".format(
+                self._hook_repr(hook)))
             hook()
 
         from blaplay.blagui import blaguiutil
@@ -96,8 +104,7 @@ def finish_startup():
     from blaplay.blacore import blacfg, bladb
 
     # Initialize the config.
-    # XXX config = blacfg.init(blaconst.CONFIG_PATH)
-    blacfg.init()
+    # config = bla.config = blacfg.init(blaconst.CONFIG_PATH)
     config = bla.config = blacfg
 
     # Initialize the library.
@@ -114,7 +121,8 @@ def finish_startup():
     from blaplay.blagui import blakeys
     blakeys.BlaKeys()
 
-    # TODO: Make python2-dbus a hard dependency.
+    # TODO: Make python2-dbus a hard dependency so we can drop this mock
+    #       module.
     # Set up the D-Bus interface.
     try:
         from blaplay.blautil import bladbus

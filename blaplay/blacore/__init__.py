@@ -14,6 +14,9 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-from blacfg import BlaCfg
-blacfg = BlaCfg()
+# XXX: The config should not be instantiated here, but we have to get rid of
+#      explicit imports of blacore.blacfg first.
+import blaconst
+import blacfg as _blacfg
+blacfg = _blacfg.init(blaconst.CONFIG_PATH)
 

@@ -41,7 +41,7 @@ COVERS = os.path.join(CACHEDIR, "covers")
 ARTISTS = os.path.join(CACHEDIR, "artists")
 
 # Files
-CFG_PATH = os.path.join(USERDIR, "config")
+CONFIG_PATH = os.path.join(USERDIR, "config")
 PIDFILE = os.path.join(USERDIR, "pid")
 LIBRARY_PATH = os.path.join(USERDIR, "library")
 OOL_PATH = os.path.join(USERDIR, "ool")
