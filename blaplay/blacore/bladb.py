@@ -30,9 +30,9 @@ import gio
 
 import blaplay
 from blaplay.blacore import blaconst
-from blaplay import blautil, formats
-get_track = formats.get_track
+from blaplay import blautil
 from blaplay.blagui import blaguiutil
+from blaplay.formats import formats, make_track
 from blaplay.formats._identifiers import *
 
 EVENT_CREATED, EVENT_DELETED, EVENT_MOVED, EVENT_CHANGED = xrange(4)
@@ -326,7 +326,7 @@ class BlaLibrary(gobject.GObject):
         self.__lock = blautil.BlaLock(strict=True)
         self._timeout_id = 0
         self.__extension_filter = re.compile(
-            r".*\.(%s)$" % "|".join(formats.formats.keys())).match
+            r".*\.(%s)$" % "|".join(formats.keys())).match
 
         def on_config_changed(config, section, key):
             # TODO: It seems illogical to do this here since BlaLibrary doesn't
@@ -498,7 +498,7 @@ class BlaLibrary(gobject.GObject):
         filt = self.__extension_filter
         add_track = self.add_track
         for uri in filter(filt, uris):
-            track = get_track(uri)
+            track = make_track(uri)
             if not track:
                 continue
             for md in self.__monitored_directories:
@@ -526,7 +526,7 @@ class BlaLibrary(gobject.GObject):
             track_updated = False
         else:
             md = track[MONITORED_DIRECTORY]
-            track = get_track(uri) # Get a new BlaTrack from `uri'.
+            track = make_track(uri) # Get a new BlaTrack from `uri'.
             if track is None:
                 return None
             track[MONITORED_DIRECTORY] = md
@@ -559,7 +559,7 @@ class BlaLibrary(gobject.GObject):
         try:
             track = self.__tracks[path_from]
         except KeyError:
-            track = get_track(path_to)
+            track = make_track(path_to)
             if track:
                 track[MONITORED_DIRECTORY] = md
                 self.add_track(track)
@@ -650,7 +650,7 @@ class BlaLibrary(gobject.GObject):
                 try:
                     track = self[uri]
                 except KeyError:
-                    track = get_track(uri)
+                    track = make_track(uri)
                     self.__tracks_ool[uri] = track
                 if track:
                     namespace["uris"].append(uri)
@@ -728,7 +728,7 @@ class BlaLibrary(gobject.GObject):
                     try:
                         track = self.__tracks_ool[path]
                     except KeyError:
-                        track = get_track(path)
+                        track = make_track(path)
                     else:
                         if update_track(path):
                             track = self[path]

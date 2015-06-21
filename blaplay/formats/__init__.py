@@ -25,7 +25,7 @@ class TagParseError(Exception):
     pass
 
 
-def get_track(path):
+def make_track(path):
     ext = blautil.get_extension(path).lower()
     try:
         format_cls = formats[ext]
