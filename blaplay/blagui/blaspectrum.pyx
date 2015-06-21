@@ -1,3 +1,5 @@
+#cython: cdivision=True, boundscheck=False
+
 # blaplay, Copyright (C) 2012-2014  Niklas Koep
 
 # This program is free software; you can redistribute it and/or
@@ -247,7 +249,6 @@ cdef class BlaSpectrum(object):
         self.__bin_width = <int>fmaxf(
             (self.__width - 4 - (self.__bands-1)) / (<float>self.__bands), 1)
 
-    @cython.boundscheck(False)
     cpdef new_buffer(self, object buf):
         cdef int l
         # Buffers are added and consumed in different threads so we need to
@@ -255,7 +256,6 @@ cdef class BlaSpectrum(object):
         with self.__lock:
             self.__adapter.push(buf)
 
-    @cython.boundscheck(False)
     cpdef consume_buffer(self):
         # TODO: Account for jitter in this method. It is used as callback for a
         #       gobject.timeout_add call. This means that if the main thread is
@@ -273,7 +273,6 @@ cdef class BlaSpectrum(object):
                 self.__np_buf = np.zeros(2 * NFFT, f32)
         return True
 
-    @cython.boundscheck(False)
     cpdef flush_buffers(self):
         with self.__lock:
             self.__adapter.flush(self.__adapter.available())
