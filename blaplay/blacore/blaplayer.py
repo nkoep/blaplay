@@ -89,15 +89,6 @@ class BlaPlayer(gobject.GObject):
             return False
 
         audio_sink = gst.Bin()
-
-        filt = gst.element_factory_make("capsfilter")
-        filt.set_property(
-            "caps", gst.caps_from_string("audio/x-raw-float,"
-                                         "rate=(int)44100,"
-                                         "channels=(int)2,"
-                                         "width=(int)32,"
-                                         "depth=(int)32,"
-                                         "endianness=(int)1234"))
         self.__equalizer = gst.element_factory_make("equalizer-10bands")
         tee = gst.element_factory_make("tee")
         queue = gst.element_factory_make("queue")
@@ -106,6 +97,13 @@ class BlaPlayer(gobject.GObject):
         def new_buffer(sink):
             self.emit("new_buffer", sink.emit("pull_buffer"))
         appsink = gst.element_factory_make("appsink")
+        appsink.set_property(
+            "caps", gst.caps_from_string("audio/x-raw-float,"
+                                         "rate=(int)44100,"
+                                         "channels=(int)2,"
+                                         "width=(int)32,"
+                                         "depth=(int)32,"
+                                         "endianness=(int)1234"))
         appsink.set_property("drop", True)
         appsink.set_property("sync", True)
         appsink.set_property("emit_signals", True)
@@ -114,14 +112,13 @@ class BlaPlayer(gobject.GObject):
         sink = gst.element_factory_make("autoaudiosink")
 
         self.__volume = gst.element_factory_make("volume")
-        elements = [filt, self.__equalizer, tee, queue, appsink,
-                    self.__volume, sink]
+        elements = [self.__equalizer, tee, queue, appsink, self.__volume, sink]
         map(audio_sink.add, elements)
 
         pad = elements[0].get_static_pad("sink")
         audio_sink.add_pad(gst.GhostPad("sink", pad))
 
-        gst.element_link_many(filt, self.__equalizer, tee)
+        gst.element_link_many(self.__equalizer, tee)
         gst.element_link_many(tee, self.__volume, sink)
         gst.element_link_many(tee, queue, appsink)
 
