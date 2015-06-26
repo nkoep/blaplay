@@ -273,6 +273,7 @@ class BlaFetcher(gobject.GObject):
 
     @blautil.thread
     def __fetch_cover(self, track, timestamp):
+        # FIXME: This method is way too convoluted to properly reason about.
         def emit_timeout(cover):
             gobject.idle_add(self.emit, "cover", timestamp, cover)
             self._timeout_id = 0
@@ -285,6 +286,7 @@ class BlaFetcher(gobject.GObject):
 
         image_base = track.get_cover_basepath()
         if image_base is None:
+            gobject.idle_add(self.emit, "cover", timestamp, blaconst.COVER)
             return
 
         if os.path.isfile("%s.jpg" % image_base):

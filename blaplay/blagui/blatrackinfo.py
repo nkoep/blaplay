@@ -56,10 +56,7 @@ class _CoverDisplay(gtk.DrawingArea):
             _CoverDisplay._on_button_press_event, self)
 
     def _update_timestamp(self):
-        """Updates the timestamp and returns it."""
-
         self._timestamp = gobject.get_current_time()
-        return self._timestamp
 
     def _on_button_press_event(self, event):
         def open_cover(*args):
@@ -143,15 +140,17 @@ class _CoverDisplay(gtk.DrawingArea):
 
     def update_cover(self, track):
         def fetch_cover():
-            self._metadata_fetcher.fetch_cover(track, self._update_timestamp())
+            self._update_timestamp()
+            self._metadata_fetcher.fetch_cover(track, self._timestamp)
             self._fetch_timeout_id = 0
 
         if track is None:
-            self._display_cover(self._update_timestamp(), blaconst.COVER)
+            self._update_timestamp()
+            self._display_cover(self._timestamp, blaconst.COVER)
         else:
             if self._fetch_timeout_id:
                 gobject.source_remove(self._fetch_timeout_id)
-            self._fetch_timeout_id = gobject.timeout_add( 250, fetch_cover)
+            self._fetch_timeout_id = gobject.timeout_add(250, fetch_cover)
 
 class BlaTrackInfo(gtk.Viewport, blautil.BlaInitiallyHidden):
     def __init__(self, metadata_fetcher):
