@@ -24,6 +24,11 @@ import dbus.service
 import dbus.mainloop.glib
 dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
 
+# FIXME: Since we started using the gst module in the formats package importing
+#        this here also imports gst which slows down startup if we only want to
+#        query the state of a running blaplay instance.
+from blaplay.formats import _identifiers as tids
+
 # We use the same bus and interface name for now.
 INTERFACE = "org.freedesktop.blaplay"
 OBJECT_PATH = "/%s/BlaDBus" % INTERFACE.replace(".", "/")
@@ -35,11 +40,6 @@ def init(app):
     BlaDBus(app, object_path=OBJECT_PATH, bus_name=bus_name)
 
 def query_bus(query, arg=None):
-    # FIXME: - do this properly once we comply to MPRIS 2.2
-    #        - since we started using the gst module in the formats package
-    #          recently importing this here also imports gst
-    from blaplay.formats._identifiers import ARTIST, TITLE, ALBUM, DATE, GENRE
-
     # Get a proxy to the bus object of the running blaplay instance.
     try:
         proxy = dbus.SessionBus().get_object(INTERFACE, OBJECT_PATH)
@@ -60,11 +60,11 @@ def query_bus(query, arg=None):
                 print_e("Invalid format string `%s'" % args)
 
         callbacks = {
-            "%a": lambda: interface.get_tag(ARTIST),
-            "%t": lambda: interface.get_tag(TITLE),
-            "%b": lambda: interface.get_tag(ALBUM),
-            "%y": lambda: interface.get_tag(DATE),
-            "%g": lambda: interface.get_tag(GENRE),
+            "%a": lambda: interface.get_tag(tids.ARTIST),
+            "%t": lambda: interface.get_tag(tids.TITLE),
+            "%b": lambda: interface.get_tag(tids.ALBUM),
+            "%y": lambda: interface.get_tag(tids.DATE),
+            "%g": lambda: interface.get_tag(tids.GENRE),
             "%c": lambda: interface.get_cover()
         }
 
@@ -99,15 +99,13 @@ class BlaDBus(dbus.service.Object):
     @dbus.service.method(
         dbus_interface=INTERFACE, in_signature="i", out_signature="s")
     def get_tag(self, identifier):
-        from blaplay.formats._identifiers import ARTIST, TITLE
-
         # FIXME: check if track is None
         track = self._app.player.get_track()
         ret = track[identifier]
         if not ret:
-            if identifier == ARTIST:
+            if identifier == tids.ARTIST:
                 ret = "?"
-            elif identifier == TITLE:
+            elif identifier == tids.TITLE:
                 ret = os.path.basename(track.uri)
             else:
                 ret = ""

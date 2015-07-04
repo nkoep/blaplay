@@ -23,6 +23,7 @@ from dbus.exceptions import DBusException
 
 from blaplay.blacore import blaconst
 from blaplay import blautil
+from blaplay.formats import _identifiers as tids
 
 BUS_NAME = "org.mpris.MediaPlayer2.%s" % blaconst.APPNAME
 OBJECT_PATH = "/org/mpris/MediaPlayer2"
@@ -425,8 +426,7 @@ class BlaMpris(dbus.service.Object):
             return Dictionary(metadata)
 
         # Track length
-        from blaplay.formats import _identifiers as ids
-        metadata["mpris:length"] = dbus.Int64(track[ids.LENGTH] * 1000 ** 2)
+        metadata["mpris:length"] = dbus.Int64(track[tids.LENGTH] * 1000 ** 2)
 
         # Cover art
         cover = track.get_cover_path()
@@ -434,7 +434,7 @@ class BlaMpris(dbus.service.Object):
             metadata["mpris:artUrl"] = dbus.UTF8String("file://%s" % cover)
 
         # Single values
-        for id_, key in [(ids.ALBUM, "album"), (ids.TITLE, "title")]:
+        for id_, key in [(tids.ALBUM, "album"), (tids.TITLE, "title")]:
             value = track[id_]
             if not value:
                 continue
@@ -442,8 +442,8 @@ class BlaMpris(dbus.service.Object):
 
         # Values which get marshaled as `as'
         pairs = [
-            (ids.ALBUM_ARTIST, "albumArtist"), (ids.ARTIST, "artist"),
-            (ids.COMPOSER, "composer"), (ids.GENRE, "genre")
+            (tids.ALBUM_ARTIST, "albumArtist"), (tids.ARTIST, "artist"),
+            (tids.COMPOSER, "composer"), (tids.GENRE, "genre")
         ]
         for id_, key in pairs:
             value = track[id_]
@@ -454,7 +454,7 @@ class BlaMpris(dbus.service.Object):
 
         # TODO: asText (lyrics)
         # Disc and track number
-        for id_, key in [(ids.DISC, "disc"), (ids.TRACK, "trackNumber")]:
+        for id_, key in [(tids.DISC, "disc"), (tids.TRACK, "trackNumber")]:
             try:
                 value = int(track[id_].split("/")[0])
             except ValueError:
@@ -462,11 +462,11 @@ class BlaMpris(dbus.service.Object):
             metadata["xesam:%s" % key] = dbus.Int32(value)
 
         # URL
-        uri = track[ids.URI]
+        uri = track[tids.URI]
         metadata["xseam:url"] = dbus.UTF8String("file://%s" % uri)
 
         # Year
-        year = track[ids.DATE].split("-")[0]
+        year = track[tids.DATE].split("-")[0]
         if year:
             import time
             metadata["xesam:contentCreated"] = dbus.UTF8String(

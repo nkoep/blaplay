@@ -45,6 +45,9 @@ class Blaplay(gobject.GObject):
         print_d("Starting the main loop")
         gtk.main()
 
+    # TODO: Replace the hook system by simply emitting a `shutdown` signal by
+    #       this object, and letting the default signal handler do what's
+    #       currently done in `Blaplay.shutdown`.
     def _hook_repr(self, hook):
         return "{:s}.{:s}".format(hook.__module__, hook.__name__)
 
@@ -95,6 +98,8 @@ class Blaplay(gobject.GObject):
         print_d("Stopping the main loop")
         gtk.main_quit()
 
+# TODO: Remove this global instance once it's accessed from nowhere else
+#       anymore.
 app = Blaplay()
 # XXX: This is only here for compatibility for now.
 bla = app
@@ -152,7 +157,7 @@ def finish_startup():
     except ImportError:
         pass
     else:
-        blampris.init(bla)
+        blampris.init(app)
 
     # Initialize last.fm services.
     from blaplay.blautil import blafm
