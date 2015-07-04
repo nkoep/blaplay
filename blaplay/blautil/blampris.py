@@ -21,7 +21,7 @@ import dbus
 import dbus.service
 from dbus.exceptions import DBusException
 
-from blaplay.blacore import blacfg, blaconst
+from blaplay.blacore import blaconst
 from blaplay import blautil
 
 BUS_NAME = "org.mpris.MediaPlayer2.%s" % blaconst.APPNAME
@@ -139,18 +139,17 @@ INTROSPECTION_DATA = """
   </interface>
 </node>""".strip()
 
-def init():
+def init(app):
     print_i("Initializing MPRIS2 interfaces")
 
     bus_name = dbus.service.BusName(name=BUS_NAME, bus=dbus.SessionBus())
-    BlaMpris(object_path=OBJECT_PATH, bus_name=bus_name)
+    BlaMpris(app, object_path=OBJECT_PATH, bus_name=bus_name)
 
 class BlaMpris(dbus.service.Object):
-    def __init__(self, object_path, bus_name):
+    def __init__(self, app, object_path, bus_name):
         dbus.service.Object.__init__(self, object_path=object_path,
                                      bus_name=bus_name)
-        import blaplay
-        self.__bla = blaplay.bla
+        self._app = app
 
         # Define the properties for each interface. They are implemented with
         # callback functions to allow for easier handling of read-only and
@@ -171,7 +170,7 @@ class BlaMpris(dbus.service.Object):
                 "SupportedMimeTypes": self.__supported_mime_types
             }),
             INTERFACE_PLAYER: blautil.BlaFrozenDict({
-                "PlaybackStatus": self.__bla.player.get_state_string,
+                "PlaybackStatus": self._app.player.get_state_string,
                 "LoopStatus": self.__loop_status,
                 "Rate": lambda value=None: 1.0,
                 "Shuffle": self.__shuffle,
@@ -221,7 +220,7 @@ class BlaMpris(dbus.service.Object):
 
         # Propagate blaplay-specific events on the session bus which have an
         # appropriate analogon in the MPRIS2 specification.
-        player = self.__bla.player
+        player = self._app.player
         def seeked(player, pos):
             self.Seeked(pos / 1000)
             return False
@@ -299,7 +298,7 @@ class BlaMpris(dbus.service.Object):
     # Methods
     @dbus.service.method(dbus_interface=INTERFACE_BASE)
     def Raise(self):
-        self.__bla.window.raise_window()
+        self._app.window.raise_window()
 
     @dbus.service.method(dbus_interface=INTERFACE_BASE)
     def Quit(self):
@@ -308,7 +307,7 @@ class BlaMpris(dbus.service.Object):
 
     # Properties (these are handled via Get/GetAll/Set)
     def __fullscreen(self, value=None):
-        window = self.__bla.window
+        window = self._app.window
 
         # Read value
         if value is None:
@@ -317,7 +316,7 @@ class BlaMpris(dbus.service.Object):
         #window.set_fullscreen()
 
     def __can_set_fullscreen(self):
-        return self.__bla.player.video
+        return self._app.player.video
 
     def __desktop_entry(self):
         import gio
@@ -335,35 +334,35 @@ class BlaMpris(dbus.service.Object):
     # Methods
     @dbus.service.method(dbus_interface=INTERFACE_PLAYER)
     def Next(self):
-        self.__bla.player.next()
+        self._app.player.next()
 
     @dbus.service.method(dbus_interface=INTERFACE_PLAYER)
     def Previous(self):
-        self.__bla.player.previous()
+        self._app.player.previous()
 
     @dbus.service.method(dbus_interface=INTERFACE_PLAYER)
     def Pause(self):
-        self.__bla.player.pause()
+        self._app.player.pause()
 
     @dbus.service.method(dbus_interface=INTERFACE_PLAYER)
     def PlayPause(self):
-        self.__bla.player.play_pause()
+        self._app.player.play_pause()
 
     @dbus.service.method(dbus_interface=INTERFACE_PLAYER)
     def Stop(self):
-        self.__bla.player.stop()
+        self._app.player.stop()
 
     @dbus.service.method(dbus_interface=INTERFACE_PLAYER)
     def Play(self):
-        self.__bla.player.play()
+        self._app.player.play()
 
     @dbus.service.method(dbus_interface=INTERFACE_PLAYER,
                          in_signature="x")
     def Seek(self, offset):
         # BlaPlayer's seek() method expects an offset in nanoseconds while
         # the MPRIS2 specification defines offets in terms of microseconds.
-        self.__bla.player.seek(
-            self.__bla.player.get_position() + offset * 1000)
+        self._app.player.seek(
+            self._app.player.get_position() + offset * 1000)
 
     @dbus.service.method(dbus_interface=INTERFACE_PLAYER, in_signature="ox")
     def SetPosition(self, track_id, offset):
@@ -372,7 +371,7 @@ class BlaMpris(dbus.service.Object):
         # if track_id != dbus.ObjectPath(path + "/" + str()): pass
         if offset < 0 or track_id != "TODO: check if track_ids match":
             return
-        self.__bla.player.seek(offset * 1000)
+        self._app.player.seek(offset * 1000)
 
     @dbus.service.method(dbus_interface=INTERFACE_PLAYER, in_signature="s")
     def OpenUri(self, uri):
@@ -388,7 +387,7 @@ class BlaMpris(dbus.service.Object):
     def __loop_status(self, value=None):
         # Read value
         if value is None:
-            order = blacfg.getint("general", "play.order")
+            order = self._app.config.getint("general", "play.order")
             if order == blaconst.ORDER_REPEAT:
                 return "Track"
             elif order == blaconst.ORDER_SHUFFLE:
@@ -403,7 +402,7 @@ class BlaMpris(dbus.service.Object):
     def __shuffle(self, value=None):
         # Read value
         if value is None:
-            return (blacfg.getint("general", "play.order") ==
+            return (self._app.config.getint("general", "play.order") ==
                     blaconst.ORDER_SHUFFLE)
         else:
             # TODO: see __loop_status
@@ -415,7 +414,7 @@ class BlaMpris(dbus.service.Object):
 
         # TODO: determine the trackid from the unique identifier we use in the
         #       playlist. it isn't exported yet though
-        player = self.__bla.player
+        player = self._app.player
         track = player.get_track()
         id_ = str(id(track)) if track is not None else "NoTrack"
         metadata = {
@@ -476,14 +475,14 @@ class BlaMpris(dbus.service.Object):
         return Dictionary(metadata)
 
     def __volume(self, value=None):
-        player = self.__bla.player
+        player = self._app.player
 
         # Read value
         if value is None:
-            return blacfg.getfloat("player", "volume")
+            return self._app.config.getfloat("player", "volume")
         else:
             player.set_volume(value)
 
     def __position(self):
-        return self.__bla.player.get_position() / 1000
+        return self._app.player.get_position() / 1000
 

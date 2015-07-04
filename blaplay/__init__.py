@@ -24,11 +24,11 @@ from blaplay.blacore import blaconst
 from blaplay import blautil
 
 
-class BlaplayState(gobject.GObject):
+class Blaplay(gobject.GObject):
     __slots__ = "_pre_shutdown_hooks config library player window".split()
 
     def __init__(self):
-        super(BlaplayState, self).__init__()
+        super(Blaplay, self).__init__()
         self._pre_shutdown_hooks = []
         self.config = self.library = self.player = self.window = None
 
@@ -38,7 +38,7 @@ class BlaplayState(gobject.GObject):
         # make sure no one reassigns to one of the allowed fields here.
         if hasattr(self, attr) and getattr(self, attr) is not None:
             raise ValueError("Attribute '%s' already has a value" % attr)
-        return super(BlaplayState, self).__setattr__(attr, value)
+        return super(Blaplay, self).__setattr__(attr, value)
 
     def run(self):
         gobject.idle_add(self.window.show)
@@ -95,28 +95,28 @@ class BlaplayState(gobject.GObject):
         print_d("Stopping the main loop")
         gtk.main_quit()
 
-# TODO: Rename to app_state and pass this along in place of config, library,
-#       player, etc.
-bla = BlaplayState()
+app = Blaplay()
+# XXX: This is only here for compatibility for now.
+bla = app
 
 
 def finish_startup():
     from blaplay.blacore import blacfg, bladb
 
     # Initialize the config.
-    # config = bla.config = blacfg.init(blaconst.CONFIG_PATH)
-    config = bla.config = blacfg
+    # config = app_state.config = blacfg.init(blaconst.CONFIG_PATH)
+    config = app.config = blacfg
 
     # Initialize the library.
-    library = bla.library = bladb.init(config, blaconst.LIBRARY_PATH)
+    library = app.library = bladb.init(config, blaconst.LIBRARY_PATH)
 
     # Create an instance of the playback device.
     from blaplay.blacore import blaplayer
-    player = bla.player = blaplayer.init(library)
+    player = app.player = blaplayer.init(library)
 
     # Initialize the GUI.
     from blaplay import blagui
-    bla.window = blagui.init(config, library, player)
+    app.window = blagui.init(config, library, player)
 
     from blaplay.blagui import blakeys
     blakeys.BlaKeys()
@@ -152,7 +152,7 @@ def finish_startup():
     except ImportError:
         pass
     else:
-        blampris.init()
+        blampris.init(bla)
 
     # Initialize last.fm services.
     from blaplay.blautil import blafm
@@ -168,8 +168,8 @@ def finish_startup():
     blautil.cdll("c").prctl(15, blaconst.APPNAME, 0, 0, 0)
 
     # Finally, start the main loop.
-    bla.run()
+    app.run()
 
 def shutdown():
-    bla.shutdown()
+    app.shutdown()
 
