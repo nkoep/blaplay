@@ -165,6 +165,8 @@ class _BlaMainWindow(BlaBaseWindow):
         pane_right = self._create_pane(
             self._tab_view_slot, lyrics_container, "right")
 
+        # FIXME: The pane settings aren't ideal, i.e., the pane position won't
+        #        shrink by window resizing after having grown due to a resize.
         # Pack the browser + view-widget into a paned widget.
         browser_container = self._create_browser_container(
             config, player, self._browser_view_slot)
@@ -180,7 +182,7 @@ class _BlaMainWindow(BlaBaseWindow):
 
         # Pack everything up together in the main window's vbox.
         self.child.pack_start(self._menubar_slot, expand=False)
-        self.child.pack_start(BlaToolbar(), expand=False)
+        self.child.pack_start(BlaToolbar(config), expand=False)
         self.child.pack_start(vbox)
 
         self.connect_object(

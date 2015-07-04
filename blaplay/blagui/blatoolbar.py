@@ -22,7 +22,7 @@ import cairo
 
 import blaplay
 player = blaplay.bla.player
-from blaplay.blacore import blaconst, blacfg
+from blaplay.blacore import blaconst
 from blastatusbar import BlaStatusbar
 from blaplay.formats._identifiers import *
 
@@ -137,11 +137,13 @@ class PositionSlider(gtk.HScale):
 class VolumeControl(gtk.HBox):
     __states = ["muted", "low", "medium", "high"]
 
-    def __init__(self):
+    def __init__(self, config):
         super(VolumeControl, self).__init__(spacing=5)
 
-        self.__volume = int(blacfg.getfloat("player", "volume") * 100)
-        state = blacfg.getboolean("player", "muted")
+        self._config = config
+
+        self.__volume = int(config.getfloat("player", "volume") * 100)
+        state = config.getboolean("player", "muted")
         if not state:
             volume = self.__volume
         else:
@@ -178,18 +180,18 @@ class VolumeControl(gtk.HBox):
         self.pack_start(self.__scale, expand=True)
 
     def __scroll_event(self, scale, event):
-        if blacfg.getboolean("player", "muted"):
+        if self._config.getboolean("player", "muted"):
             return True
 
     def __button_press_event(self, scale, event):
-        if blacfg.getboolean("player", "muted"):
+        if self._config.getboolean("player", "muted"):
             return True
         if hasattr(event, "button"):
             event.button = 2
         return False
 
     def __button_release_event(self, scale, event):
-        if blacfg.getboolean("player", "muted"):
+        if self._config.getboolean("player", "muted"):
             return True
 
         if hasattr(event, "button"):
@@ -199,20 +201,20 @@ class VolumeControl(gtk.HBox):
         return False
 
     def __volume_changed(self, scale):
-        state = blacfg.getboolean("player", "muted")
+        state = self._config.getboolean("player", "muted")
 
         if state:
             volume = self.__volume
         else:
             volume = scale.get_value()
 
-        blacfg.set_("player", "volume", volume / 100.0)
+        self._config.set_("player", "volume", volume / 100.0)
         player.set_volume(scale.get_value())
         self.__update_icon(state)
 
     def __mute_toggled(self, button):
         state = button.get_active()
-        blacfg.setboolean("player", "muted", state)
+        self._config.setboolean("player", "muted", state)
         if state:
             self.__volume = self.__scale.get_value()
             self.__scale.set_value(0)
@@ -234,7 +236,7 @@ class VolumeControl(gtk.HBox):
 
     def __query_tooltip(self, *args):
         volume = self.__scale.get_value()
-        if blacfg.getboolean("player", "logarithmic.volume.scale"):
+        if self._config.getboolean("player", "logarithmic.volume.scale"):
             if volume == 0:
                 tooltip = "-Inf dB"
             else:
@@ -247,7 +249,7 @@ class VolumeControl(gtk.HBox):
 class BlaToolbar(gtk.Alignment):
     __state = None
 
-    def __init__(self):
+    def __init__(self, config):
         super(BlaToolbar, self).__init__(xalign=0.0, yalign=0.5, xscale=1.0,
                                          yscale=1.0)
         self.set_padding(0, 0, blaconst.BORDER_PADDING,
@@ -315,7 +317,7 @@ class BlaToolbar(gtk.Alignment):
         seekbar = PositionSlider()
 
         # Volume control
-        volume = VolumeControl()
+        volume = VolumeControl(config)
 
         hbox = gtk.HBox(spacing=10)
         hbox.pack_start(ctrlbar, expand=False)
