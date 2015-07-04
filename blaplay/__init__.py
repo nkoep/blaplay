@@ -143,8 +143,8 @@ def finish_startup():
             @classmethod
             def query_bus(cls, *args):
                 cls.__warning(True)
-
-    bladbus.setup_bus()
+    else:
+        bladbus.init(app)
 
     # Initialize MPRIS2 module.
     try:

@@ -29,11 +29,10 @@ INTERFACE = "org.freedesktop.blaplay"
 OBJECT_PATH = "/%s/BlaDBus" % INTERFACE.replace(".", "/")
 
 
-def setup_bus():
+def init(app):
     print_i("Setting up D-Bus")
-
     bus_name = dbus.service.BusName(INTERFACE, dbus.SessionBus())
-    BlaDBus(object_path=OBJECT_PATH, bus_name=bus_name)
+    BlaDBus(app, object_path=OBJECT_PATH, bus_name=bus_name)
 
 def query_bus(query, arg=None):
     # FIXME: - do this properly once we comply to MPRIS 2.2
@@ -93,10 +92,9 @@ def query_bus(query, arg=None):
 
 
 class BlaDBus(dbus.service.Object):
-    def __init__(self, **kwargs):
+    def __init__(self, app, **kwargs):
         dbus.service.Object.__init__(self, dbus.SessionBus(), **kwargs)
-        import blaplay
-        self.__player = blaplay.bla.player
+        self._app = app
 
     @dbus.service.method(
         dbus_interface=INTERFACE, in_signature="i", out_signature="s")
@@ -104,7 +102,7 @@ class BlaDBus(dbus.service.Object):
         from blaplay.formats._identifiers import ARTIST, TITLE
 
         # FIXME: check if track is None
-        track = self.__player.get_track()
+        track = self._app.player.get_track()
         ret = track[identifier]
         if not ret:
             if identifier == ARTIST:
@@ -118,7 +116,7 @@ class BlaDBus(dbus.service.Object):
     @dbus.service.method(
         dbus_interface=INTERFACE, in_signature="", out_signature="s")
     def get_cover(self):
-        track = self.__player.get_track()
+        track = self._app.player.get_track()
         if track:
             cover = track.get_cover_path()
             if cover is not None:
@@ -128,28 +126,27 @@ class BlaDBus(dbus.service.Object):
     @dbus.service.method(
         dbus_interface=INTERFACE, in_signature="", out_signature="")
     def play_pause(self):
-        self.__player.play_pause()
+        self._app.player.play_pause()
 
     @dbus.service.method(
         dbus_interface=INTERFACE, in_signature="", out_signature="")
     def stop(self):
-        self.__player.stop()
+        self._app.player.stop()
 
     @dbus.service.method(
         dbus_interface=INTERFACE, in_signature="", out_signature="")
     def next(self):
-        self.__player.next()
+        self._app.player.next()
 
     @dbus.service.method(
         dbus_interface=INTERFACE, in_signature="", out_signature="")
     def previous(self):
-        self.__player.previous()
+        self._app.player.previous()
 
     @dbus.service.method(
         dbus_interface=INTERFACE, in_signature="", out_signature="")
     def raise_window(self):
-        import blaplay
-        blaplay.bla.window.raise_window()
+        self._bla.window.raise_window()
 
     @dbus.service.method(
         dbus_interface=INTERFACE, in_signature="sas", out_signature="")
