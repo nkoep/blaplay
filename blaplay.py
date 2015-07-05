@@ -146,7 +146,7 @@ def process_args(args):
         if args[cmd]:
             bladbus.query_bus(cmd)
 
-def ensure_singleton():
+def create_instance_lock():
     # TODO: Make python2-dbus a hard-dependency and ensure singleton behavior
     #       with owned bus names.
 
@@ -206,7 +206,7 @@ def main():
 
     # If we made it this far, create a lock file that we use to guarantee only
     # one instance is running at a time.
-    lock_file = ensure_singleton()
+    lock_file = create_instance_lock()
     # Fire up the main application.
     app = blaplay.Blaplay()
     # This blocks until the shutdown sequence is initiated.
