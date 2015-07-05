@@ -21,26 +21,23 @@ import fcntl
 import gobject
 gobject.threads_init()
 
+import blaplay
 from blaplay.blacore import blaconst
 
 cli_queue = None
 
 
 def init_signals():
-    import signal
-
     def main_quit(*args):
         def idle_quit():
-            import blaplay
             blaplay.shutdown()
         gobject.idle_add(idle_quit, priority=gobject.PRIORITY_HIGH)
         return False
 
-    # Writing to a file descriptor which is monitored by gobject is buffered,
-    # i.e. we can write to it here and the event gets handled as soon as a main
-    # loop is started. We use this to defer shutdown requests during startup.
     r, w = os.pipe()
     gobject.io_add_watch(r, gobject.IO_IN, main_quit)
+
+    import signal
     for sig in [signal.SIGTERM, signal.SIGINT, signal.SIGHUP]:
         signal.signal(sig, lambda *x: os.write(w, "bla")) # What else?
 
@@ -189,22 +186,7 @@ def ensure_singleton():
     lock_file.write(str(os.getpid()))
     return lock_file
 
-def main():
-    init_signals()
-
-    args = parse_args()
-
-    init_logging(args)
-
-    process_args(args)
-
-    lock_file = ensure_singleton()
-
-    # Finish startup. This blocks until the shutdown sequence is initiated.
-    import blaplay
-    blaplay.finish_startup()
-
-    # Get rid of the lock file.
+def remove_instance_lock(lock_file):
     fcntl.lockf(lock_file, fcntl.LOCK_UN)
     lock_file.close()
     try:
@@ -212,6 +194,26 @@ def main():
     except OSError:
         pass
 
+def main():
+    # Initialize signal handling like SIGINT.
+    init_signals()
+    # Parse command-line arguments.
+    args = parse_args()
+    # Initialize the logging interfaces.
+    init_logging(args)
+    # Process and handle any remaining command-line arguments.
+    process_args(args)
+
+    # If we made it this far, create a lock file that we use to guarantee only
+    # one instance is running at a time.
+    lock_file = ensure_singleton()
+    # Fire up the main application.
+    app = blaplay.Blaplay()
+    # This blocks until the shutdown sequence is initiated.
+    app.run()
+
+    # Get rid of the lock file again.
+    remove_instance_lock(lock_file)
     print_d("Shutdown complete")
 
 if __name__ == "__main__":

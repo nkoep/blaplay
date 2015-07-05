@@ -312,9 +312,9 @@ class BlaLibrary(gobject.GObject):
         "library_updated": blautil.signal(0)
     }
 
-    def __init__(self, config, path):
+    def __init__(self, app, path):
         super(BlaLibrary, self).__init__()
-        self._config = config
+        self._app = app
         self._path = path
 
         self.__monitored_directories = []
@@ -339,12 +339,12 @@ class BlaLibrary(gobject.GObject):
                 if self._timeout_id:
                     gobject.source_remove(self._timeout_id)
                 self._timeout_id = gobject.timeout_add(2500, self.sync)
-        self._config.connect("changed", on_config_changed)
+        app.config.connect("changed", on_config_changed)
 
         # Restore the library.
         tracks = blautil.deserialize_from_file(self._path)
         if tracks is None:
-            self._config.set("library", "directories", "")
+            app.config.set("library", "directories", "")
         else:
             self.__tracks = tracks
 
@@ -359,10 +359,10 @@ class BlaLibrary(gobject.GObject):
 
         self.__monitored_directories = map(
             os.path.realpath,
-            self._config.getdotliststr("library", "directories"))
+            app.config.getdotliststr("library", "directories"))
 
         def initialized(library_monitor, directories):
-            if self._config.getboolean("library", "update.on.startup"):
+            if app.config.getboolean("library", "update.on.startup"):
                 p = self.__detect_changes(directories)
                 gobject.idle_add(p.next, priority=gobject.PRIORITY_LOW)
                 # TODO: This is more efficient than the method above. However,
@@ -370,7 +370,7 @@ class BlaLibrary(gobject.GObject):
                 # for md in self.__monitored_directories:
                 #     self.scan_directory(md)
             self.__library_monitor.disconnect(callback_id)
-        self.__library_monitor = BlaLibraryMonitor(config)
+        self.__library_monitor = BlaLibraryMonitor(app.config)
         callback_id = self.__library_monitor.connect(
             "initialized", initialized)
         # FIXME: Pass in `initialized' as a callback function instead of using
@@ -381,7 +381,7 @@ class BlaLibrary(gobject.GObject):
             print_i("Saving pending library changes")
             if pending_save:
                 self.__save_library()
-        blaplay.bla.add_pre_shutdown_hook(pre_shutdown_hook)
+        app.add_pre_shutdown_hook(pre_shutdown_hook)
 
 
     def __getitem__(self, key):
@@ -428,7 +428,7 @@ class BlaLibrary(gobject.GObject):
         # XXX: We should be able to update the contents of __tracks in one go.
 
         print_i("Checking for changes in monitored directories %r" %
-                self._config.getdotliststr("library", "directories"))
+                self._app.config.getdotliststr("library", "directories"))
 
         yield_interval = 25
 
@@ -474,10 +474,12 @@ class BlaLibrary(gobject.GObject):
         print_i("%d files missing, %d new ones, %d updated" %
                 (missing, new_files, updated))
 
+        # FIXME: This is really ugly, as the library shouldn't even have to
+        #        know about the existence of a window.
         # Finally update the model for the library browser and playlists. The
         # GUI might not be fully initialized yet, so wait for that to happen
         # before requesting an update.
-        while blaplay.bla.window is None:
+        while self._app.window is None:
             yield True
         update_library()
         yield False
@@ -588,7 +590,7 @@ class BlaLibrary(gobject.GObject):
         self.__save_library()
         self.__monitored_directories = map(
             os.path.realpath,
-            self._config.getdotliststr("library", "directories"))
+            self._app.config.getdotliststr("library", "directories"))
         self.emit("library_updated")
         self._timeout_id = 0
         return False

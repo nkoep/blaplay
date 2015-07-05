@@ -53,10 +53,7 @@ def error_dialog(text, secondary_text="", parent=None):
     diag.run()
     diag.destroy()
 
-def create_control_popup_menu():
-    import blaplay
-    player = blaplay.bla.player
-
+def create_control_popup_menu(player):
     menu = BlaMenu()
 
     if player.get_state() in [blaconst.STATE_PAUSED, blaconst.STATE_STOPPED]:
@@ -75,15 +72,6 @@ def create_control_popup_menu():
         menu.append_image_item(label, stock_id, callback)
     return menu
 
-# XXX: Global state, get rid of it.
-def set_visible(state):
-    from blawindows import BlaWindow
-    if state:
-        f = BlaWindow.present
-    else:
-        f = gtk.Window.hide
-    map(f, BlaWindow.instances)
-
 def wrap_in_viewport(widget):
     viewport = gtk.Viewport()
     viewport.set_shadow_type(gtk.SHADOW_NONE)
@@ -96,7 +84,6 @@ def wrap_in_viewport(widget):
 #       id.
 class BlaDialog(gtk.Dialog):
     def __init__(self, *args, **kwargs):
-        kwargs["parent"] = kwargs.get("parent", None) or blaplay.bla.window
         kwargs["flags"] = gtk.DIALOG_DESTROY_WITH_PARENT | gtk.DIALOG_MODAL
         if "buttons" not in kwargs:
             kwargs["buttons"] = (gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL,
@@ -106,7 +93,6 @@ class BlaDialog(gtk.Dialog):
 
 class BlaMessageDialog(gtk.MessageDialog):
     def __init__(self, *args, **kwargs):
-        kwargs["parent"] = kwargs.get("parent", None) or blaplay.bla.window
         kwargs["flags"] = gtk.DIALOG_DESTROY_WITH_PARENT | gtk.DIALOG_MODAL
         super(BlaMessageDialog, self).__init__(*args, **kwargs)
         self.set_resizable(False)

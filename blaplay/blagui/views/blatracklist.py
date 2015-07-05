@@ -594,8 +594,9 @@ class BlaTrackList(BlaView):
         hbox.set_visible(False)
         return hbox
 
-    def __init__(self, name, *args, **kwargs):
+    def __init__(self, player, name, *args, **kwargs):
         super(BlaTrackList, self).__init__(name, *args, **kwargs)
+        self._player = player
 
         self._reset()
 
@@ -897,7 +898,7 @@ class BlaTrackList(BlaView):
                 menu.append_separator()
 
             item = treeview.get_model()[path][0]
-            submenu = blafm.create_popup_menu(item.track)
+            submenu = blafm.create_popup_menu(self._player, item.track)
             if submenu is not None:
                 menu.append_submenu("last.fm", submenu)
                 menu.append_separator()

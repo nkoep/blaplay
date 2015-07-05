@@ -31,9 +31,6 @@ import cPickle as pickle
 import gtk
 import gobject
 
-import blaplay
-# XXX: Get rid of this.
-player = blaplay.bla.player
 from blaplay import blautil
 from blaplay.blacore import blacfg, blaconst
 from blaplay.blagui import blaguiutil
@@ -45,14 +42,14 @@ TIMEOUT = 5
 scrobbler = None
 
 
-def init(library, player):
+def init(app):
     global scrobbler
-    scrobbler = BlaScrobbler(library)
+    scrobbler = BlaScrobbler(app)
 
-    BlaFm(library, player, scrobbler)
+    BlaFm(app.library, app.player, scrobbler)
 
 # TODO: Rename this to create_submenu.
-def create_popup_menu(track=None):
+def create_popup_menu(player, track=None):
     user = blacfg.getstring("lastfm", "user")
     if not user:
         return None
@@ -351,9 +348,9 @@ class _SubmissionQueue(Queue.Queue):
         blautil.serialize_to_file(items, blaconst.SCROBBLES_PATH)
 
 class BlaScrobbler(object):
-    def __init__(self, library):
+    def __init__(self, app):
         super(BlaScrobbler, self).__init__()
-        self._library = library
+        self._app = app
 
         self._requested_authorization = False
         self._timeout_id = 0
@@ -364,13 +361,14 @@ class BlaScrobbler(object):
         self._iterations = 0
         self._thread = None
 
-        self._queue = _SubmissionQueue(library)
+        self._queue = _SubmissionQueue(app.library)
         def pre_shutdown_hook():
             self._submit_last_track(True)
-        blaplay.bla.add_pre_shutdown_hook(pre_shutdown_hook)
+        app.add_pre_shutdown_hook(pre_shutdown_hook)
 
     def _request_authorization(self):
         from blaplay.blagui import blaguiutil
+        # FIXME: Pass in the toplevel window as parent.
         response = blaguiutil.question_dialog(
             "last.fm authorization required", "In order to submit tracks to "
             "the last.fm scrobbler, blaplay needs to be authorized to use "
@@ -398,7 +396,7 @@ class BlaScrobbler(object):
     @blautil.thread
     def _update_now_playing(self):
         try:
-            track = self._library[self._uri]
+            track = self._app.library[self._uri]
         except KeyError:
             return
         if (not track[ARTIST] or not track[TITLE] or track[LENGTH] < 30 or
@@ -429,7 +427,7 @@ class BlaScrobbler(object):
             print_d("Failed to update nowplaying: %s" % response)
 
     def _query_status(self):
-        state = player.get_state()
+        state = self._app.player.get_state()
         self._iterations += 1
         # Wait 10~ seconds in between POSTs. Before actually posting an update
         # kill any remaining thread that still might be running.
@@ -449,7 +447,7 @@ class BlaScrobbler(object):
     def _submit_last_track(self, shutdown=False):
         if self._uri:
             try:
-                track = self._library[self._uri]
+                track = self._app.library[self._uri]
             except KeyError:
                 return
             # According to the last.fm API docs, only tracks longer than 30

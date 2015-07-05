@@ -21,6 +21,7 @@ import dbus
 import dbus.service
 from dbus.exceptions import DBusException
 
+import blaplay
 from blaplay.blacore import blaconst
 from blaplay import blautil
 from blaplay.formats import _identifiers as tids
@@ -303,7 +304,6 @@ class BlaMpris(dbus.service.Object):
 
     @dbus.service.method(dbus_interface=INTERFACE_BASE)
     def Quit(self):
-        import blaplay
         blaplay.shutdown()
 
     # Properties (these are handled via Get/GetAll/Set)

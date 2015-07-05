@@ -66,6 +66,7 @@ class BlaPlaylistManager(BlaViewManager):
             playlist.set_state_icons(stock_id)
 
     def _prompt_for_name(self, title, default=""):
+        # FIXME: Pass in the toplevel window as parent.
         diag = blaguiutil.BlaDialog(title=title)
         vbox = gtk.VBox(spacing=5)
         vbox.set_border_width(10)
@@ -143,7 +144,7 @@ class BlaPlaylistManager(BlaViewManager):
             name = self._build_generic_name()
         assert not not name, "Playlist name missing"
 
-        playlist = BlaPlaylist(name, self)
+        playlist = BlaPlaylist(self._player, name, self)
         self.views.append(playlist)
         self._notify_add(playlist)
         if request_focus:

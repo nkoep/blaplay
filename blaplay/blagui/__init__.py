@@ -35,8 +35,12 @@ def _gtk_init():
     gtk.icon_theme_get_default().append_search_path(blaconst.ICONS_PATH)
     gtk.window_set_default_icon_name(blaconst.APPNAME)
 
-def init(config, library, player):
+def init(app):
     _gtk_init()
+
+    config = app.config
+    library = app.library
+    player = app.player
 
     # Create and populate the main window.
     from . import blamainwindow
@@ -44,7 +48,7 @@ def init(config, library, player):
 
     # Set up the system tray icon.
     from blatray import BlaTray
-    tray = BlaTray(config)
+    tray = BlaTray(config, player, window)
     def on_hide(window):
         tray.set_visible(True)
     window.connect("hide", on_hide)

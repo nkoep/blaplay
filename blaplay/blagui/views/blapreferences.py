@@ -19,8 +19,6 @@ import os
 import gobject
 import gtk
 
-import blaplay
-player = blaplay.bla.player
 from blaplay.blacore import blaconst
 from ..blakeys import BlaKeys
 from .. import blaguiutil
@@ -30,13 +28,14 @@ ROW_SPACING = 3
 
 
 class _Page(gtk.VBox):
-    def __init__(self, name, config, library):
+    def __init__(self, name, config, library, player):
         super(_Page, self).__init__(spacing=ROW_SPACING)
         self.set_border_width(10)
 
         self._name = name
         self._config = config
         self._library = library
+        self._player = player
 
     @property
     def name(self):
@@ -357,12 +356,12 @@ class _PlayerSettings(_Page):
     def _volume_scale_changed(self, checkbutton):
         self._config.setboolean("player", "logarithmic.volume.scale",
                           checkbutton.get_active())
-        player.set_volume(self._config.getfloat("player", "volume") * 100)
+        self._player.set_volume(self._config.getfloat("player", "volume") * 100)
 
     def _use_equalizer_changed(self, checkbutton):
         state = checkbutton.get_active()
         self._config.setboolean("player", "use.equalizer", state)
-        player.enable_equalizer(state)
+        self._player.enable_equalizer(state)
 
         if state and not self._profile_box.get_model().get_iter_first():
             self._scale_container.set_sensitive(False)
@@ -390,7 +389,7 @@ class _PlayerSettings(_Page):
         self._config.set_("player", "equalizer.profile", profile_name)
 
         # Update the specified band in the playback device.
-        player.set_equalizer_value(band, scale.get_value())
+        self._player.set_equalizer_value(band, scale.get_value())
 
     def _profile_changed(self, combobox):
         profile_name = combobox.get_active_text()
@@ -414,7 +413,7 @@ class _PlayerSettings(_Page):
                 s.set_value(0)
             self._scale_container.set_sensitive(False)
 
-        player.enable_equalizer(True)
+        self._player.enable_equalizer(True)
 
     def _new_profile(self, button, combobox):
         diag = blaguiutil.BlaDialog(parent=self.get_toplevel(),
@@ -482,7 +481,7 @@ class _Keybindings(_Page):
         super(_Keybindings, self).__init__(
             "Global keybindings", *args, **kwargs)
 
-        blakeys = BlaKeys()
+        blakeys = BlaKeys(self._config, self._player)
         actions = [
             ("Play/Pause", "playpause"),
             ("Pause", "pause"),
@@ -589,7 +588,7 @@ class _LastfmSettings(_Page):
 class BlaPreferences(BlaView):
     ID = blaconst.VIEW_PREFERENCES
 
-    def __init__(self, config, library, *args, **kwargs):
+    def __init__(self, config, library, player, *args, **kwargs):
         super(BlaPreferences, self).__init__("Preferences", *args, **kwargs)
         self._header.set_icon_from_stock(gtk.STOCK_PREFERENCES)
 
@@ -605,10 +604,10 @@ class BlaPreferences(BlaView):
 
         vbox = gtk.VBox(spacing=5)
         vbox.set_border_width(25)
-        for page in [_GeneralSettings, _TraySettings, _LibrarySettings,
+        for Page in [_GeneralSettings, _TraySettings, _LibrarySettings,
                      _BrowserSettings, _PlayerSettings, _Keybindings,
                      _LastfmSettings]:
-            section = Section(page(config, library))
+            section = Section(Page(config, library, player))
             vbox.pack_start(section)
 
         self.add(blaguiutil.wrap_in_viewport(vbox))

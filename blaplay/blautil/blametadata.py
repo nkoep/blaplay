@@ -28,7 +28,6 @@ from HTMLParser import HTMLParser as HTMLParser_
 
 import gobject
 
-import blaplay
 from blaplay import blautil
 from blaplay.blacore import blaconst
 from blaplay.blautil import blafm
@@ -36,31 +35,33 @@ from blaplay.formats._identifiers import *
 
 TIMEOUT = 10
 
-metadata = None
+lyrics_cache = None
 
 
-def init():
-    global metadata
-    metadata = BlaMetadata()
+def init(app):
+    global lyrics_cache
+    lyrics_cache = _BlaLyricsCache(app)
 
 
-class BlaMetadata(object):
-    def __init__(self):
-        metadata = blautil.deserialize_from_file(blaconst.METADATA_PATH)
-        self.__metadata = metadata or {"lyrics": {}}
+class _BlaLyricsCache(object):
+    def __init__(self, app):
+        lyrics = blautil.deserialize_from_file(blaconst.METADATA_PATH)
+        self._cache = lyrics or {}
         def pre_shutdown_hook():
-            blautil.serialize_to_file(self.__metadata, blaconst.METADATA_PATH)
-        blaplay.bla.add_pre_shutdown_hook(pre_shutdown_hook)
+            blautil.serialize_to_file(self._cache, blaconst.METADATA_PATH)
+        app.add_pre_shutdown_hook(pre_shutdown_hook)
 
-    def add(self, section, key, value):
-        self.__metadata[section][key] = value
+    def add(self, key, value):
+        self._cache[key] = value
 
-    def get(self, section, key):
+    def get(self, key):
         try:
-            return self.__metadata[section][key]
+            return self._cache[key]
         except KeyError:
             return None
 
+# TODO: Refactor this as base class and implement dedicated Lyrics- and
+#       AlbumArtFetcher classes.
 class BlaFetcher(gobject.GObject):
     __gsignals__ = {
         "cover": blautil.signal(2),
@@ -211,7 +212,7 @@ class BlaFetcher(gobject.GObject):
         lyrics_key = track.get_lyrics_key()
 
         # Try locally stored lyrics first.
-        lyrics = metadata.get("lyrics", lyrics_key)
+        lyrics = lyrics_cache.get(lyrics_key)
         if lyrics and False: # FIXME: remove this after testing
             emit(lyrics)
             return
@@ -267,7 +268,7 @@ class BlaFetcher(gobject.GObject):
                 lyrics = lyrics.decode("utf-8", "replace")
             except (AttributeError, UnicodeDecodeError):
                 print_d("Failed to store lyrics")
-            metadata.add("lyrics", lyrics_key, lyrics)
+            lyrics_cache.add(lyrics_key, lyrics)
 
         emit(lyrics)
 

@@ -99,7 +99,7 @@ class _BlaMainWindow(BlaBaseWindow):
         vbox.pack_start(BlaVisualization(config, player), expand=False)
         return vbox
 
-    def _create_lyrics_container(self):
+    def _create_lyrics_container(self, player):
         # TODO: Rename BlaFetcher to BlaMetadataFetcher.
         from blaplay.blautil.blametadata import BlaFetcher as BlaMetadataFetcher
         from blalyricsviewer import BlaLyricsViewer
@@ -107,8 +107,8 @@ class _BlaMainWindow(BlaBaseWindow):
 
         vbox = gtk.VBox(spacing=blaconst.WIDGET_SPACING)
         metadata_fetcher = BlaMetadataFetcher()
-        vbox.pack_start(BlaLyricsViewer(metadata_fetcher))
-        vbox.pack_start(BlaTrackInfo(metadata_fetcher), expand=False)
+        vbox.pack_start(BlaLyricsViewer(player, metadata_fetcher))
+        vbox.pack_start(BlaTrackInfo(player, metadata_fetcher), expand=False)
         return vbox
 
     def _create_pane(self, widget1, widget2, key):
@@ -161,7 +161,7 @@ class _BlaMainWindow(BlaBaseWindow):
 
         # Create the main view outlet and place it in a pane with the lyrics
         # and track info side pane.
-        lyrics_container = self._create_lyrics_container()
+        lyrics_container = self._create_lyrics_container(player)
         pane_right = self._create_pane(
             self._tab_view_slot, lyrics_container, "right")
 
@@ -182,7 +182,7 @@ class _BlaMainWindow(BlaBaseWindow):
 
         # Pack everything up together in the main window's vbox.
         self.child.pack_start(self._menubar_slot, expand=False)
-        self.child.pack_start(BlaToolbar(config), expand=False)
+        self.child.pack_start(BlaToolbar(config, player), expand=False)
         self.child.pack_start(vbox)
 
         self.connect_object(
@@ -193,8 +193,6 @@ class _BlaMainWindow(BlaBaseWindow):
         self.show_all()
 
     def _hide_windows(self, yes):
-        from . import blaguiutil
-        blaguiutil.set_visible(not yes)
         if yes:
             self.hide()
         else:

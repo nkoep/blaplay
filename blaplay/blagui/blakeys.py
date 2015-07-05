@@ -20,30 +20,27 @@ try:
 except ImportError:
     keybinder = None
 
-import blaplay
-player = blaplay.bla.player
-from blaplay.blacore import blacfg
-
 
 class BlaKeys(gobject.GObject):
-    __ACTIONS = {
-        "playpause": lambda *x: player.play_pause(),
-        "pause": lambda *x: player.pause(),
-        "stop": lambda *x: player.stop(),
-        "previous": lambda *x: player.previous(),
-        "next": lambda *x: player.next(),
-        # TODO: Add a proper API for these to the BlaPlayer class.
-        "volup": lambda *x: False,
-        "voldown": lambda *x: False,
-        "mute": lambda *x: False
-    }
-
-    def __init__(self):
+    def __init__(self, config, player):
         if not self.can_bind():
             return
 
-        for action in self.__ACTIONS.iterkeys():
-            accel = blacfg.getstring("keybindings", action)
+        self._config = config
+
+        self._actions = {
+            "playpause": lambda *x: player.play_pause(),
+            "pause": lambda *x: player.pause(),
+            "stop": lambda *x: player.stop(),
+            "previous": lambda *x: player.previous(),
+            "next": lambda *x: player.next(),
+            # TODO: Add a proper API for these to the BlaPlayer class.
+            "volup": lambda *x: False,
+            "voldown": lambda *x: False,
+            "mute": lambda *x: False
+        }
+        for action in self._actions.keys():
+            accel = config.getstring("keybindings", action)
             if accel:
                 self.bind(action, accel)
 
@@ -52,8 +49,8 @@ class BlaKeys(gobject.GObject):
 
     def bind(self, action, accel):
         if self.can_bind():
-            self.unbind(accel)
-            return keybinder.bind(accel, self.__ACTIONS[action], None)
+            self.unbind(self._config.getstring("keybindings", action))
+            return keybinder.bind(accel, self._actions[action], None)
         return False
 
     def unbind(self, accel):

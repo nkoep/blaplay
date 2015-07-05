@@ -20,8 +20,6 @@ import gobject
 import gtk
 import pango
 
-import blaplay
-player = blaplay.bla.player
 from blaplay import blautil
 from blaplay.blacore import blaconst
 from blaplay.formats._identifiers import *
@@ -29,7 +27,7 @@ from blawindows import BlaScrolledWindow
 
 
 class BlaLyricsViewer(gtk.Notebook):
-    def __init__(self, metadata_fetcher):
+    def __init__(self, player, metadata_fetcher):
         super(BlaLyricsViewer, self).__init__()
 
         self._metadata_fetcher = metadata_fetcher

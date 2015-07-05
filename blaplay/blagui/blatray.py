@@ -23,11 +23,14 @@ import blaguiutil
 
 
 class BlaTray(gtk.StatusIcon):
-    def __init__(self, config):
+    def __init__(self, config, player, window):
         super(BlaTray, self).__init__()
+        self._config = config
+        self._player = player
+        self._window = window
+
         self.set_from_icon_name(blaconst.APPNAME)
-        self.set_visible(
-            config.getboolean("general", "always.show.tray"))
+        self.set_visible(config.getboolean("general", "always.show.tray"))
         self.set_tooltip_text("Stopped")
         def config_changed(cfg, section, key):
             if section == "general" and key == "always.show.tray":
@@ -35,18 +38,18 @@ class BlaTray(gtk.StatusIcon):
         config.connect("changed", config_changed)
 
         def activate(status_icon):
-            blaplay.bla.window.toggle_hide()
+            window.toggle_hide()
         self.connect("activate", activate)
         self.connect("popup-menu", self._tray_menu)
 
         # TODO: Add support for scroll-events.
 
     def _tray_menu(self, icon, button, activation_time):
-        menu = blaguiutil.create_control_popup_menu()
+        menu = blaguiutil.create_control_popup_menu(self._player)
         menu.append_separator()
 
         # Add last.fm submenu.
-        submenu = blafm.create_popup_menu()
+        submenu = blafm.create_popup_menu(self._player)
         if submenu:
             menu.append_submenu("last.fm", submenu)
             menu.append_separator()

@@ -88,6 +88,10 @@ class BlaVisualization(gtk.Viewport, blautil.BlaInitiallyHidden):
         self._consume_buffer_timeout_id = gobject.timeout_add(
             int(1000 / self._rate), self._spectrum.consume_buffer)
 
+        # TODO: Don't draw the spectrum explicitly. Do the drawing in the
+        #       spectrum analyzer, use an autovideosink in the player and set
+        #       the DA's xid on the video sink via set_xwindow_id().
+
         self._config.setboolean("general", "show.visualization", True)
 
     def _disable(self):
@@ -116,7 +120,6 @@ class BlaVisualization(gtk.Viewport, blautil.BlaInitiallyHidden):
         try:
             self._spectrum.draw(drawing_area.window.cairo_create(),
                                 drawing_area.get_pango_context())
-
         except AttributeError:
             pass
 

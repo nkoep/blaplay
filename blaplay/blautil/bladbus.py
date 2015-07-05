@@ -144,7 +144,7 @@ class BlaDBus(dbus.service.Object):
     @dbus.service.method(
         dbus_interface=INTERFACE, in_signature="", out_signature="")
     def raise_window(self):
-        self._bla.window.raise_window()
+        self._app.window.raise_window()
 
     @dbus.service.method(
         dbus_interface=INTERFACE, in_signature="sas", out_signature="")

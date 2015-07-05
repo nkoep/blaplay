@@ -16,6 +16,7 @@
 
 import gtk
 
+import blaplay
 from blaplay.blacore import blaconst
 
 
@@ -168,7 +169,5 @@ class BlaUIManager(gtk.UIManager):
         BlaAbout()
 
     def _quit(self, *args):
-        # XXX: Don't use a globals!
-        import blaplay
         blaplay.shutdown()
 

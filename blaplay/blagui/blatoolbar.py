@@ -20,8 +20,6 @@ import gobject
 import gtk
 import cairo
 
-import blaplay
-player = blaplay.bla.player
 from blaplay.blacore import blaconst
 from blastatusbar import BlaStatusbar
 from blaplay.formats._identifiers import *
@@ -33,8 +31,10 @@ class PositionSlider(gtk.HScale):
     _SEEK_INTERVAL = 100
     _SCROLL_DELAY = 10
 
-    def __init__(self):
+    def __init__(self, player):
         super(PositionSlider, self).__init__()
+
+        self._player = player
 
         self._scroll_timeout_id = 0
         self.__seeking = False
@@ -55,13 +55,14 @@ class PositionSlider(gtk.HScale):
             self._SEEK_INTERVAL, self.__update_position)
 
     def __scroll_timeout(self):
-        player.seek(self.get_value())
+        self._player.seek(self.get_value())
         self.__seeking = False
         self._scroll_timeout_id = 0
         return False
 
     def __scroll(self, scale, event):
-        if self.__seeking or player.get_state() == blaconst.STATE_STOPPED:
+        if (self.__seeking or
+            self._player.get_state() == blaconst.STATE_STOPPED):
             return True
         if self._scroll_timeout_id:
             gobject.source_remove(self._scroll_timeout_id)
@@ -80,14 +81,14 @@ class PositionSlider(gtk.HScale):
         BlaStatusbar.update_position(self.get_value())
 
     def __seek_start(self, scale, event):
-        if player.get_state() == blaconst.STATE_STOPPED:
+        if self._player.get_state() == blaconst.STATE_STOPPED:
             return True
         if hasattr(event, "button"):
             event.button = 2
         self.__seeking = True
 
     def __seek_end(self, scale, event):
-        if player.get_state() == blaconst.STATE_STOPPED:
+        if self._player.get_state() == blaconst.STATE_STOPPED:
             return True
         if hasattr(event, "button"):
             event.button = 2
@@ -98,18 +99,18 @@ class PositionSlider(gtk.HScale):
             # track in nanoseconds). The offset we should add to the position
             # (number of units the slider would move in one update step) can
             # thus be calculated to 1e6 * _SEEK_INTERVAL.
-            player.seek(self.get_value() + 1e6 * self._SEEK_INTERVAL)
+            self._player.seek(self.get_value() + 1e6 * self._SEEK_INTERVAL)
             self.__changed = False
 
     def __update_position(self):
-        state = player.get_state()
+        state = self._player.get_state()
         # XXX: Simplify these conditions.
         if state == blaconst.STATE_STOPPED:
             self.set_value(0)
         elif (not state == blaconst.STATE_PAUSED and
               not state == blaconst.STATE_STOPPED and
               not self.__seeking):
-            position = player.get_position()
+            position = self._player.get_position()
             if position != 0:
                 self.set_value(position)
                 BlaStatusbar.update_position(position)
@@ -137,10 +138,11 @@ class PositionSlider(gtk.HScale):
 class VolumeControl(gtk.HBox):
     __states = ["muted", "low", "medium", "high"]
 
-    def __init__(self, config):
+    def __init__(self, config, player):
         super(VolumeControl, self).__init__(spacing=5)
 
         self._config = config
+        self._player = player
 
         self.__volume = int(config.getfloat("player", "volume") * 100)
         state = config.getboolean("player", "muted")
@@ -197,7 +199,7 @@ class VolumeControl(gtk.HBox):
         if hasattr(event, "button"):
             event.button = 2
         self.__volume = self.__scale.get_value()
-        player.set_volume(self.__volume)
+        self._player.set_volume(self.__volume)
         return False
 
     def __volume_changed(self, scale):
@@ -209,7 +211,7 @@ class VolumeControl(gtk.HBox):
             volume = scale.get_value()
 
         self._config.set_("player", "volume", volume / 100.0)
-        player.set_volume(scale.get_value())
+        self._player.set_volume(scale.get_value())
         self.__update_icon(state)
 
     def __mute_toggled(self, button):
@@ -249,11 +251,13 @@ class VolumeControl(gtk.HBox):
 class BlaToolbar(gtk.Alignment):
     __state = None
 
-    def __init__(self, config):
+    def __init__(self, config, player):
         super(BlaToolbar, self).__init__(xalign=0.0, yalign=0.5, xscale=1.0,
                                          yscale=1.0)
         self.set_padding(0, 0, blaconst.BORDER_PADDING,
                          blaconst.BORDER_PADDING)
+
+        self._player = player
 
         # The button box
         ctrlbar = gtk.Table(rows=1, columns=5, homogeneous=True)
@@ -314,10 +318,10 @@ class BlaToolbar(gtk.Alignment):
         ctrlbar.attach(random, 4, 5, 0, 1)
 
         # Position slider
-        seekbar = PositionSlider()
+        seekbar = PositionSlider(player)
 
         # Volume control
-        volume = VolumeControl(config)
+        volume = VolumeControl(config, player)
 
         hbox = gtk.HBox(spacing=10)
         hbox.pack_start(ctrlbar, expand=False)
@@ -350,13 +354,13 @@ class BlaToolbar(gtk.Alignment):
 
     def __ctrl(self, button, cmd):
         if cmd == CMD_PLAYPAUSE:
-            player.play_pause()
+            self._player.play_pause()
         elif cmd == CMD_STOP:
-            player.stop()
+            self._player.stop()
         elif cmd == CMD_PREVIOUS:
-            player.previous()
+            self._player.previous()
         elif cmd == CMD_NEXT:
-            player.next()
+            self._player.next()
         elif cmd == CMD_NEXT_RANDOM:
-            player.random()
+            self._player.random()
 

@@ -25,9 +25,10 @@ class BlaPreferencesManager(BlaViewManager):
     ID = blaconst.VIEW_PREFERENCES
 
     def show_preferences(self):
-        if self.views == []:
-            self.views.append(
-                BlaPreferences(self._config, self._library, self))
+        if not self.views:
+            preferences = BlaPreferences(
+                self._config, self._library, self._player, self)
+            self.views.append(preferences)
         preferences = self.views[0]
         self._notify_add(preferences)
         self._notify_focus(preferences)

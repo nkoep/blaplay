@@ -23,8 +23,6 @@ import gtk
 import cairo
 import pango
 
-import blaplay
-player = blaplay.bla.player
 from blaplay import blautil
 from blaplay.blacore import blaconst
 from blaplay.formats._identifiers import *
@@ -153,7 +151,7 @@ class _CoverDisplay(gtk.DrawingArea):
             self._fetch_timeout_id = gobject.timeout_add(250, fetch_cover)
 
 class BlaTrackInfo(gtk.Viewport, blautil.BlaInitiallyHidden):
-    def __init__(self, metadata_fetcher):
+    def __init__(self, player, metadata_fetcher):
         super(BlaTrackInfo, self).__init__()
         blautil.BlaInitiallyHidden.__init__(self)
         self.set_shadow_type(gtk.SHADOW_IN)

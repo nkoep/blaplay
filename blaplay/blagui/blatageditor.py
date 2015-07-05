@@ -23,8 +23,6 @@ import gobject
 import gtk
 import pango
 
-import blaplay
-library = blaplay.bla.library
 from blaplay.blacore import blaconst
 from blaplay import blautil, blagui
 from blaplay.formats._blatrack import BlaTrack
