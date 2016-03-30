@@ -188,7 +188,10 @@ class BlaWindow(BlaBaseWindow):
         self.__clicked()
 
 class BlaScrolledWindow(gtk.ScrolledWindow):
-    def __init__(self):
+    def __init__(self, widget=None):
         super(BlaScrolledWindow, self).__init__()
         self.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
+
+        if widget is not None:
+            self.add(widget)
 

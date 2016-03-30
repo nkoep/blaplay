@@ -118,16 +118,14 @@ def caches_return_value(func):
     if inspect.getargspec(func).keywords is not None:
         raise ValueError(
             "Decorator does not support functions with keyword arguments")
-
-    _cache = {}
-
+    cache = {}
     @functools.wraps(func)
     def wrapper(*args):
         key = args
         try:
-            value = _cache[key]
+            value = cache[key]
         except KeyError:
-            value = _cache[key] = func(*args)
+            value = cache[key] = func(*args)
         return value
     return wrapper
 
@@ -138,7 +136,7 @@ def get_extension(filepath):
     return filepath.split(".")[-1]
 
 def resolve_uris(uris):
-    # The argument might be a tuple or a list. Either way turn it into a new
+    # The argument might be a tuple or a list. Either way, turn it into a new
     # list so we don't mutate the iterable `uris' references when first calling
     # this function.
     uris = list(uris)
@@ -206,17 +204,15 @@ def open_with_filehandler(f, msg):
             except (OSError, ValueError):
                 error_dialog(msg)
 
-def discover(d, directories_only=False):
+def discover(directories, directories_only=False):
     checked_directories = []
-    if not hasattr(d, "__iter__"):
-        d = [d]
-
+    if not hasattr(directories, "__iter__"):
+        directories = [directories]
     realpath = os.path.realpath
     walk = os.walk
     append = checked_directories.append
     join = os.path.join
-
-    for directory in d:
+    for directory in directories:
         directory = realpath(directory)
         for dirname, dirs, filenames in walk(directory, followlinks=True):
             dirname = realpath(dirname)
@@ -239,7 +235,7 @@ def serialize_to_file(data, path):
     os.fsync(f.fileno())
     f.close()
 
-    # Move old file
+    # Move the old file.
     new_path = "%s.bak" % path
     try:
         os.unlink(new_path)
@@ -326,19 +322,20 @@ class BlaThread(Thread):
     """
     A kill'able thread class. This is certainly a bit of an overkill solution
     as the class inserts a bytecode trace which checks for the kill condition
-    before every function call or line interpretation to break out of loops as
-    soon as possible. However, it's the only way to make it work without adding
-    kill condition checks to the threaded function/method itself. Additionally,
-    it's the only way we can guarantee that daemonic threads are terminated
-    before the interpreter shuts down. In theory this is supposed to be readily
+    before every function call or line (elns) to break out of loops as soon as
+    possible. However, it's the only way to make it work without adding kill
+    condition checks to the threaded function/method itself. Additionally, it's
+    the only way we can guarantee that daemonic threads are terminated before
+    the interpreter shuts down. In theory, this is supposed to be readily
     handled by threading.Thread. However, instead of suppressing exceptions
-    from daemon threads on interpreter shutdown the Thread class tries to
+    from daemon threads on interpreter shutdown, the Thread class tries to
     reconstruct the backtrace of the exception and prints it to stderr (which
     we can't catch). Those are (almost surely) AttributeError exceptions caused
-    by accessing a member of a globals() dict which gets wiped clean by CPython
-    on shutdown.
+    by accessing a member of a globals() dict which gets wiped clean by the
+    interpreter on shutdown.
     """
 
+    # XXX: Global state is bad for your health!
     __threads = []
 
     def __init__(self, *args, **kwargs):
@@ -465,18 +462,20 @@ class BlaNotifyDict(dict):
     __delitem__ = __notify_wrap(dict.__delitem__)
     clear = __notify_wrap(dict.clear)
 
-# Note that assignment to an existing key is still possible by deleting the
-# relevant entry first. The class still offers a decent precautionary measure
-# against accidental overrides of existing keys.
 class BlaFrozenDict(dict):
     def setdefault(self, keys, default=None):
         raise NotImplementedError("Method not supported")
 
     def __setitem__(self, key, value):
         if key in self:
+            # Note that assignment to an existing key is still possible by
+            # deleting the relevant entry first. The class still offers a
+            # decent precautionary measure against accidental overrides of
+            # existing keys though.
             raise ValueError("Entry for key '%s' already exists" % key)
         super(BlaFrozenDict, self).__setitem__(key, value)
 
+# TODO: Move this to blaguiutil.py.
 class BlaInitiallyHidden(object):
     """
     Mixin to guarantee that a widget gets hidden once after its first `map'
