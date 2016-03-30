@@ -37,6 +37,9 @@ from .. import blaguiutil
  COLUMN_GENRE, COLUMN_FORMAT, COLUMN_BITRATE, COLUMN_FILESIZE, COLUMN_FILENAME,
  COLUMN_DIRECTORY) = range(15)
 
+COLUMNS_DEFAULT_PLAYLIST = (COLUMN_PLAYING, COLUMN_TRACK, COLUMN_ARTIST,
+                            COLUMN_TITLE, COLUMN_ALBUM, COLUMN_DURATION)
+
 MODE_NORMAL, MODE_SORTED, MODE_FILTERED = 1 << 0, 1 << 1, 1 << 2
 
 
@@ -102,7 +105,7 @@ def _make_query_function(config, filter_string, treat_as_regex):
         return []
 
     query_identifiers = [ARTIST, TITLE, ALBUM]
-    # XXX: Pass in a list of columns instead.
+    # TODO: Pass in a list of columns instead.
     columns = config.getlistint("general", "columns.playlist")
     if columns is None:
         columns = COLUMNS_DEFAULT_PLAYLIST

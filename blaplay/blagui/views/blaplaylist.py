@@ -208,13 +208,13 @@ class BlaPlaylist(blatracklist.BlaTrackList):
             uris = [item.uri for item in items]
         else:
             if type_ == blaconst.PLAYLIST_FROM_ARTISTS:
-                column_id = COLUMN_ARTIST
+                column_id = blatracklist.COLUMN_ARTIST
             elif type_ == blaconst.PLAYLIST_FROM_ALBUMS:
-                column_id = COLUMN_ALBUM
+                column_id = blatracklist.COLUMN_ALBUM
             elif type_ == blaconst.PLAYLIST_FROM_ALBUM_ARTISTS:
-                column_id = COLUMN_ALBUM_ARTIST
+                column_id = blatracklist.COLUMN_ALBUM_ARTIST
             else:
-                column_id = COLUMN_GENRE
+                column_id = blatracklist.COLUMN_GENRE
 
             eval_ = blatracklist.COLUMNS[column_id].eval_track
             values = set()
