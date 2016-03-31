@@ -167,9 +167,9 @@ class BlaTrackInfo(gtk.Viewport, blautil.BlaInitiallyHidden):
         hbox.pack_start(self._cover_display, expand=False)
 
         # Add the info labels.
-        self._label_stack = [gtk.Label() for _ in range(4)]
-        table = gtk.Table(rows=len(self._label_stack), columns=1,
-                          homogeneous=False)
+        num_labels = 4
+        self._label_stack = [gtk.Label() for _ in range(num_labels)]
+        table = gtk.Table(rows=num_labels, columns=1, homogeneous=False)
         for idx, label in enumerate(self._label_stack):
             label.set_ellipsize(pango.ELLIPSIZE_END)
             alignment = gtk.Alignment()
