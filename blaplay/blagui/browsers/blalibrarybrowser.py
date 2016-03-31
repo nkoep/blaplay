@@ -17,6 +17,8 @@
 from collections import OrderedDict
 import cPickle as pickle
 import os
+import re
+import time
 
 import cairo
 import gobject
@@ -24,14 +26,21 @@ import gtk
 import pango
 import pangocairo
 
-from blaplay.blacore import blaconst
 from blaplay import blautil, blagui
-from .. import blaguiutil
-from ..blawindows import BlaScrolledWindow
+from blaplay.blacore import blaconst
+from blaplay.blagui import blaguiutil
+from blaplay.blagui.blawindows import BlaScrolledWindow
 from .blabrowser import BlaBrowser, BlaBrowserTreeView
+from .blalibrarymodel import BlaLibraryModel
+from .blalibrarycontroller import BlaLibraryController
 
 PADDING_X, PADDING_Y, PADDING_WIDTH, PADDING_HEIGHT = -2, 0, 4, 0
 
+
+def create_browser(config, library, view):
+    browser = BlaLibraryBrowser(config)
+    BlaLibraryController(config, library, browser, view)
+    return browser
 
 
 class _BlaCellRenderer(blaguiutil.BlaCellRendererBase):
@@ -50,9 +59,7 @@ class _BlaCellRenderer(blaguiutil.BlaCellRendererBase):
         fdesc = gtk.widget_get_default_style().font_desc
         layout.set_font_description(fdesc)
 
-        if text:
-            layout.set_text(text)
-        else:
+        if not text:
             try:
                 text = self.get_property("text")
             except AttributeError:
@@ -152,11 +159,13 @@ class BlaLibraryBrowser(BlaBrowser):
 
         return treeview
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, config, *args, **kwargs):
         super(BlaLibraryBrowser, self).__init__("Library", *args, **kwargs)
+        self._config = config
+        config.connect_object(
+            "changed", BlaLibraryBrowser._on_config_changed, self)
 
         self._expanded_rows = []
-
         self._treeview = self._create_treeview()
         sw = BlaScrolledWindow()
         sw.add(self._treeview)
@@ -206,21 +215,32 @@ class BlaLibraryBrowser(BlaBrowser):
         self.pack_start(sw, expand=True)
         self.pack_start(hbox, expand=False)
 
-    # TODO: Move this to the base class so the filesystem browser can use it
-    #       as well.
-    def _get_playlist_name(self, path=None):
-        if path is None:
-            selection = self._treeview.get_selection()
-            model, selections = selection.get_selected_rows()
-            try:
-                path = selections[0]
-            except IndexError:
-                path = None
+        self._update_browser_style()
+
+    def _on_config_changed(self, section, key):
+        if section == "library" and key == "custom.browser":
+            self._update_browser_style()
+
+    def _update_browser_style(self):
+            self._set_treeview_style(
+                self._config.getboolean("library", "custom.browser"))
+
+    def _set_treeview_style(self, use_custom_browser):
+        column = self._treeview.get_column(0)
+        column.clear()
+
+        if use_custom_browser:
+            renderer = _BlaCellRenderer()
         else:
-            model = self._treeview.get_model()
-        if path is None:
-            return ""
-        return model[path][-1] # The last model column holds the label.
+            renderer = gtk.CellRendererText()
+        column.pack_start(renderer)
+        def cdf(column, renderer, model, iterator):
+            n_children = model.iter_n_children(iterator)
+            text = model[iterator][1]
+            if n_children > 0:
+                text = "%s (%d)" % (text, n_children)
+            renderer.set_property("text", text)
+        column.set_cell_data_func(renderer, cdf)
 
     def _on_key_press_event(self, treeview, event):
         if blagui.is_accel(event, "Q"):
@@ -229,7 +249,7 @@ class BlaLibraryBrowser(BlaBrowser):
         elif (blagui.is_accel(event, "Return") or
               blagui.is_accel(event, "KP_Enter")):
             # TODO: Factor this into a method.
-            name = self._get_playlist_name()
+            name = treeview.get_name_from_path()
             uris = treeview.get_uris()
             self.emit("key-action", name, uris)
         return False
@@ -252,7 +272,7 @@ class BlaLibraryBrowser(BlaBrowser):
             selection.unselect_all()
             selection.select_path(path)
 
-        name = self._get_playlist_name(path)
+        name = treeview.get_name_from_path(path)
         uris = treeview.get_uris()
         if is_double_click:
             signal = "button-action-double-click"
@@ -281,7 +301,7 @@ class BlaLibraryBrowser(BlaBrowser):
                           timestamp):
         # TODO: Send a name with the DND data for when we drop on the playlist
         #       tab strip.
-        name = self._get_playlist_name()
+        name = treeview.get_name_from_path()
         uris = treeview.get_uris()
         # TODO: We could use set_uris() here as well which would allow DND
         #       from the library to external applications like file managers.
@@ -330,24 +350,10 @@ class BlaLibraryBrowser(BlaBrowser):
     def set_model(self, model):
         self._expanded_rows = []
         self._treeview.set_model(model)
+        # XXX: This is just a silly special case that we need because  we use a
+        #      "bla" root node for shits and giggles when we organize by
+        #      directory. It might go away in the future.
         if (model.organize_by == blaconst.ORGANIZE_BY_DIRECTORY and
             model.get_iter_first()):
             self._treeview.expand_row((0,), open_all=False)
-
-    def set_treeview_style(self, use_custom_browser):
-        column = self._treeview.get_column(0)
-        column.clear()
-
-        if use_custom_browser:
-            renderer = _BlaCellRenderer()
-        else:
-            renderer = gtk.CellRendererText()
-        column.pack_start(renderer)
-        def cdf(column, renderer, model, iterator):
-            n_children = model.iter_n_children(iterator)
-            text = model[iterator][1]
-            if n_children > 0:
-                text = "%s (%d)" % (text, n_children)
-            renderer.set_property("text", text)
-        column.set_cell_data_func(renderer, cdf)
 

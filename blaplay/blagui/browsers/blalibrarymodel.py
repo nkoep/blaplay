@@ -38,7 +38,6 @@ class BlaLibraryModel(gtk.TreeStore):
 
     def __init__(self, organize_by):
         super(BlaLibraryModel, self).__init__(*BlaLibraryModel._MODEL_LAYOUT)
-
         self._organize_by = organize_by
 
     def _make_query_function(self, library, filter_string):
@@ -134,14 +133,18 @@ class BlaLibraryModel(gtk.TreeStore):
         return (track[ALBUM] or "?", cls._get_track_label(track))
 
     @classmethod
-    def _organize_by_genre_year(cls, uri, track, organize_by):
-        if organize_by == blaconst.ORGANIZE_BY_GENRE:
-            key = GENRE
-        else:
-            key = DATE
+    def _organize_by_genre(cls, uri, track):
+        key = GENRE
         organizer = track[key].capitalize() or "?"
-        if key == DATE:
-            organizer = organizer.split("-")[0]
+        label = "%s - %s" % (
+            track[ALBUM_ARTIST] or track[ARTIST], track[ALBUM] or "?")
+        return (organizer, label, cls._get_track_label(track))
+
+    @classmethod
+    def _organize_by_year(cls, uri, track):
+        key = DATE
+        organizer = track[key].capitalize() or "?"
+        organizer = organizer.split("-")[0]
         label = "%s - %s" % (
             track[ALBUM_ARTIST] or track[ARTIST], track[ALBUM] or "?")
         return (organizer, label, cls._get_track_label(track))
@@ -162,16 +165,15 @@ class BlaLibraryModel(gtk.TreeStore):
             cb = self._organize_by_artist_album
         elif organize_by == blaconst.ORGANIZE_BY_ALBUM:
             cb = self._organize_by_album
-        elif organize_by in (blaconst.ORGANIZE_BY_GENRE,
-                             blaconst.ORGANIZE_BY_YEAR):
-            def cb(uri, comps):
-                return self._organize_by_genre_year(
-                    uri, comps, organize_by=organize_by)
+        elif organize_by == blaconst.ORGANIZE_BY_GENRE:
+            cb = self._organize_by_genre
+        elif organize_by == blaconst.ORGANIZE_BY_YEAR:
+            cb = self._organize_by_year
         else:
             raise NotImplementedError
 
         count = 0
-        yield_interval = 25
+        batch_size = 25
 
         list_ = []
         append = list_.append
@@ -183,7 +185,7 @@ class BlaLibraryModel(gtk.TreeStore):
             comps = tuple(map(unicode, cb(uri, library[uri])))
             append((comps, uri))
             count = count+1
-            if count % yield_interval == 0:
+            if count % batch_size == 0:
                 yield True
 
         iterators = {}
@@ -200,7 +202,7 @@ class BlaLibraryModel(gtk.TreeStore):
                         parent, (None, comps_init[-1]))
             append(iterator, (uri, comps[-1]))
             count = count+1
-            if count % yield_interval == 0:
+            if count % batch_size == 0:
                 yield True
 
         print_d("Populated library model in %.2f seconds" %

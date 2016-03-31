@@ -104,6 +104,20 @@ class BlaBrowserTreeView(blaguiutil.BlaTreeViewBase):
 
         return uris[slice(0, n_max)]
 
+    def get_name_from_path(self, path=None):
+        if path is None:
+            selection = self.get_selection()
+            model, selections = selection.get_selected_rows()
+            try:
+                path = selections[0]
+            except IndexError:
+                path = None
+        else:
+            model = self.get_model()
+        if path is None:
+            return ""
+        return model[path][-1] # The last model column holds the label.
+
 class BlaBrowser(gtk.VBox):
     __gsignals__ = {
         "add-to-current-playlist": blautil.signal(2),
@@ -128,6 +142,8 @@ class BlaBrowser(gtk.VBox):
             return None
 
         def transfer_uris_to_playlist(signal, name):
+            # FIXME: Can treeview.get_uris() even work for the filesystem
+            #        browser?
             self.emit(signal, name, treeview.get_uris())
         name = treeview.get_model()[path][-1]
         items = [

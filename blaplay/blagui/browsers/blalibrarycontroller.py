@@ -21,57 +21,45 @@ from blaplay.blacore import blaconst
 from .blalibrarymodel import BlaLibraryModel
 
 
-class BlaLibraryBrowserController(object):
+class BlaLibraryController(object):
     """
     This class serves as delegator between the library browser and the
     underlying model. It also proxies requests to send tracks to playlists,
-    queue, or edit tracks by observing the library browser for the
+    the queue, or edit tracks by observing the library browser for the
     corresponding events, and forwarding them to the appropriate view manager
-    through the view delegate.
+    through the view.
     """
 
-    def __init__(self, config, library, browser, view_delegate):
+    def __init__(self, config, library, browser, view):
         self._config = config
         self._library = library
-        self._browser = browser
-        self._view_delegate = view_delegate
-        self._timeout_id = 0
+        self._view = view
 
-        self._config.connect_object(
-            "changed", BlaLibraryBrowserController._on_config_changed, self)
+        self._timeout_id = 0
 
         library.connect_object(
             "library-updated", type(browser).request_model, browser)
 
         browser.connect("model-requested", self._on_model_requested)
         browser.connect_object(
-            "add-to-current-playlist",
-            BlaLibraryBrowserController._add_uris_to_current_playlist, self)
-        browser.connect_object(
             "button-action-double-click",
-            BlaLibraryBrowserController._on_button_action_double_click, self)
+            BlaLibraryController._on_button_action_double_click, self)
         browser.connect_object(
             "button-action-middle-click",
-            BlaLibraryBrowserController._on_button_action_middle_click, self)
+            BlaLibraryController._on_button_action_middle_click, self)
         browser.connect_object(
-            "key-action", BlaLibraryBrowserController._on_key_action, self)
+            "key-action", BlaLibraryController._on_key_action, self)
+        browser.connect_object(
+            "add-to-current-playlist",
+            BlaLibraryController._add_uris_to_current_playlist, self)
         browser.connect_object(
             "send-to-current-playlist",
-            BlaLibraryBrowserController._send_uris_to_current_playlist, self)
+            BlaLibraryController._send_uris_to_current_playlist, self)
         browser.connect_object(
             "send-to-new-playlist",
-            BlaLibraryBrowserController._send_uris_to_new_playlist, self)
+            BlaLibraryController._send_uris_to_new_playlist, self)
 
-        self._update_browser_style()
         browser.set_organize_by(config.getint("library", "organize.by"))
-
-    def _update_browser_style(self):
-            self._browser.set_treeview_style(
-                self._config.getboolean("library", "custom.browser"))
-
-    def _on_config_changed(self, section, key):
-        if section == "library" and key == "custom.browser":
-            self._update_browser_style()
 
     def _on_model_requested(self, browser, filter_string):
         def source_remove():
@@ -88,20 +76,20 @@ class BlaLibraryBrowserController(object):
             source_remove()
             self._set_cursor(browser, None)
         model.connect("populated", on_populated)
-        generator = model.populate(
+        populate_model = model.populate(
             self._config, self._library, filter_string).next
         source_remove()
-        self._callback_id = gobject.idle_add(generator)
+        self._callback_id = gobject.idle_add(populate_model)
         self._set_cursor(browser, gtk.gdk.WATCH)
 
     def _send_uris_to_current_playlist(self, name, uris):
-        self._view_delegate.send_uris_to_current_playlist(uris)
+        self._view.send_uris_to_current_playlist(uris)
 
     def _add_uris_to_current_playlist(self, name, uris):
-        self._view_delegate.add_uris_to_current_playlist(uris)
+        self._view.add_uris_to_current_playlist(uris)
 
     def _send_uris_to_new_playlist(self, name, uris):
-        self._view_delegate.send_uris_to_new_playlist(name, uris)
+        self._view.send_uris_to_new_playlist(name, uris)
 
     def _forward_playlist_action(self, action, name, uris):
         if action == blaconst.ACTION_SEND_TO_CURRENT:

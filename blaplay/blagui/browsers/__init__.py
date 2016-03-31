@@ -16,23 +16,12 @@
 
 import gtk
 
-from .blalibrarybrowser import BlaLibraryBrowser
-from .blalibrarybrowsercontroller import BlaLibraryBrowserController
-from .blafilesystembrowser import BlaFilesystemBrowser
+from . import blalibrarybrowser
 
 
-def create_view(config, library, playlist_manager):
-    # Create the library browser and its controller.
-    library_browser = BlaLibraryBrowser()
-    BlaLibraryBrowserController(
-        config, library, library_browser, playlist_manager)
-
-    # # Create the filesystem browser and its controller.
-    # filesystem_browser = BlaFilesystemBrowser()
-    # BlaFilesystemBrowserController(
-    #     config, filesystem_browser, playlist_manager)
-
-    return BlaBrowserView(config, [library_browser])#, filesystem_browser])
+def create_view(config, library, view):
+    library_browser = blalibrarybrowser.create_browser(config, library, view)
+    return BlaBrowserView(config, [library_browser])
 
 
 class BlaBrowserView(gtk.Notebook):
