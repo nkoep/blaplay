@@ -21,7 +21,6 @@ import gtk
 import cairo
 
 from blaplay.blacore import blaconst
-from blastatusbar import BlaStatusbar
 from blaplay.formats._identifiers import *
 
 CMD_PLAYPAUSE, CMD_STOP, CMD_PREVIOUS, CMD_NEXT, CMD_NEXT_RANDOM = xrange(5)
@@ -78,7 +77,6 @@ class PositionSlider(gtk.HScale):
         # that it should perform a seek operation on the playback device.
         if self.__seeking:
             self.__changed = True
-        BlaStatusbar.update_position(self.get_value())
 
     def __seek_start(self, scale, event):
         if self._player.get_state() == blaconst.STATE_STOPPED:
@@ -113,7 +111,6 @@ class PositionSlider(gtk.HScale):
             position = self._player.get_position()
             if position != 0:
                 self.set_value(position)
-                BlaStatusbar.update_position(position)
         return True
 
     def __state_changed(self, player):
@@ -318,14 +315,14 @@ class BlaToolbar(gtk.Alignment):
         ctrlbar.attach(random, 4, 5, 0, 1)
 
         # Position slider
-        seekbar = PositionSlider(player)
+        self._seekbar = PositionSlider(player)
 
         # Volume control
         volume = VolumeControl(config, player)
 
         hbox = gtk.HBox(spacing=10)
         hbox.pack_start(ctrlbar, expand=False)
-        hbox.pack_start(seekbar, expand=True)
+        hbox.pack_start(self._seekbar, expand=True)
         hbox.pack_start(volume, expand=False)
         self.add(hbox)
 
@@ -333,6 +330,11 @@ class BlaToolbar(gtk.Alignment):
         self.__update_state(player, img, play_pause)
 
         self.show_all()
+
+    def link_statusbar(self, statusbar):
+        def value_changed(*args):
+            statusbar.update_position(self._seekbar.get_value())
+        self._seekbar.connect("value-changed", value_changed)
 
     def __update_state(self, player, img, play_pause):
         state = player.get_state()
@@ -363,4 +365,3 @@ class BlaToolbar(gtk.Alignment):
             self._player.next()
         elif cmd == CMD_NEXT_RANDOM:
             self._player.random()
-

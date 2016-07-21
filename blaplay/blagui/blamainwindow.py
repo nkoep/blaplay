@@ -138,8 +138,9 @@ class _BlaMainWindow(BlaBaseWindow):
                     player.previous()
                 elif event.button == 9:
                     player.next()
-            # This behaves like gobject.{timeout,idle}_add: if the callback
-            # doesn't return True it's only called once.
+            # This behaves like gobject.{timeout,idle}_add, i.e., if the
+            # callback returns True the hook will be invoked every time a new
+            # event arrives.
             return True
         self._last_event_time = -1
         gobject.add_emission_hook(
@@ -182,7 +183,8 @@ class _BlaMainWindow(BlaBaseWindow):
 
         # Pack everything up together in the main window's vbox.
         self.child.pack_start(self._menubar_slot, expand=False)
-        self.child.pack_start(BlaToolbar(config, player), expand=False)
+        self._toolbar = BlaToolbar(config, player)
+        self.child.pack_start(self._toolbar, expand=False)
         self.child.pack_start(vbox)
 
         self.connect_object(
@@ -226,4 +228,4 @@ class _BlaMainWindow(BlaBaseWindow):
     def add_statusbar(self, statusbar):
         assert self._statusbar_slot.child is None
         self._statusbar_slot.add(statusbar)
-
+        self._toolbar.link_statusbar(statusbar)

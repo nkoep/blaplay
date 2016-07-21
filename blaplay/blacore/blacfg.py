@@ -57,6 +57,7 @@ class BlaCfg(RawConfigParser, gobject.GObject):
                 "close.to.tray": "yes",
                 "filesystem.directory": "",
                 "filechooser.directory": "",
+                # TODO: Rename these to browser.type and metadata.type.
                 "browser.view": blaconst.BROWSER_LIBRARY,
                 "metadata.view": blaconst.METADATA_LYRICS,
                 "play.order": blaconst.ORDER_NORMAL,

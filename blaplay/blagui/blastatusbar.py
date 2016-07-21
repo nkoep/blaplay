@@ -67,11 +67,8 @@ class _FileScannerBox(gtk.HBox):
         self._progress_bar.set_text(text)
 
 class BlaStatusbar(gtk.Table):
-    _instance = None
-
     def __init__(self):
         super(BlaStatusbar, self).__init__(rows=1, columns=3, homogeneous=True)
-        type(self)._instance = self
 
         self._state = blaconst.STATE_STOPPED
         self._state_string = "Stopped"
@@ -91,7 +88,7 @@ class BlaStatusbar(gtk.Table):
         hbox.pack_start(self._file_scanner_box)
         hbox.pack_start(self._track_info)
 
-        self._view_info = gtk.Label("")
+        self._view_info_label = gtk.Label("")
 
         # Playback order
         self._order = gtk.combo_box_new_text()
@@ -109,7 +106,7 @@ class BlaStatusbar(gtk.Table):
         table.attach(self._order, 1, 2, 0, 1)
 
         count = 0
-        for widget, xalign in [(hbox, 0.0), (self._view_info, 0.5),
+        for widget, xalign in [(hbox, 0.0), (self._view_info_label, 0.5),
                                (table, 1.0)]:
             alignment = gtk.Alignment(xalign, 0.5, 0.0, 0.5)
             alignment.add(widget)
@@ -158,14 +155,11 @@ class BlaStatusbar(gtk.Table):
         elif self._timeout_id:
             source_remove()
 
-        try:
+        if isinstance(arg, float):
             self._file_scanner_box.set_fraction(arg)
             self._file_scanner_box.set_text("%d %%" % (arg * 100))
-        except TypeError:
-            pass
-
-        if arg == 1.0:
-            self._file_scanner_box.hide_box()
+            if arg == 1.0:
+                self._file_scanner_box.hide_box()
 
     def update_track_info(self, player):
         self._state = player.get_state()
@@ -182,26 +176,15 @@ class BlaStatusbar(gtk.Table):
             self._duration = self._convert_time(self._duration_nanoseconds)
         self._update_track_info_string()
 
-    @classmethod
-    def update_position(cls, position):
-        if position > cls._instance._duration_nanoseconds:
-            cls._instance._position = cls._instance._duration
+    def update_position(self, position):
+        if position > self._duration_nanoseconds:
+            self._position = self._duration
         else:
-            cls._instance._position = cls._instance._convert_time(position)
-        cls._instance._update_track_info_string()
+            self._position = self._convert_time(position)
+        self._update_track_info_string()
 
     def set_status_message(self, msg):
-        self.set_view_info(0, msg)
-
-    # XXX: Get rid of this.
-    @classmethod
-    def set_view_info(cls, view, string):
-        if view == blacfg.getint("general", "view"):
-            try:
-                cls._instance._view_info.set_text(string)
-            except AttributeError:
-                pass
-        return False
+        self._view_info_label.set_text(msg)
 
     def _set_status_message_from_view(self, view):
         self.set_status_message(view.get_status_message())
@@ -212,4 +195,3 @@ class BlaStatusbar(gtk.Table):
     def notify_focus(self, view):
         # FIXME: This doesn't always fire when a view receives focus.
         self._set_status_message_from_view(view)
-
