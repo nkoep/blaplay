@@ -66,6 +66,7 @@ class _FileScannerBox(gtk.HBox):
     def set_text(self, text):
         self._progress_bar.set_text(text)
 
+
 class BlaStatusbar(gtk.Table):
     def __init__(self):
         super(BlaStatusbar, self).__init__(rows=1, columns=3, homogeneous=True)
@@ -190,8 +191,4 @@ class BlaStatusbar(gtk.Table):
         self.set_status_message(view.get_status_message())
 
     def notify_status(self, view):
-        self._set_status_message_from_view(view)
-
-    def notify_focus(self, view):
-        # FIXME: This doesn't always fire when a view receives focus.
         self._set_status_message_from_view(view)

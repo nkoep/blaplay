@@ -56,13 +56,17 @@ def create_window(config, library, player):
     # Create the statusbar.
     statusbar = blastatusbar.create_statusbar(library, player, view_managers)
 
+    def on_view_changed(tab_view, view):
+        statusbar.set_status_message(view.get_status_message())
+    tab_view.connect("view-changed", on_view_changed)
+
     # Create the main window and inject the missing components.
     window = _BlaMainWindow(config, player)
+    window.add_accel_group(ui_manager.get_accel_group())
     window.add_menubar(ui_manager.get_menubar())
     window.add_browser_view(browser_view)
     window.add_tab_view(tab_view)
     window.add_statusbar(statusbar)
-    window.add_accel_group(ui_manager.get_accel_group())
 
     return window
 

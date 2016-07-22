@@ -62,9 +62,9 @@ class _Header(gtk.HBox):
     def set_locked(self, locked):
         self._lock_image.set_visible(locked)
 
+
 class BlaView(BlaScrolledWindow):
     def __new__(cls, *args, **kwargs):
-        # XXX: Can we do this with a mixin for future re-use?
         if cls == BlaView:
             raise ValueError("Cannot instantiate abstract class '%s'" %
                              cls.__name__)
@@ -120,4 +120,3 @@ class BlaView(BlaScrolledWindow):
 
     def add_context_menu_options(self, menu):
         self.manager.populate_context_menu(menu, self)
-

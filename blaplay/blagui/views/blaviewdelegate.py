@@ -28,6 +28,7 @@ class _BlaTracklistDelegateMixin(object):
             tab = self._get_current_tab()
             tab.enable_search()
 
+
 class _BlaPlaylistDelegateMixin(object):
     def _get_current_tab_as_playlist(self):
         if not self.current_tab_is_playlist():
@@ -86,19 +87,20 @@ class _BlaPlaylistDelegateMixin(object):
         self._view_managers[blaconst.VIEW_PLAYLIST].send_uris_to_new_playlist(
             name=name, uris=uris)
 
+
 class _BlaPreferencesDelegateMixin(object):
     def show_preferences(self):
         self._view_managers[blaconst.VIEW_PREFERENCES].show_preferences()
 
+
 class BlaViewDelegate(_BlaPlaylistDelegateMixin, _BlaTracklistDelegateMixin,
                       _BlaPreferencesDelegateMixin):
     """
-    This class abstracts away the views system. Intended consumers are the UI
+    This class abstracts away the views system. Intended users are the UI
     manager which implements the global menu bar, as well as the browser
     classes which use the view delegate to send media resources to playlists,
     tag editors or the queue.
     """
-
     def __init__(self, tab_view, view_managers):
         self._tab_view = tab_view
         self._view_managers = view_managers
@@ -117,4 +119,3 @@ class BlaViewDelegate(_BlaPlaylistDelegateMixin, _BlaTracklistDelegateMixin,
     def close_current_tab(self):
         view = self._get_current_tab()
         view.remove()
-

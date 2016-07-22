@@ -191,7 +191,7 @@ class BlaPlaylist(blatracklist.BlaTrackList):
         # DND from the filesystem browser or an external location
         elif info == blagui.DND_URIS:
             # XXX: Ugly!!
-            uris = self._manager._library.parse_ool_uris(
+            uris = self.manager._library.parse_ool_uris(
                 blautil.resolve_uris(selection_data.get_uris()))
             items = self.manager.create_items_from_uris(uris)
 
@@ -238,7 +238,7 @@ class BlaPlaylist(blatracklist.BlaTrackList):
         if not items:
             return
         playlist.add_items(items=items, select_rows=True)
-        self.manager.focus_playlist(playlist)
+        self.manager.request_focus_for_view(playlist)
 
     def _add_selection_to_playlist(self, playlist):
         if not playlist.can_modify():
@@ -249,7 +249,7 @@ class BlaPlaylist(blatracklist.BlaTrackList):
             return
         items = map(copyfunc, items)
         playlist.add_items(items=items, select_rows=True)
-        self.manager.focus_playlist(playlist)
+        self.manager.request_focus_for_view(playlist)
 
     # def _queue_selection(self):
     #     queue_n_items = queue.n_items

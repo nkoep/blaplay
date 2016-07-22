@@ -19,6 +19,7 @@ import abc
 from .. import blaguiutil
 
 
+# TODO: Turn this into a GObject to we can re-use the signal model.
 class BlaViewManager(object):
     __metaclass__ = abc.ABCMeta
 
@@ -29,29 +30,29 @@ class BlaViewManager(object):
         self._observers = []
         self.views = []
 
-    def _notify_observers(self, method, view):
+    def _notify_observers(self, action, view):
         # Notify observers about changes to a view. Observers shouldn't have to
         # implement all supported methods though so we're fine with
         # AttributeError exceptions here.
         for observer in self._observers:
-            try:
-                callback = getattr(observer, method)
-            except AttributeError:
-                pass
-            else:
-                callback(view)
+            # TODO: Rename methods to "on_notify_*" to make the semantics
+            #       clearer. Methods on the observer will be called by the
+            #       observee.
+            method = "notify_" + action
+            if hasattr(observer, method):
+                getattr(observer, method)(view)
 
     def _notify_add(self, view):
-        self._notify_observers("notify_add", view)
+        self._notify_observers("add", view)
 
     def _notify_focus(self, view):
-        self._notify_observers("notify_focus", view)
+        self._notify_observers("focus", view)
 
     def _notify_status(self, view):
-        self._notify_observers("notify_status", view)
+        self._notify_observers("status", view)
 
     def _notify_remove(self, view):
-        self._notify_observers("notify_remove", view)
+        self._notify_observers("remove", view)
 
     def register_observer(self, observer):
         self._observers.append(observer)
@@ -60,13 +61,15 @@ class BlaViewManager(object):
     def create_view(self):
         pass
 
+    def request_focus_for_view(self, view):
+        self._notify_focus(view)
+
     def remove_view(self, view):
         """
         Remove a view from the view manager. Subclasses should always call this
         method to remove a view to guarantee that the lock state is checked
         first.
         """
-
         if view.locked():
             blaguiutil.error_dialog(
                 "This tab is locked", "Unlock it first to remove it.")
@@ -86,4 +89,3 @@ class BlaViewManager(object):
             menu.append_item("Unlock tab" if view.locked() else "Lock tab",
                              on_activate_callback=view.toggle_lock)
             menu.append_item("Close tab", self.remove_view, view)
-

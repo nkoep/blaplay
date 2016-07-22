@@ -379,16 +379,15 @@ class BlaPlaylistManager(BlaViewManager):
     #         self.add_playlist()
 
     def remove_view(self, playlist):
-        # Chain up first and see if the playlist was removed.
-        if not super(BlaPlaylistManager, self).remove_view(playlist):
-            return
-
         if self._get_active_playlist() == playlist:
             try:
                 self.current_item.playlist = None
             except AttributeError:
                 pass
         playlist.clear()
+
+        # Chain up.
+        super(BlaPlaylistManager, self).remove_view(playlist)
 
     def send_uris_to_playlist(self, playlist, uris):
         if not uris:
@@ -455,15 +454,12 @@ class BlaPlaylistManager(BlaViewManager):
                 self._scroll_to_current_item()
         self._player.play_track(uri)
 
-    def focus_playlist(self, playlist):
-        self._notify_focus(playlist)
-
     def jump_to_playing_track(self):
         if self.current_item is None:
             return
         playlist = self._get_active_playlist()
         playlist.jump_to_track(self.current_item)
-        self.focus_playlist(playlist)
+        self.request_focus_for_view(playlist)
 
     def create_items_from_uris(self, uris):
         # XXX: Ugly, the playlist manager shouldn't have to know about the
@@ -471,4 +467,3 @@ class BlaPlaylistManager(BlaViewManager):
         from .blatracklist import BlaTrackListItem as cls
         library = self._library
         return [cls(library[uri]) for uri in uris]
-

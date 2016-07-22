@@ -77,13 +77,13 @@ class BlaTabView(gtk.Notebook):
 
         return False
 
-    def _on_drag_data_received(
-        self, drag_context, x, y, selection_data, info, time):
+    def _on_drag_data_received(self, drag_context, x, y, selection_data, info,
+                               time):
         print_w("TODO")
 
     def _on_switch_page(self, page, page_num):
-        self.emit("view-changed", self.get_nth_page(page_num))
-        return False
+        view = self.get_nth_page(page_num)
+        self.emit("view-changed", view)
 
     def _show_context_menu(self, event, view=None):
         menu = blaguiutil.BlaMenu(event)
@@ -111,4 +111,3 @@ class BlaTabView(gtk.Notebook):
 
     def get_current_view(self):
         return self.get_nth_page(self.get_current_page())
-

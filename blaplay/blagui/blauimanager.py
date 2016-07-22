@@ -170,4 +170,3 @@ class BlaUIManager(gtk.UIManager):
 
     def _quit(self, *args):
         blaplay.shutdown()
-
