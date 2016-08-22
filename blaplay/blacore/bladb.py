@@ -37,8 +37,6 @@ from blaplay.formats._identifiers import *
 
 EVENT_CREATED, EVENT_DELETED, EVENT_MOVED, EVENT_CHANGED = xrange(4)
 
-# TODO: Move `pending_save' or a similar variable into BlaLibrary.
-pending_save = False
 
 library = None # XXX: Remove this
 def init(config, path):
@@ -48,11 +46,7 @@ def init(config, path):
     return library
 
 def update_library():
-    global pending_save
-
     library.sync()
-    pending_save = False
-
     return False
 
 
@@ -137,17 +131,16 @@ class BlaLibraryMonitor(gobject.GObject):
             print_d("New event of type `%s' for file %s (%r)" %
                     (EVENTS[event], path_from, path_to))
 
-            # TODO: Rename `update' to something more meaningful.
-            update = True
             if self._timeout_id:
                 gobject.source_remove(self._timeout_id)
                 self._timeout_id = 0
 
+            if path_from in BlaLibraryMonitor.ignore:
+                BlaLibraryMonitor.ignore.remove(path_from)
+                continue
+
             if event == EVENT_CREATED:
-                if path_from in BlaLibraryMonitor.ignore:
-                    BlaLibraryMonitor.ignore.remove(path_from)
-                    update = False
-                elif os.path.isfile(path_from):
+                if os.path.isfile(path_from):
                     library.add_tracks([path_from])
                 else:
                     # For files that are copied a CHANGED event is triggered
@@ -159,10 +152,7 @@ class BlaLibraryMonitor(gobject.GObject):
                     library.add_tracks(blautil.discover(path_from))
 
             elif event == EVENT_CHANGED:
-                if path_from in BlaLibraryMonitor.ignore:
-                    BlaLibraryMonitor.ignore.remove(path_from)
-                    update = False
-                elif os.path.isfile(path_from):
+                if os.path.isfile(path_from):
                     library.add_tracks([path_from])
 
             elif event == EVENT_DELETED:
@@ -215,12 +205,10 @@ class BlaLibraryMonitor(gobject.GObject):
             # Schedule an update for the library browser, etc. The timeout
             # might be removed immediately at the beginning of this loop if
             # there are more events in the queue.
-            if update:
-                global pending_save
-                pending_save = True
-                # XXX: The timeout has to be handled elsewhere.
-                self._timeout_id = gobject.timeout_add(
-                    3000, self._update_library)
+            library.touch()
+            # XXX: The timeout has to be handled elsewhere.
+            self._timeout_id = gobject.timeout_add(
+                3000, self._update_library)
 
     def _update_library(self):
         self._timeout_id = 0
@@ -317,6 +305,8 @@ class BlaLibrary(gobject.GObject):
         self._app = app
         self._path = path
 
+        self._out_of_date = False
+
         self.__monitored_directories = []
         self.__scan_queue = []
         self.__currently_scanning = None
@@ -379,10 +369,16 @@ class BlaLibrary(gobject.GObject):
 
         def pre_shutdown_hook():
             print_i("Saving pending library changes")
-            if pending_save:
+            if self._out_of_date:
                 self.__save_library()
+                self._out_of_date = False
         app.add_pre_shutdown_hook(pre_shutdown_hook)
 
+    # TODO: Update the `_out_of_date` flag internally when tracks were
+    #       added/updated/(re)moved to get rid of this method again.
+    def touch(self):
+        """Mark the library as out-of-date"""
+        self._out_of_date = True
 
     def __getitem__(self, key):
         try:
@@ -426,6 +422,13 @@ class BlaLibrary(gobject.GObject):
 
     def __detect_changes(self, directories):
         # XXX: We should be able to update the contents of __tracks in one go.
+
+        # TODO: Generate three lists of tracks here: missing, new, updated
+        #       ones. Then pass this list to the main process (more exactly, a
+        #       waiting thread in the main process) by means of a pipe from
+        #       where changes are performed on the library. The advantage of
+        #       this approach is that we can off-load the heavy lifting to a
+        #       secondary process and handle the "simple" stuff from a thread.
 
         print_i("Checking for changes in monitored directories %r" %
                 self._app.config.getdotliststr("library", "directories"))
