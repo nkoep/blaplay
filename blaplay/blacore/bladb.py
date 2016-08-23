@@ -46,9 +46,7 @@ def init(config, path):
     return library
 
 
-# TODO: - Derive this class from Queue.Queue, too, so we can drop the __queue
-#         attribute.
-#       - Move this to its own file.
+# TODO: Move this to its own file.
 class BlaLibraryMonitor(gobject.GObject):
     __gsignals__ = {
         "initialized": blautil.signal(1)
@@ -78,15 +76,15 @@ class BlaLibraryMonitor(gobject.GObject):
         self._file_ignored = create_filter_function(
             config.getstring("library", "ignore.pattern"))
 
-        self.__monitors = {}
-        self.__lock = blautil.BlaLock()
-        self.__queue = Queue.Queue()
-        self.__processing = False
+        self._monitors = {}
+        self._lock = blautil.BlaLock()
+        self._queue = Queue.Queue()
+        self._processing = False
         self._timeout_id = 0
 
-        self.__process_events()
+        self._process_events()
 
-    def __queue_event(self, monitor, path_from, path_to, type_):
+    def _queue_event(self, monitor, path_from, path_to, type_):
         if type_ == gio.FILE_MONITOR_EVENT_CHANGES_DONE_HINT:
             event = EVENT_CHANGED
         elif type_ == gio.FILE_MONITOR_EVENT_DELETED:
@@ -113,10 +111,10 @@ class BlaLibraryMonitor(gobject.GObject):
         # we don't actually dispatch on self.
         if self._file_ignored(path_from):
             return
-        self.__queue.put((event, path_from, path_to))
+        self._queue.put((event, path_from, path_to))
 
     @blautil.thread
-    def __process_events(self):
+    def _process_events(self):
         EVENTS = {
             EVENT_DELETED: "EVENT_DELETED",
             EVENT_CHANGED: "EVENT_CHANGED",
@@ -124,7 +122,7 @@ class BlaLibraryMonitor(gobject.GObject):
         }
 
         while True:
-            event, path_from, path_to = self.__queue.get()
+            event, path_from, path_to = self._queue.get()
             print_d("New event of type `%s' for file %s (%r)" %
                     (EVENTS[event], path_from, path_to))
 
@@ -202,7 +200,7 @@ class BlaLibraryMonitor(gobject.GObject):
         library.commit()
         return False
 
-    def __get_subdirectories(self, directories):
+    def _get_subdirectories(self, directories):
         # The heavy lifting here is actually just getting a list of all the
         # directories which need a monitor. The creation of the monitors itself
         # is rather simple. To circumvent the GIL when getting the directory
@@ -236,35 +234,35 @@ class BlaLibraryMonitor(gobject.GObject):
     def add_directory(self, directory):
         # TODO: this is largely identical to update_directories. combine the
         #       two methods
-        directories = self.__get_subdirectories(directory)
+        directories = self._get_subdirectories(directory)
 
-        with self.__lock:
+        with self._lock:
             for directory in directories:
-                if directory in self.__monitors:
+                if directory in self._monitors:
                     continue
                 f = gio.File(directory)
                 monitor = f.monitor_directory(
                     flags=gio.FILE_MONITOR_NONE | gio.FILE_MONITOR_SEND_MOVED)
-                monitor.connect("changed", self.__queue_event)
-                self.__monitors[directory] = monitor
+                monitor.connect("changed", self._queue_event)
+                self._monitors[directory] = monitor
 
     @blautil.thread
     def remove_directories(self, md):
-        with self.__lock:
-            for directory in sorted(self.__monitors.keys()):
+        with self._lock:
+            for directory in sorted(self._monitors.keys()):
                 if directory.startswith(md):
-                    self.__monitors.pop(directory).cancel()
+                    self._monitors.pop(directory).cancel()
 
     @blautil.thread
     def update_directories(self):
         monitored_directories = self._config.getdotliststr(
             "library", "directories")
-        directories = self.__get_subdirectories(monitored_directories)
+        directories = self._get_subdirectories(monitored_directories)
 
-        with self.__lock:
+        with self._lock:
             cancel = gio.FileMonitor.cancel
-            map(cancel, self.__monitors.itervalues())
-            self.__monitors.clear()
+            map(cancel, self._monitors.itervalues())
+            self._monitors.clear()
 
             # According to the GIO C API documentation there are backends which
             # don't support gio.FILE_MONITOR_EVENT_MOVED. However, since we
@@ -275,10 +273,10 @@ class BlaLibraryMonitor(gobject.GObject):
                 f = gio.File(directory)
                 monitor = f.monitor_directory(
                     flags=gio.FILE_MONITOR_NONE | gio.FILE_MONITOR_SEND_MOVED)
-                monitor.connect("changed", self.__queue_event)
-                self.__monitors[directory] = monitor
+                monitor.connect("changed", self._queue_event)
+                self._monitors[directory] = monitor
         print_d("Now monitoring %d directories under %r" %
-                (len(self.__monitors), monitored_directories))
+                (len(self._monitors), monitored_directories))
         self.emit("initialized", directories)
 
 
@@ -293,17 +291,16 @@ class BlaLibrary(gobject.GObject):
         self._app = app
         self._path = path
 
+        self._monitored_directories = []
+        self._scan_queue = []
+        self._currently_scanning = None
         self._out_of_date = False
-
-        self.__monitored_directories = []
-        self.__scan_queue = []
-        self.__currently_scanning = None
-        self.__tracks = {}
-        self.__tracks_ool = {}
-        self.__playlists = []
-        self.__lock = blautil.BlaLock(strict=True)
+        self._tracks = {}
+        self._tracks_ool = {}
+        self._playlists = []
+        self._lock = blautil.BlaLock(strict=True)
         self._timeout_id = 0
-        self.__extension_filter = re.compile(
+        self._extension_filter = re.compile(
             r".*\.(%s)$" % "|".join(formats.keys())).match
 
         def on_config_changed(config, section, key):
@@ -324,41 +321,41 @@ class BlaLibrary(gobject.GObject):
         if tracks is None:
             app.config.set("library", "directories", "")
         else:
-            self.__tracks = tracks
+            self._tracks = tracks
 
         # Restore out-of-library tracks.
         # TODO: Store the entire library under self._path.
         tracks = blautil.deserialize_from_file(blaconst.OOL_PATH)
         if tracks is not None:
-            self.__tracks_ool = tracks
+            self._tracks_ool = tracks
 
         print_d("Restoring library: %d tracks in the library, %d additional "
-                "tracks" % (len(self.__tracks), len(self.__tracks_ool)))
+                "tracks" % (len(self._tracks), len(self._tracks_ool)))
 
-        self.__monitored_directories = map(
+        self._monitored_directories = map(
             os.path.realpath,
             app.config.getdotliststr("library", "directories"))
 
         def initialized(library_monitor, directories):
             if app.config.getboolean("library", "update.on.startup"):
-                p = self.__detect_changes(directories)
+                p = self._detect_changes(directories)
                 gobject.idle_add(p.next, priority=gobject.PRIORITY_LOW)
                 # TODO: This is more efficient than the method above. However,
-                # it does not clean up missing tracks.
-                # for md in self.__monitored_directories:
+                #       it does not clean up missing tracks.
+                # for md in self._monitored_directories:
                 #     self.scan_directory(md)
-            self.__library_monitor.disconnect(callback_id)
-        self.__library_monitor = BlaLibraryMonitor(app.config)
-        callback_id = self.__library_monitor.connect(
+            self._library_monitor.disconnect(callback_id)
+        self._library_monitor = BlaLibraryMonitor(app.config)
+        callback_id = self._library_monitor.connect(
             "initialized", initialized)
         # FIXME: Pass in `initialized' as a callback function instead of using
         #        a single-purpose-single-use signal.
-        self.__library_monitor.update_directories()
+        self._library_monitor.update_directories()
 
         def pre_shutdown_hook():
             print_i("Saving pending library changes")
             if self._out_of_date:
-                self.__save_library()
+                self._save_library()
                 self._out_of_date = False
         app.add_pre_shutdown_hook(pre_shutdown_hook)
 
@@ -370,27 +367,27 @@ class BlaLibrary(gobject.GObject):
 
     def __getitem__(self, key):
         try:
-            return self.__tracks[key]
+            return self._tracks[key]
         except KeyError:
-            return self.__tracks_ool[key]
+            return self._tracks_ool[key]
 
     def __setitem__(self, key, item):
-        if self.__tracks.has_key(key):
-            self.__tracks[key] = item
+        if self._tracks.has_key(key):
+            self._tracks[key] = item
         else:
-            self.__tracks_ool[key] = item
+            self._tracks_ool[key] = item
 
     def __contains__(self, item):
-        return item in self.__tracks
+        return item in self._tracks
 
     def __iter__(self):
         return self.next()
 
     def next(self):
-        for uri in self.__tracks.keys():
+        for uri in self._tracks.keys():
             yield uri
 
-    def __save_library(self):
+    def _save_library(self):
         # Pickling a large dict causes quite an increase in memory use as the
         # module basically creates an exact copy of the object in memory. To
         # combat the problem we offload the serialization of the library to
@@ -400,7 +397,7 @@ class BlaLibrary(gobject.GObject):
         # occasionally.
         p = multiprocessing.Process(
             target=blautil.serialize_to_file,
-            args=(self.__tracks, self._path))
+            args=(self._tracks, self._path))
         p.start()
 
         @blautil.thread_nondaemonic
@@ -408,8 +405,8 @@ class BlaLibrary(gobject.GObject):
             p.join()
         join()
 
-    def __detect_changes(self, directories):
-        # XXX: We should be able to update the contents of __tracks in one go.
+    def _detect_changes(self, directories):
+        # XXX: We should be able to update the contents of _tracks in one go.
 
         # TODO: Generate three lists of tracks here: missing, new, updated
         #       ones. Then pass this list to the main process (more exactly, a
@@ -425,7 +422,7 @@ class BlaLibrary(gobject.GObject):
 
         # Update out-of-library tracks.
         update_track = self.update_track
-        for idx, uri in enumerate(self.__tracks_ool.keys()):
+        for idx, uri in enumerate(self._tracks_ool.keys()):
             update_track(uri)
             if idx % yield_interval == 0:
                 yield True
@@ -480,21 +477,21 @@ class BlaLibrary(gobject.GObject):
     # if the key is already present and otherwise adds it to the ool dict.
     def add_track(self, track):
         uri = track.uri
-        self.__tracks[uri] = track
+        self._tracks[uri] = track
         try:
-            del self.__tracks_ool[uri]
+            del self._tracks_ool[uri]
         except KeyError:
             pass
 
     def add_tracks(self, uris):
         count = 0
-        filt = self.__extension_filter
+        filt = self._extension_filter
         add_track = self.add_track
         for uri in filter(filt, uris):
             track = make_track(uri)
             if not track:
                 continue
-            for md in self.__monitored_directories:
+            for md in self._monitored_directories:
                 if uri.startswith(md):
                     track[MONITORED_DIRECTORY] = md
                     add_track(track)
@@ -529,17 +526,17 @@ class BlaLibrary(gobject.GObject):
 
     def move_track(self, path_from, path_to, md=""):
         # When a file is moved we create an entry for the new path in the
-        # __tracks dict and move the old track to __tracks_ool. This is
+        # _tracks dict and move the old track to _tracks_ool. This is
         # necessary because some elements like the player, scrobbler or a
         # playlist might still try to get metadata using the old URI so we have
         # to guarantee that it's still available somewhere. The redundant data
-        # will be removed from __tracks_ool on shutdown when we sync entries in
-        # __tracks_ool to playlist contents.
+        # will be removed from _tracks_ool on shutdown when we sync entries in
+        # _tracks_ool to playlist contents.
 
         # Get first match for a monitored directory if no specific one is
         # given.
         if not md:
-            for md in self.__monitored_directories:
+            for md in self._monitored_directories:
                 if path_to.startswith(md):
                     break
             else:
@@ -550,7 +547,7 @@ class BlaLibrary(gobject.GObject):
         # Chromium, for instance, appends a .crdownload suffix to downloads and
         # then renames them on transfer completion.
         try:
-            track = self.__tracks[path_from]
+            track = self._tracks[path_from]
         except KeyError:
             track = make_track(path_to)
             if track:
@@ -558,28 +555,28 @@ class BlaLibrary(gobject.GObject):
                 self.add_track(track)
             return
 
-        if path_from in self.__tracks and path_from != path_to:
-            self.__tracks_ool[path_from] = self.__tracks.pop(path_from)
+        if path_from in self._tracks and path_from != path_to:
+            self._tracks_ool[path_from] = self._tracks.pop(path_from)
         track[URI] = path_to
         track[MONITORED_DIRECTORY] = md
         if md:
-            self.__tracks[path_to] = track
+            self._tracks[path_to] = track
         else:
-            self.__tracks_ool[path_to] = track
+            self._tracks_ool[path_to] = track
 
     def remove_track(self, uri):
         try:
-            track = self.__tracks[uri]
+            track = self._tracks[uri]
         except KeyError:
             pass
         else:
             track[MONITORED_DIRECTORY] = ""
-            self.__tracks_ool[uri] = track
-            del self.__tracks[uri]
+            self._tracks_ool[uri] = track
+            del self._tracks[uri]
 
     def commit(self):
-        self.__save_library()
-        self.__monitored_directories = map(
+        self._save_library()
+        self._monitored_directories = map(
             os.path.realpath,
             self._app.config.getdotliststr("library", "directories"))
         self.emit("library_updated")
@@ -593,13 +590,13 @@ class BlaLibrary(gobject.GObject):
         # this set and the set of URIs for each playlist. The remainder will be
         # a set of URIs that weren't referenced by any playlist so we just get
         # rid of them.
-        ool_uris = set(self.__tracks_ool.keys())
+        ool_uris = set(self._tracks_ool.keys())
         for uri in ool_uris.difference(uris):
-            self.__tracks_ool.pop(uri)
+            self._tracks_ool.pop(uri)
 
         p = multiprocessing.Process(
             target=blautil.serialize_to_file,
-            args=(self.__tracks_ool, blaconst.OOL_PATH))
+            args=(self._tracks_ool, blaconst.OOL_PATH))
         p.start()
 
         @blautil.thread_nondaemonic
@@ -615,7 +612,7 @@ class BlaLibrary(gobject.GObject):
             timeout_id = gobject.timeout_add(40, pb.pulse)
 
             files = []
-            filt = self.__extension_filter
+            filt = self._extension_filter
             for uri in uris:
                 uri = os.path.realpath(uri)
                 if os.path.isdir(uri):
@@ -644,7 +641,7 @@ class BlaLibrary(gobject.GObject):
                     track = self[uri]
                 except KeyError:
                     track = make_track(uri)
-                    self.__tracks_ool[uri] = track
+                    self._tracks_ool[uri] = track
                 if track:
                     namespace["uris"].append(uri)
 
@@ -681,17 +678,17 @@ class BlaLibrary(gobject.GObject):
             print_d("Scanning `%s' and its subdirectories..." % directory)
 
             self.emit("progress", "pulse")
-            self.__aborted = False
+            self._aborted = False
 
             checked_directories = []
             files = []
 
-            filt = self.__extension_filter
+            filt = self._extension_filter
             for f in blautil.discover(directory):
                 filt(f) and files.append(f)
-                if self.__aborted:
+                if self._aborted:
                     self.emit("progress", "abort")
-                    self.__currently_scanning = None
+                    self._currently_scanning = None
                     namespace["wait"] = False
                     yield False
                 yield True
@@ -706,20 +703,20 @@ class BlaLibrary(gobject.GObject):
             for idx, path in enumerate(files):
                 self.emit("progress", step_size * (idx+1))
 
-                if self.__aborted:
+                if self._aborted:
                     self.emit("progress", "abort")
-                    self.__currently_scanning = None
+                    self._currently_scanning = None
                     namespace["wait"] = False
                     yield False
 
                 try:
-                    track = self.__tracks[path]
+                    track = self._tracks[path]
                 except KeyError:
                     # If track wasn't in the library check if it was in
-                    # __tracks_ool. In that case it might require an update as
+                    # _tracks_ool. In that case it might require an update as
                     # we don't monitor such tracks.
                     try:
-                        track = self.__tracks_ool[path]
+                        track = self._tracks_ool[path]
                     except KeyError:
                         track = make_track(path)
                     else:
@@ -732,28 +729,28 @@ class BlaLibrary(gobject.GObject):
                 yield True
 
             self.commit()
-            self.__library_monitor.add_directory(directory)
+            self._library_monitor.add_directory(directory)
             self.emit("progress", 1.0)
 
             print_d("Finished parsing of %d files after %.2f seconds" %
                     (len(files), (time.time() - t)))
 
             namespace["wait"] = False
-            self.__currently_scanning = None
+            self._currently_scanning = None
             yield False
 
         # FIXME: get rid of `namespace'
-        self.__scan_queue.append(directory)
-        if not self.__currently_scanning:
+        self._scan_queue.append(directory)
+        if not self._currently_scanning:
             while True:
                 try:
-                    directory = self.__scan_queue.pop(0)
+                    directory = self._scan_queue.pop(0)
                 except IndexError:
                     break
 
                 namespace = {"wait": True}
                 directory = os.path.realpath(directory)
-                self.__currently_scanning = directory
+                self._currently_scanning = directory
                 p = scan(directory)
                 gobject.idle_add(p.next)
                 while namespace["wait"]:
@@ -765,16 +762,16 @@ class BlaLibrary(gobject.GObject):
         directory = os.path.realpath(directory)
         while True:
             try:
-                self.__scan_queue.remove(directory)
+                self._scan_queue.remove(directory)
             except ValueError:
                 break
-        if self.__currently_scanning == directory:
-            self.__aborted = True
+        if self._currently_scanning == directory:
+            self._aborted = True
 
         remove_track = self.remove_track
-        tracks = [(uri, track) for uri, track in self.__tracks.iteritems()
+        tracks = [(uri, track) for uri, track in self._tracks.iteritems()
                 if track[MONITORED_DIRECTORY] == directory]
-        mds = self.__monitored_directories
+        mds = self._monitored_directories
 
         try:
             mds.remove(directory)
@@ -790,8 +787,8 @@ class BlaLibrary(gobject.GObject):
                 remove_track(uri)
 
         # If there are no more monitored directories but still tracks in the
-        # library something went wrong so move them to __tracks_ool as well.
+        # library something went wrong so move them to _tracks_ool as well.
         if not mds:
-            map(remove_track, self.__tracks.iterkeys())
+            map(remove_track, self._tracks.iterkeys())
         self.commit()
-        self.__library_monitor.remove_directories(directory)
+        self._library_monitor.remove_directories(directory)
