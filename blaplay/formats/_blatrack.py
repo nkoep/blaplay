@@ -111,12 +111,6 @@ class BlaTrack(dict):
         self[LENGTH] = int(info.length)
 
     def save(self):
-        from blaplay.blacore import bladb
-        ignore = bladb.BlaLibraryMonitor.ignore
-
-        # This makes sure the next EVENT_CHANGED event for this file is ignored
-        # by the library monitor as otherwise we'd update everything twice.
-        ignore.add(self[URI])
         status = self._save()
         self[MTIME] = os.path.getmtime(self[URI])
         return status
@@ -131,7 +125,7 @@ class BlaTrack(dict):
         # a numerical identifier as defined in formats._identifiers.
         return list(set(self.keys()).difference(xrange(N_IDENTIFIERS)))
 
-    # TODO: cache properties which don't change over time
+    # TODO: Cache properties that don't change over time.
 
     def get_cover_basepath(self):
         if "" in (self[ARTIST], self[ALBUM]):
