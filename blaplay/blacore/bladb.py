@@ -45,10 +45,6 @@ def init(config, path):
     library = BlaLibrary(config, path)
     return library
 
-def update_library():
-    library.sync()
-    return False
-
 
 # TODO: - Derive this class from Queue.Queue, too, so we can drop the __queue
 #         attribute.
@@ -212,7 +208,7 @@ class BlaLibraryMonitor(gobject.GObject):
 
     def _update_library(self):
         self._timeout_id = 0
-        update_library()
+        library.commit()
         return False
 
     def __get_subdirectories(self, directories):
@@ -328,7 +324,7 @@ class BlaLibrary(gobject.GObject):
                 (key == "restrict.to.pattern" or key == "exclude.pattern")):
                 if self._timeout_id:
                     gobject.source_remove(self._timeout_id)
-                self._timeout_id = gobject.timeout_add(2500, self.sync)
+                self._timeout_id = gobject.timeout_add(2500, self.commit)
         app.config.connect("changed", on_config_changed)
 
         # Restore the library.
@@ -484,7 +480,7 @@ class BlaLibrary(gobject.GObject):
         # before requesting an update.
         while self._app.window is None:
             yield True
-        update_library()
+        library.commit()
         yield False
 
     # This method exclusively inserts tracks into the library. The form
@@ -589,7 +585,7 @@ class BlaLibrary(gobject.GObject):
             self.__tracks_ool[uri] = track
             del self.__tracks[uri]
 
-    def sync(self):
+    def commit(self):
         self.__save_library()
         self.__monitored_directories = map(
             os.path.realpath,
@@ -743,7 +739,7 @@ class BlaLibrary(gobject.GObject):
                     add_track(track)
                 yield True
 
-            self.sync()
+            self.commit()
             self.__library_monitor.add_directory(directory)
             self.emit("progress", 1.0)
 
@@ -805,6 +801,6 @@ class BlaLibrary(gobject.GObject):
         # library something went wrong so move them to __tracks_ool as well.
         if not mds:
             map(remove_track, self.__tracks.iterkeys())
-        self.sync()
+        self.commit()
         self.__library_monitor.remove_directories(directory)
 

@@ -375,7 +375,7 @@ class BlaTagEditor(BlaMetadataViewer):
             idx += 1
         self._pb.set_visible(False)
 
-        library.sync()
+        library.commit()
 
         self._update_model(self._uris)
 
