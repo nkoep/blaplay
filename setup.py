@@ -56,10 +56,10 @@ class clean(d_clean):
             if os.path.isdir(path):
                 shutil.rmtree(path)
 
+
 class check(Command):
     description = "check installation requirements"
     user_options = []
-    __NAME = "blaplay"
 
     def initialize_options(self):
         pass
@@ -67,89 +67,98 @@ class check(Command):
     def finalize_options(self):
         pass
 
-    def run(self):
-        print "Checking Python version >= 2.7:",
-        print ".".join(map(str, sys.version_info[:2]))
-        if sys.version_info < (2, 7):
-            raise SystemExit("%s requires at least Python 2.7. "
-                             "(http://www.python.org)" % self.__NAME)
-
-        print "Checking for PyGTK >= 2.22:",
+    def _check_version(self, callable, library, url):
+        print "Checking for {}:".format(library),
         try:
-            import pygtk
-            pygtk.require("2.0")
-            import gtk
-            if gtk.pygtk_version < (2, 22) or gtk.gtk_version < (2, 22):
-                raise ImportError
+            callable()
         except ImportError:
-            raise SystemExit("not found\n%s requires PyGTK 2.21. "
-                             "(http://www.pygtk.org)" % self.__NAME)
-        else:
-            print "found"
-
-        print "Checking for gst-python >= 0.10.21:",
-        try:
-            import pygst
-            pygst.require("0.10")
-            import gst
-            if gst.pygst_version < (0, 10, 21):
-                raise ImportError
-        except ImportError:
-            have_pygst = False
             print "not found"
-        else:
-            have_pygst = True
-            print "found"
-
-        print "Checking for Mutagen >= 1.19:",
-        try:
-            import mutagen
-            if mutagen.version < (1, 19):
-                raise ImportError
-        except ImportError:
             raise SystemExit(
-                "not found\n%s requires Mutagen 1.19.\n"
-                "(http://code.google.com/p/mutagen/downloads/list)" %
-                self.__NAME)
+                "{name} requires {library}. ({url})".format(
+                    name=blaconst.APPNAME, library=library, url=url))
         else:
             print "found"
 
-        print "Checking for PyGObject >= 2.21:",
-        try:
-            import gobject
-            if gobject.pygobject_version < (2, 21):
-                raise ImportError
-        except ImportError:
-            raise SystemExit(
-                "not found\n%s requires PyGObject 2.21.\n"
-                "(https://live.gnome.org/PyGObject)" %
-                self.__NAME)
-        else:
-            print "found"
+    def _check_python(self):
+        major = sys.version_info.major
+        minor = sys.version_info.minor
+        if (major, minor) < (2, 7):
+            raise ImportError
 
-        print "Checking for Cython >= 0.15.1:",
+    def _check_pygtk(self):
+        import pygtk
         try:
-            import Cython
-            if Cython.__version__ < "0.15.1":
-                raise ImportError
-        except ImportError:
-            raise SystemExit(
-                "not found\n%s requires Cython 0.15.1.\n"
-                "(http://http://www.cython.org/#download)" %
-                self.__NAME)
-        else:
-            print "found"
+            pygtk.require("2.0")
+        except AssertionError:
+            raise ImportError
+        import gtk
+        if gtk.pygtk_version < (2, 22) or gtk.gtk_version < (2, 22):
+            raise ImportError
 
-        print "Checking for numpy >= 1.3:",
+    def _check_pygst(self):
+        import pygst
         try:
-            import numpy.version
-            if numpy.version.version < "1.3":
-                raise ImportError
-        except ImportError:
-            raise SystemExit("not found\n%s requires python-numpy 1.3.\n" %
-                             self.__NAME)
-        else:
-            print "found"
+            pygst.require("0.10")
+        except pygst.RequiredVersionError:
+            raise ImportError
+        import gst
+        if gst.pygst_version < (0, 10, 21):
+            raise ImportError
+
+    def _check_mutagen(self):
+        import mutagen
+        if mutagen.version < (1, 19):
+            raise ImportError
+
+    def _check_pygobject(self):
+        import gobject
+        if gobject.pygobject_version < (2, 21):
+            raise ImportError
+
+    def _check_cython(self):
+        import Cython
+        major, minor, patch = map(int, Cython.__version__.split("."))
+        if (major, minor, patch) < (0, 15, 1):
+            raise ImportError
+
+    def _check_numpy(self):
+        from numpy.version import version
+        major, minor, patch = map(int, version.split("."))
+        if (major, minor) < (1, 3):
+            raise ImportError
+
+    def _check_dbus(self):
+        import dbus
+        major, minor, patch = map(int, dbus.__version__.split("."))
+        if (major, minor, patch)  < (1, 2, 4):
+            raise ImportError
+
+    def run(self):
+        self._check_version(self._check_python, "Python >= 2.7",
+                            "http://www.python.org")
+
+        self._check_version(self._check_pygtk, "PyGTK >= 2.22",
+                            "http://www.pygtk.org")
+
+        self._check_version(
+            self._check_pygst, "gst-python >= 0.10.21",
+            "https://gstreamer.freedesktop.org/modules/gst-python.html")
+
+        self._check_version(self._check_mutagen, "Mutagen >= 1.19",
+                            "https://github.com/quodlibet/mutagen")
+
+        self._check_version(self._check_pygobject, "PyGObject >= 2.21",
+                            "https://live.gnome.org/PyGObject")
+
+        self._check_version(self._check_cython, "Cython >= 0.15.1",
+                            "http://http://www.cython.org/")
+
+        self._check_version(self._check_numpy, "NumPy >= 1.3",
+                            "http://www.numpy.org/")
+
+        self._check_version(
+            self._check_dbus, "python-dbus >= 1.2.4",
+            "https://dbus.freedesktop.org/releases/dbus-python")
 
 class build_scripts(d_build_scripts):
     description = "copy scripts to build directory"
@@ -181,6 +190,7 @@ class build_shortcuts(Command):
             self.copy_file(shortcut,
                            os.path.join(basepath, os.path.basename(shortcut)))
 
+
 class update_icon_cache(Command):
     def initialize_options(self):
         pass
@@ -192,6 +202,7 @@ class update_icon_cache(Command):
         icon_dir = "blaplay/images/icons/hicolor"
         if os.access(icon_dir, os.W_OK):
             self.spawn(["gtk-update-icon-cache", "-f", icon_dir])
+
 
 class install_shortcuts(Command):
     description = "install .desktop files"
@@ -225,16 +236,19 @@ class install_shortcuts(Command):
             fullpath = os.path.join(basepath, shortcut)
             self.copy_file(fullsrc, fullpath)
 
+
 class build(d_build):
     """Override the default build with new subcommands."""
     sub_commands = d_build.sub_commands
     sub_commands.extend([("build_shortcuts", lambda *x: True)])
+
 
 class install(d_install):
     sub_commands = d_install.sub_commands
     sub_commands.extend(
         [("install_shortcuts", lambda *x: True),
          ("update_icon_cache", lambda *x: True)])
+
 
 class BlaDistribution(Distribution):
     shortcuts = []
@@ -251,12 +265,10 @@ class BlaDistribution(Distribution):
 if __name__ == "__main__":
     description = "Minimalist audio player for GNU/Linux written in Python"
 
-    # Spectrum visualization
+    # Spectrum visualizer
     extra_compile_args = ["-std=gnu99", "-funroll-loops"]
-    try:
+    if np is not None:
         extra_compile_args.append("-I%s" % np.get_include())
-    except AttributeError:
-        pass
     path = "blaplay/blagui/blaspectrum.pyx"
     ext_modules = [Extension(blautil.toss_extension(path.replace("/", ".")),
                              [path], libraries=["fftw3f"],
@@ -299,4 +311,3 @@ if __name__ == "__main__":
         "ext_modules": ext_modules
     }
     setup(**kwargs)
-
