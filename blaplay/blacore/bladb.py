@@ -35,7 +35,7 @@ from blaplay.blagui import blaguiutil
 from blaplay.formats import formats, make_track
 from blaplay.formats._identifiers import *
 
-EVENT_CREATED, EVENT_DELETED, EVENT_MOVED, EVENT_CHANGED = xrange(4)
+EVENT_DELETED, EVENT_MOVED, EVENT_CHANGED = range(3)
 
 
 library = None # XXX: Remove this
@@ -93,30 +93,31 @@ class BlaLibraryMonitor(gobject.GObject):
             event = EVENT_DELETED
         elif type_ == gio.FILE_MONITOR_EVENT_MOVED:
             event = EVENT_MOVED
-        elif type_ == gio.FILE_MONITOR_EVENT_CREATED:
-            event = EVENT_CREATED
-            path = path_from.get_path()
-            if os.path.isdir(path):
-                self.add_directory(path)
         else:
-            event = None
+            if type_ == gio.FILE_MONITOR_EVENT_CREATED:
+                # CREATED events are always followed by a corresponding CHANGED
+                # event. Therefore, it's enough to add a file monitor to any
+                # subdirectories here without explicitly queuing a CREATED
+                # event.
+                path = path_from.get_path()
+                if os.path.isdir(path):
+                    self.add_directory(path)
+            return
 
-        if event is not None:
-            path_from = path_from.get_path()
-            try:
-                path_to = path_to.get_path()
-            except AttributeError:
-                pass
-            # Note that this is a callable attribute, not a bound method, i.e.,
-            # we don't actually dispatch on self.
-            if self._file_ignored(path_from):
-                return
-            self.__queue.put((event, path_from, path_to))
+        path_from = path_from.get_path()
+        try:
+            path_to = path_to.get_path()
+        except AttributeError:
+            pass
+        # Note that this is a callable attribute, not a bound method, i.e.,
+        # we don't actually dispatch on self.
+        if self._file_ignored(path_from):
+            return
+        self.__queue.put((event, path_from, path_to))
 
     @blautil.thread
     def __process_events(self):
         EVENTS = {
-            EVENT_CREATED: "EVENT_CREATED",
             EVENT_DELETED: "EVENT_DELETED",
             EVENT_CHANGED: "EVENT_CHANGED",
             EVENT_MOVED: "EVENT_MOVED"
@@ -135,21 +136,11 @@ class BlaLibraryMonitor(gobject.GObject):
                 BlaLibraryMonitor.ignore.remove(path_from)
                 continue
 
-            if event == EVENT_CREATED:
+            if event == EVENT_CHANGED:
                 if os.path.isfile(path_from):
                     library.add_tracks([path_from])
                 else:
-                    # For files that are copied a CHANGED event is triggered
-                    # as well. This is not the case for moved files. This is
-                    # why we can't add any paths to the ignore set here as they
-                    # might never be removed again. Unfortunately, we have no
-                    # choice but to let the event handlers do their job even if
-                    # it means checking certain files multiple times.
                     library.add_tracks(blautil.discover(path_from))
-
-            elif event == EVENT_CHANGED:
-                if os.path.isfile(path_from):
-                    library.add_tracks([path_from])
 
             elif event == EVENT_DELETED:
                 # This is a bit fiddly. We can't check if whatever was deleted
@@ -178,7 +169,7 @@ class BlaLibraryMonitor(gobject.GObject):
                     # monitor under the given directory.
                     self.remove_directories(path_from)
 
-            else: # event == EVENT_MOVED
+            else:  # event == EVENT_MOVED
                 uris = {}
                 if os.path.isfile(path_to):
                     library.move_track(path_from, path_to)
@@ -289,6 +280,7 @@ class BlaLibraryMonitor(gobject.GObject):
         print_d("Now monitoring %d directories under %r" %
                 (len(self.__monitors), monitored_directories))
         self.emit("initialized", directories)
+
 
 class BlaLibrary(gobject.GObject):
     __gsignals__ = {
@@ -803,4 +795,3 @@ class BlaLibrary(gobject.GObject):
             map(remove_track, self.__tracks.iterkeys())
         self.commit()
         self.__library_monitor.remove_directories(directory)
-
