@@ -68,10 +68,10 @@ class check(Command):
         pass
 
     def run(self):
-        print "Checking Python version >= 2.6:",
+        print "Checking Python version >= 2.7:",
         print ".".join(map(str, sys.version_info[:2]))
-        if sys.version_info < (2, 6):
-            raise SystemExit("%s requires at least Python 2.6. "
+        if sys.version_info < (2, 7):
+            raise SystemExit("%s requires at least Python 2.7. "
                              "(http://www.python.org)" % self.__NAME)
 
         print "Checking for PyGTK >= 2.22:",
