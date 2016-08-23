@@ -32,14 +32,14 @@ class Blaplay(gobject.GObject):
         self._pre_shutdown_hooks = []
         self.config = self.library = self.player = self.window = None
 
-        from blaplay.blacore import blacfg, bladb
+        from blaplay.blacore import blacfg, blalibrary
 
         # Initialize the config.
         # config = app_state.config = blacfg.init(blaconst.CONFIG_PATH)
         config = self.config = blacfg
 
         # Initialize the library.
-        library = self.library = bladb.init(self, blaconst.LIBRARY_PATH)
+        library = self.library = blalibrary.init(self, blaconst.LIBRARY_PATH)
 
         # Create an instance of the playback device.
         from blaplay.blacore import blaplayer
