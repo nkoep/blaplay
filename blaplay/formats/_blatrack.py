@@ -180,3 +180,14 @@ class BlaTrack(dict):
     def sampling_rate(self):
         return "%d Hz" % self[SAMPLING_RATE] if self[SAMPLING_RATE] else ""
 
+    def exists(self):
+        """Check whether the track actually exists on disk."""
+        return os.path.isfile(self[URI])
+
+    def was_modified(self):
+        """
+        Check whether the track was updated on disk by comparing the cached and
+        current mtime. Note that this function does not validate whether the
+        underlying file exists or not.
+        """
+        return self[MTIME] != os.path.getmtime(self[URI])

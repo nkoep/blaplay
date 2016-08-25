@@ -271,6 +271,8 @@ class BlaPlayer(gobject.GObject):
                 "Playback error", "Resource \"%s\" unavailable." % uri)
             return
 
+        # XXX: Is it sensible to update the track from here? Seems like the
+        #      library (monitor) should be in charge of that.
         # If `update_track' returns None it means the track needed updating,
         # but failed to be parsed properly so request another song.
         if self._library.update_track(self._uri) is None:

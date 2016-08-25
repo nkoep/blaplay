@@ -268,15 +268,11 @@ class BlaLibrary(gobject.GObject):
         refers to a non-existent resource or the resource's format is not
         supported.
         """
-        try:
-            mtime = os.path.getmtime(uri)
-        except OSError:
+        track = self[uri]
+        if not track.exists():
             return None
 
-        track = self[uri]
-        if track[MTIME] == mtime:
-            track_updated = False
-        else:
+        if track.was_modified():
             md = track[MONITORED_DIRECTORY]
             track = make_track(uri) # Get a new BlaTrack from `uri'.
             if track is None:
@@ -284,6 +280,8 @@ class BlaLibrary(gobject.GObject):
             track[MONITORED_DIRECTORY] = md
             self[uri] = track
             track_updated = True
+        else:
+            track_updated = False
         return track_updated
 
     def move_track(self, path_from, path_to, md=""):
