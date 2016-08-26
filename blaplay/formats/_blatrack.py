@@ -31,6 +31,9 @@ class BlaTrack(dict):
 
         self._read_tags()
 
+    def __str__(self):
+        return "{}({})".format(self.__class__.__name__, self[URI])
+
     def __getstate__(self):
         return self.items()
 
