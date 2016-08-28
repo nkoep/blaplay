@@ -98,20 +98,9 @@ class BlaLibrary(gobject.GObject):
             os.path.realpath,
             app.config.getdotliststr("library", "directories"))
 
-        def initialized(library_monitor, directories):
-            if app.config.getboolean("library", "update.on.startup"):
-                p = self._detect_changes(directories)
-                gobject.idle_add(p.next, priority=gobject.PRIORITY_LOW)
-                # TODO: This is more efficient than the method above. However,
-                #       it does not clean up missing tracks.
-                # for md in self._monitored_directories:
-                #     self.scan_directory(md)
-            self._library_monitor.disconnect(callback_id)
         self._library_monitor = BlaLibraryMonitor(app.config, self)
-        callback_id = self._library_monitor.connect(
-            "initialized", initialized)
-        # FIXME: Pass in `initialized' as a callback function instead of using
-        #        a single-purpose-single-use signal.
+        self._callback_id = self._library_monitor.connect_object(
+            "initialized", BlaLibrary._on_library_monitor_initialized, self)
         self._library_monitor.update_directories()
 
         def pre_shutdown_hook():
@@ -120,6 +109,46 @@ class BlaLibrary(gobject.GObject):
                 self._save_library()
                 self._out_of_date = False
         app.add_pre_shutdown_hook(pre_shutdown_hook)
+
+    # TODO: Call this method in regular intervals so as to keep the library
+    #       up-to-date all the time in case the filesystem monitor misses some
+    #       events.
+    def _on_library_monitor_initialized(self):
+        if self._app.config.getboolean("library", "update.on.startup"):
+            pipe1, pipe2 = multiprocessing.Pipe(duplex=False)
+            p = multiprocessing.Process(target=self._detect_changes,
+                                        args=(pipe2,))
+            p.daemon = True
+            p.start()
+            @blautil.thread
+            def join():
+                modified_tracks, missing_tracks, new_tracks = pipe1.recv()
+                p.join()
+                self._update_library_contents(modified_tracks, missing_tracks,
+                                              new_tracks)
+            join()
+        self._library_monitor.disconnect(self._callback_id)
+        del self._callback_id
+
+    @blautil.thread
+    def _update_library_contents(self, modified_tracks, missing_tracks,
+                                 new_tracks):
+        for track in modified_tracks:
+            # This updates a track either in the library or the OOL dict.
+            self[track.uri] = track
+
+        for uri in missing_tracks:
+            self.remove_track(uri)
+
+        for track in new_tracks:
+            # This exclusively adds new tracks to the library and possibly
+            # purges them from the OOL dict.
+            self.add_track(track)
+
+        print_i("%d files missing, %d new ones, %d updated" %
+                (len(missing_tracks), len(new_tracks), len(modified_tracks)))
+
+        library.commit()
 
     # TODO: Update the `_out_of_date` flag internally when tracks were
     #       added/updated/(re)moved to get rid of this method again.
@@ -167,72 +196,43 @@ class BlaLibrary(gobject.GObject):
             p.join()
         join()
 
-    def _detect_changes(self, directories):
-        # XXX: We should be able to update the contents of _tracks in one go.
-
-        # TODO: Generate three lists of tracks here: missing, new, updated
-        #       ones. Then pass this list to the main process (more exactly, a
-        #       waiting thread in the main process) by means of a pipe from
-        #       where changes are performed on the library. The advantage of
-        #       this approach is that we can off-load the heavy lifting to a
-        #       secondary process and handle the "simple" stuff from a thread.
-
+    def _detect_changes(self, pipe):
+        monitored_directories = self._app.config.getdotliststr(
+            "library", "directories")
         print_i("Checking for changes in monitored directories %r" %
-                self._app.config.getdotliststr("library", "directories"))
+                monitored_directories)
 
-        yield_interval = 25
+        # Check out-of-library tracks. Note that we don't remove metadata for
+        # missing OOL tracks here since we still might need it in certain
+        # places.
+        modified_tracks = []
+        missing_tracks = []
+        for uri, track in self._tracks_ool.iteritems():
+            if track.exists() and track.was_modified():
+                new_track = make_track(uri)
+                if new_track is not None:
+                    modified_tracks.append(new_track)
+        # Check library tracks.
+        for uri, track in self._tracks.iteritems():
+            if track.exists():
+                if track.was_modified():
+                    new_track = make_track(uri)
+                    if new_track is not None:
+                        modified_tracks.append(new_track)
+            else:
+                missing_tracks.append(uri)
 
-        # Update out-of-library tracks.
-        update_track = self.update_track
-        for idx, uri in enumerate(self._tracks_ool.keys()):
-            update_track(uri)
-            if idx % yield_interval == 0:
-                yield True
+        # Check for new tracks in the monitored directories.
+        new_tracks = []
+        for directory in monitored_directories:
+            for uri in blautil.discover(directory):
+                if uri not in self:
+                    track = make_track(uri)
+                    if track is not None:
+                        track[MONITORED_DIRECTORY] = directory
+                        new_tracks.append(track)
 
-        # Check for new tracks or tracks in need of updating in monitored
-        # directories.
-        remove_track = self.remove_track
-        updated = 0
-        missing = 0
-        for idx, uri in enumerate(self):
-            try:
-                updated += int(update_track(uri))
-            except TypeError:
-                remove_track(uri)
-                missing += 1
-            if idx % yield_interval == 0:
-                yield True
-
-        files = set()
-        add = files.add
-        discover = blautil.discover
-        new_files = 0
-        idx = 0
-        for directory in set(directories):
-            for f in discover(directory):
-                if f not in self:
-                    add(f)
-                if len(files) == yield_interval:
-                    new_files += self.add_tracks(files)
-                    files.clear()
-                if idx % yield_interval == 0:
-                    yield True
-                idx += 1
-            if files:
-                new_files += self.add_tracks(files)
-
-        print_i("%d files missing, %d new ones, %d updated" %
-                (missing, new_files, updated))
-
-        # FIXME: This is really ugly, as the library shouldn't even have to
-        #        know about the existence of a window.
-        # Finally update the model for the library browser and playlists. The
-        # GUI might not be fully initialized yet, so wait for that to happen
-        # before requesting an update.
-        while self._app.window is None:
-            yield True
-        library.commit()
-        yield False
+        pipe.send((modified_tracks, missing_tracks, new_tracks))
 
     # This method exclusively inserts tracks into the library. The form
     # `self[uri] = track', on the other hand, inserts it into the library only
@@ -273,11 +273,11 @@ class BlaLibrary(gobject.GObject):
             return None
 
         if track.was_modified():
-            md = track[MONITORED_DIRECTORY]
-            track = make_track(uri) # Get a new BlaTrack from `uri'.
+            monitored_directory = track[MONITORED_DIRECTORY]
+            track = make_track(uri)
             if track is None:
                 return None
-            track[MONITORED_DIRECTORY] = md
+            track[MONITORED_DIRECTORY] = monitored_directory
             self[uri] = track
             track_updated = True
         else:
@@ -325,6 +325,12 @@ class BlaLibrary(gobject.GObject):
             self._tracks_ool[path_to] = track
 
     def remove_track(self, uri):
+        """
+        Remove track with URI `uri` from the library. Note that this merely
+        moves the track to the OOL dictionary so we still have access to the
+        tracks metadata if needed. This OOL dict then gets cleaned up when
+        blaplay shuts down.
+        """
         try:
             track = self._tracks[uri]
         except KeyError:

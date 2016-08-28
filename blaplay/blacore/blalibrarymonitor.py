@@ -29,7 +29,7 @@ EVENT_DELETED, EVENT_MOVED, EVENT_CHANGED = range(3)
 
 class BlaLibraryMonitor(gobject.GObject):
     __gsignals__ = {
-        "initialized": blautil.signal(1)
+        "initialized": blautil.signal(0)
     }
 
     def __init__(self, config, library):
@@ -99,6 +99,11 @@ class BlaLibraryMonitor(gobject.GObject):
             EVENT_CHANGED: "EVENT_CHANGED",
             EVENT_MOVED: "EVENT_MOVED"
         }
+
+        # TODO: Instead of modifying the library explicitly here, create
+        #       "delta" lists much like we do in BlaLibrary's `_detect_changes`
+        #       method. Then forward these updates to the library by emitting
+        #       a signal.
 
         while True:
             event, path_from, path_to = self._queue.get()
@@ -180,9 +185,7 @@ class BlaLibraryMonitor(gobject.GObject):
         # directories which need a monitor. The creation of the monitors itself
         # is rather simple. To circumvent the GIL when getting the directory
         # list we use another process, even though a generator would be more
-        # memory efficient. However, on start-up we can pass the directory list
-        # on to the method which scans for changed files so it doesn't have to
-        # walk the entire directory tree again.
+        # memory efficient.
         def get_subdirectories(conn, directories):
             # KeyboardInterrupt exceptions need to be handled in child
             # processes. Since this is no crucial operation we can just return.
@@ -204,21 +207,43 @@ class BlaLibraryMonitor(gobject.GObject):
         p.join()
         return directories
 
+    def _create_monitor(self, directory):
+        file_ = gio.File(directory)
+        # According to the GIO C API documentation there are backends which
+        # don't support gio.FILE_MONITOR_EVENT_MOVED. However, since we
+        # specifically target Linux which has inotify since kernel 2.6.13 we
+        # should be in the clear (that is if the kernel in use was compiled
+        # with inotify support).
+        monitor = file_.monitor_directory(
+            flags=(gio.FILE_MONITOR_NONE |
+                   gio.FILE_MONITOR_SEND_MOVED))
+        monitor.connect("changed", self._queue_event)
+        self._monitors[directory] = monitor
+
     @blautil.thread
     def add_directory(self, directory):
-        # TODO: This is largely identical to update_directories so combine the
-        #       two methods.
         directories = self._get_subdirectories(directory)
-
         with self._lock:
             for directory in directories:
                 if directory in self._monitors:
                     continue
-                f = gio.File(directory)
-                monitor = f.monitor_directory(
-                    flags=gio.FILE_MONITOR_NONE | gio.FILE_MONITOR_SEND_MOVED)
-                monitor.connect("changed", self._queue_event)
-                self._monitors[directory] = monitor
+                self._create_monitor(directory)
+
+    @blautil.thread
+    def update_directories(self):
+        monitored_directories = self._config.getdotliststr(
+            "library", "directories")
+        directories = self._get_subdirectories(monitored_directories)
+        with self._lock:
+            cancel = gio.FileMonitor.cancel
+            map(cancel, self._monitors.itervalues())
+            self._monitors.clear()
+            for directory in directories:
+                self._create_monitor(directory)
+
+        print_d("Now monitoring %d directories under %r" %
+                (len(self._monitors), monitored_directories))
+        self.emit("initialized")
 
     @blautil.thread
     def remove_directories(self, md):
@@ -226,29 +251,3 @@ class BlaLibraryMonitor(gobject.GObject):
             for directory in sorted(self._monitors.keys()):
                 if directory.startswith(md):
                     self._monitors.pop(directory).cancel()
-
-    @blautil.thread
-    def update_directories(self):
-        monitored_directories = self._config.getdotliststr(
-            "library", "directories")
-        directories = self._get_subdirectories(monitored_directories)
-
-        with self._lock:
-            cancel = gio.FileMonitor.cancel
-            map(cancel, self._monitors.itervalues())
-            self._monitors.clear()
-
-            # According to the GIO C API documentation there are backends which
-            # don't support gio.FILE_MONITOR_EVENT_MOVED. However, since we
-            # specifically target Linux which has inotify since kernel 2.6.13
-            # we should be in the clear (that is if the kernel in use was
-            # compiled with inotify support).
-            for directory in directories:
-                f = gio.File(directory)
-                monitor = f.monitor_directory(
-                    flags=gio.FILE_MONITOR_NONE | gio.FILE_MONITOR_SEND_MOVED)
-                monitor.connect("changed", self._queue_event)
-                self._monitors[directory] = monitor
-        print_d("Now monitoring %d directories under %r" %
-                (len(self._monitors), monitored_directories))
-        self.emit("initialized", directories)
