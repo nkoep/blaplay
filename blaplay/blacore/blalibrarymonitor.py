@@ -121,31 +121,13 @@ class BlaLibraryMonitor(gobject.GObject):
                     self._library.add_tracks(blautil.discover(path_from))
 
             elif event == EVENT_DELETED:
-                # This is a bit fiddly. We can't check if whatever was deleted
-                # was a file or a directory since it's already unlinked.
-                # We therefore have to check every URI in the library against
-                # `path_from'. If we get an exact match we can remove the track
-                # and stop since URIs are unique. If we get a partial match we
-                # have to continue looking. To keep string comparison to a
-                # minimum we use str.startswith to see if we should remove a
-                # track. We then check if the strings have the same length as
-                # this indicates an exact match so we can stop iterating.
-                len_ = len(path_from)
-                try:
-                    # iterating over a BlaLibrary instance uses a generator so
-                    # we have to make a list of tracks to remove first
+                if path_from in self._monitors:  # a directory was removed
                     for uri in self._library:
-                        if uri.startswith(path_from) and uri[len_] == "/":
+                        if uri.startswith(path_from):
                             self._library.remove_track(uri)
-                except IndexError:
-                    # IndexError will only be raised for exact matches, meaning
-                    # we removed a file.
-                    self._library.remove_track(uri)
-                else:
-                    # If we made it this far we didn't get an exact match so
-                    # we removed a directory. In this case we remove every file
-                    # monitor under the given directory.
                     self.remove_directories(path_from)
+                else:
+                    self._library.remove_track(path_from)
 
             else:  # event == EVENT_MOVED
                 uris = {}
@@ -209,11 +191,6 @@ class BlaLibraryMonitor(gobject.GObject):
 
     def _create_monitor(self, directory):
         file_ = gio.File(directory)
-        # According to the GIO C API documentation there are backends which
-        # don't support gio.FILE_MONITOR_EVENT_MOVED. However, since we
-        # specifically target Linux which has inotify since kernel 2.6.13 we
-        # should be in the clear (that is if the kernel in use was compiled
-        # with inotify support).
         monitor = file_.monitor_directory(
             flags=(gio.FILE_MONITOR_NONE |
                    gio.FILE_MONITOR_SEND_MOVED))
@@ -241,13 +218,14 @@ class BlaLibraryMonitor(gobject.GObject):
             for directory in directories:
                 self._create_monitor(directory)
 
-        print_d("Now monitoring %d directories under %r" %
+        print_d("Monitoring %d directories under %r" %
                 (len(self._monitors), monitored_directories))
         self.emit("initialized")
 
     @blautil.thread
-    def remove_directories(self, md):
+    def remove_directories(self, monitored_directory):
         with self._lock:
-            for directory in sorted(self._monitors.keys()):
-                if directory.startswith(md):
-                    self._monitors.pop(directory).cancel()
+            for directory in sorted(self._monitors):
+                if directory.startswith(monitored_directory):
+                    monitor = self._monitors.pop(directory)
+                    monitor.cancel()

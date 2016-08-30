@@ -202,9 +202,8 @@ class BlaLibrary(gobject.GObject):
         print_i("Checking for changes in monitored directories %r" %
                 monitored_directories)
 
-        # Check out-of-library tracks. Note that we don't remove metadata for
-        # missing OOL tracks here since we still might need it in certain
-        # places.
+        # Check out-of-library tracks. We don't remove metadata for missing OOL
+        # tracks here since we still might need it in certain places.
         modified_tracks = []
         missing_tracks = []
         for uri, track in self._tracks_ool.iteritems():
@@ -253,9 +252,9 @@ class BlaLibrary(gobject.GObject):
             track = make_track(uri)
             if not track:
                 continue
-            for md in self._monitored_directories:
-                if uri.startswith(md):
-                    track[MONITORED_DIRECTORY] = md
+            for monitored_directory in self._monitored_directories:
+                if uri.startswith(monitored_directory):
+                    track[MONITORED_DIRECTORY] = monitored_directory
                     add_track(track)
                     break
             count += 1
@@ -284,7 +283,7 @@ class BlaLibrary(gobject.GObject):
             track_updated = False
         return track_updated
 
-    def move_track(self, path_from, path_to, md=""):
+    def move_track(self, path_from, path_to, monitored_directory=""):
         # When a file is moved we create an entry for the new path in the
         # _tracks dict and move the old track to _tracks_ool. This is
         # necessary because some elements like the player, scrobbler or a
@@ -295,12 +294,11 @@ class BlaLibrary(gobject.GObject):
 
         # Get first match for a monitored directory if no specific one is
         # given.
-        if not md:
-            for md in self._monitored_directories:
-                if path_to.startswith(md):
+        if not monitored_directory:
+            for directory in self._monitored_directories:
+                if path_to.startswith(monitored_directory):
+                    monitored_directory = directory
                     break
-            else:
-                md = ""
 
         # Try to get the corresponding track from the library. If it's not in
         # it we might have to try and parse it cause it could just be a rename.
@@ -311,15 +309,15 @@ class BlaLibrary(gobject.GObject):
         except KeyError:
             track = make_track(path_to)
             if track:
-                track[MONITORED_DIRECTORY] = md
+                track[MONITORED_DIRECTORY] = monitored_directory
                 self.add_track(track)
             return
 
         if path_from in self._tracks and path_from != path_to:
             self._tracks_ool[path_from] = self._tracks.pop(path_from)
         track[URI] = path_to
-        track[MONITORED_DIRECTORY] = md
-        if md:
+        track[MONITORED_DIRECTORY] = monitored_directory
+        if monitored_directory:
             self._tracks[path_to] = track
         else:
             self._tracks_ool[path_to] = track
@@ -536,25 +534,24 @@ class BlaLibrary(gobject.GObject):
 
         remove_track = self.remove_track
         tracks = [(uri, track) for uri, track in self._tracks.iteritems()
-                if track[MONITORED_DIRECTORY] == directory]
-        mds = self._monitored_directories
+                  if track[MONITORED_DIRECTORY] == directory]
 
         try:
-            mds.remove(directory)
+            self._monitored_directories.remove(directory)
         except ValueError:
             pass
 
         for uri, track in tracks:
-            for md in mds:
-                if uri.startswith(md):
-                    self.move_track(uri, uri, md)
+            for monitored_directory in self._monitored_directories:
+                if uri.startswith(monitored_directory):
+                    self.move_track(uri, uri, monitored_directory)
                     break
             else:
                 remove_track(uri)
 
         # If there are no more monitored directories but still tracks in the
         # library something went wrong so move them to _tracks_ool as well.
-        if not mds:
+        if not self._monitored_directories:
             map(remove_track, self._tracks.iterkeys())
         self.commit()
         self._library_monitor.remove_directories(directory)
