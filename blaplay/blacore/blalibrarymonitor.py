@@ -114,9 +114,8 @@ class BlaLibraryMonitor(gobject.GObject):
                 gobject.source_remove(self._timeout_id)
                 self._timeout_id = 0
 
-            if event == EVENT_CHANGED:
-                if os.path.isfile(path_from):
-                    self._library.add_tracks([path_from])
+            if event == EVENT_CHANGED and os.path.isfile(path_from):
+                self._library.add_track_from_uri(path_from)
 
             elif event == EVENT_DELETED:
                 if path_from in self._monitors:  # a directory was removed

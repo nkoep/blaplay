@@ -244,21 +244,17 @@ class BlaLibrary(gobject.GObject):
         except KeyError:
             pass
 
-    def add_tracks(self, uris):
-        count = 0
-        filt = self._extension_filter
-        add_track = self.add_track
-        for uri in filter(filt, uris):
-            track = make_track(uri)
-            if not track:
-                continue
-            for monitored_directory in self._monitored_directories:
-                if uri.startswith(monitored_directory):
-                    track[MONITORED_DIRECTORY] = monitored_directory
-                    add_track(track)
-                    break
-            count += 1
-        return count
+    def add_track_from_uri(self, uri):
+        if not self._extension_filter(uri):
+            return
+        track = make_track(uri)
+        if not track:
+            return
+        for directory in self._monitored_directories:
+            if uri.startswith(directory):
+                track[MONITORED_DIRECTORY] = directory
+                self.add_track(track)
+                break
 
     def update_track(self, uri):
         """
