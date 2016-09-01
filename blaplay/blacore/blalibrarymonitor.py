@@ -117,8 +117,6 @@ class BlaLibraryMonitor(gobject.GObject):
             if event == EVENT_CHANGED:
                 if os.path.isfile(path_from):
                     self._library.add_tracks([path_from])
-                else:
-                    self._library.add_tracks(blautil.discover(path_from))
 
             elif event == EVENT_DELETED:
                 if path_from in self._monitors:  # a directory was removed
