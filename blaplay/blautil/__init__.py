@@ -29,7 +29,8 @@ import webbrowser
 import subprocess
 import inspect
 import functools
-from threading import Thread, ThreadError, Lock
+import threading
+import multiprocessing
 import collections
 import time
 
@@ -43,19 +44,24 @@ def cdll(lib):
         raise OSError("No shared library for '%s' found" % lib)
     return ctypes.CDLL(soname)
 
+
 def thread_id():
     # From bits/syscall.h: 186 == SYS_gettid
     return cdll("c").syscall(186)
+
 
 def clamp(min_, max_, value):
     if min_ > max_:
         raise ValueError("Lower bound must be smaller or equal to upper bound")
     return max(min_, min(max_, value))
 
+
 def signal(n_args):
     return (gobject.SIGNAL_RUN_LAST | gobject.SIGNAL_ACTION,
             gobject.TYPE_NONE, (object,) * n_args)
 
+
+# TODO: Rename this to `daemon_thread`.
 def thread(func):
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
@@ -65,13 +71,35 @@ def thread(func):
         return t
     return wrapper
 
+
+# TODO: Rename this `thread`.
 def thread_nondaemonic(func):
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
-        t = Thread(target=func, args=args, kwargs=kwargs)
+        t = BlaThread(target=func, args=args, kwargs=kwargs)
         t.start()
         return t
     return wrapper
+
+
+def daemon_process(func):
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        t = multiprocessing.Process(target=func, args=args, kwargs=kwargs)
+        t.daemon = True
+        t.start()
+        return t
+    return wrapper
+
+
+def process(func):
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        p = multiprocessing.Process(target=func, args=args, kwargs=kwargs)
+        p.start()
+        return p
+    return wrapper
+
 
 def idle(func=None, **kwargs):
     # There is one case we cannot avoid which is `@idle(some_callable)' as this
@@ -98,6 +126,7 @@ def idle(func=None, **kwargs):
         return gobject.idle_add(func, *args, priority=priority)
     return wrapper
 
+
 def lock(lock_):
     def wrapper_(func):
         @functools.wraps(func)
@@ -106,6 +135,7 @@ def lock(lock_):
                 func(*args, **kwargs)
         return wrapper
     return wrapper_
+
 
 def caches_return_value(func):
     """
@@ -129,11 +159,15 @@ def caches_return_value(func):
         return value
     return wrapper
 
+
+# TODO: Rename this to `drop_extension`.
 def toss_extension(filepath):
     return os.path.splitext(filepath)[0]
 
+
 def get_extension(filepath):
     return filepath.split(".")[-1]
+
 
 def resolve_uris(uris):
     # The argument might be a tuple or a list. Either way, turn it into a new
@@ -152,10 +186,12 @@ def resolve_uris(uris):
             uris[idx] = abspath(url2pathname(uri))
     return uris
 
+
 def filepaths2uris(paths):
     quote = urllib.quote
     urljoin = urlparse.urljoin
     return [urljoin("file:", quote(filepath)) for filepath in paths]
+
 
 def get_mimetype(path):
     file_ = gio.File(path)
@@ -164,17 +200,21 @@ def get_mimetype(path):
     except gio.Error:
         return ""
 
+
 def md5(string):
     m = hashlib.md5()
     m.update(string)
     return m.hexdigest()
 
+
 def remove_html_tags(string):
     return re.sub(r"<.*?>", "", string)
+
 
 def format_date(date):
     # Parse a date tuple into a date string, e.g. Thursday 10. January 2013.
     return time.strftime("%A %d %B %Y", time.localtime(time.mktime(date)))
+
 
 @thread
 def open_url(url):
@@ -189,9 +229,11 @@ def open_url(url):
     finally:
         os.dup2(stdout, 1)
 
+
 def open_directory(directory):
     open_with_filehandler(
         directory, "Failed to open directory \"%s\"" % directory)
+
 
 def open_with_filehandler(f, msg):
     with open(os.devnull, "w") as devnull:
@@ -203,6 +245,7 @@ def open_with_filehandler(f, msg):
                     ["xdg-open", f], stdout=devnull, stderr=devnull)
             except (OSError, ValueError):
                 error_dialog(msg)
+
 
 def discover(directories, directories_only=False):
     checked_directories = []
@@ -225,6 +268,7 @@ def discover(directories, directories_only=False):
                 continue
             for filename in filenames:
                 yield join(dirname, filename)
+
 
 def serialize_to_file(data, path):
     # Write data to tempfile first.
@@ -258,6 +302,7 @@ def serialize_to_file(data, path):
             os.unlink(new_path)
         except OSError:
             pass
+
 
 def deserialize_from_file(path):
     new_path = "%s.bak" % path
@@ -297,7 +342,7 @@ class BlaLock(object):
     def __init__(self, strict=False, blocking=True):
         self.__strict = strict
         self.__blocking = blocking
-        self.__lock = Lock()
+        self.__lock = threading.Lock()
 
     def acquire(self):
         self.__lock.acquire(self.__blocking)
@@ -305,7 +350,7 @@ class BlaLock(object):
     def release(self):
         try:
             self.__lock.release()
-        except ThreadError:
+        except threading.ThreadError:
             if self.__strict:
                 raise
 
@@ -348,7 +393,7 @@ class BlaThread(Thread):
 
     def run(self):
         sys.settrace(self.__globaltrace)
-        Thread.run(self)
+        threading.Thread.run(self)
 
     def kill(self):
         self.__killed = True
@@ -369,9 +414,11 @@ class BlaThread(Thread):
             raise SystemExit
         return self.__localtrace
 
+
 class BlaOrderedSet(collections.MutableSet):
     """
-    set-like class which maintains the order in which elements were added.
+    A set-like class which maintains the order in which elements were added.
+
     Modified version of http://code.activestate.com/recipes/576694
     """
 
@@ -437,7 +484,13 @@ class BlaOrderedSet(collections.MutableSet):
     def __del__(self):
         self.clear()
 
+
 class BlaNotifyDict(dict):
+    """
+    A dictionary with the possibility to register callback methods to be
+    called when the dictionary gets modified.
+    """
+
     __slots__ = "__callbacks"
 
     def __init__(self, *args, **kwargs):
@@ -462,18 +515,23 @@ class BlaNotifyDict(dict):
     __delitem__ = __notify_wrap(dict.__delitem__)
     clear = __notify_wrap(dict.clear)
 
+
 class BlaFrozenDict(dict):
+    """
+    A dictionary class whose entries cannot be modified by assignment after its
+    initial creation. Note that assignment to an existing key is still possible
+    by deleting the relevant entry first. The class still offers a decent
+    precautionary measure against accidental overrides of existing keys though.
+    """
+
     def setdefault(self, keys, default=None):
         raise NotImplementedError("Method not supported")
 
     def __setitem__(self, key, value):
         if key in self:
-            # Note that assignment to an existing key is still possible by
-            # deleting the relevant entry first. The class still offers a
-            # decent precautionary measure against accidental overrides of
-            # existing keys though.
             raise ValueError("Entry for key '%s' already exists" % key)
         super(BlaFrozenDict, self).__setitem__(key, value)
+
 
 # TODO: Move this to blaguiutil.py.
 class BlaInitiallyHidden(object):
@@ -494,4 +552,3 @@ class BlaInitiallyHidden(object):
     def _on_map(self):
         self.disconnect(self.__callback_id)
         self.set_visible(False)
-

@@ -125,37 +125,33 @@ class BlaLibraryMonitor(gobject.GObject):
                     for uri in self._library:
                         if uri.startswith(path_from):
                             self._library.remove_track(uri)
-                    self.remove_directories(path_from)
+                    self.remove_directory(path_from)
                 else:
                     self._library.remove_track(path_from)
 
             else:  # event == EVENT_MOVED
-                uris = {}
+                # TODO: Pass `moved_files` on to the library to perform the
+                #       actual moves.
+                moved_files = {}
                 if os.path.isfile(path_to):
                     self._library.move_track(path_from, path_to)
-                    uris[path_from] = path_to
+                    moved_files[path_from] = path_to
                 else:
                     for uri in self._library:
                         if uri.startswith(path_from):
                             new_path = os.path.join(
                                 path_to, uri[len(path_from)+1:])
                             self._library.move_track(uri, new_path)
-                            uris[uri] = new_path
+                            moved_files[uri] = new_path
 
-                    self.remove_directories(path_from)
+                    self.remove_directory(path_from)
                     self.add_directory(path_to)
-                # TODO: Add a `library_entries_moved' signal for this so we
-                #       don't need to call methods on the playlist manager.
-                # from blaplay.blagui.blaplaylist import BlaPlaylistManager
-                # BlaPlaylistManager().update_uris(uris)
 
             # Schedule an update for the library browser, etc. The timeout
             # might be removed immediately at the beginning of this loop if
             # there are more events in the queue.
             self._library.touch()
-            # XXX: The timeout has to be handled elsewhere.
-            self._timeout_id = gobject.timeout_add(
-                3000, self._update_library)
+            self._timeout_id = gobject.timeout_add(3000, self._update_library)
 
     def _update_library(self):
         self._timeout_id = 0
@@ -168,46 +164,32 @@ class BlaLibraryMonitor(gobject.GObject):
         # is rather simple. To circumvent the GIL when getting the directory
         # list we use another process, even though a generator would be more
         # memory efficient.
-        def get_subdirectories(conn, directories):
+        @blautil.daemon_process
+        def get_subdirectories(pipe, directories):
             # KeyboardInterrupt exceptions need to be handled in child
             # processes. Since this is no crucial operation we can just return.
             try:
                 directories = list(
                     blautil.discover(directories, directories_only=True))
-                conn.send(directories)
+                pipe.send(directories)
             except KeyboardInterrupt:
                 pass
 
-        conn1, conn2 = multiprocessing.Pipe(duplex=False)
-        p = multiprocessing.Process(
-            target=get_subdirectories, args=(conn2, directories))
-        p.daemon = True
-        p.start()
-        directories = conn1.recv()
-        # Processes must be joined to prevent them from turning into zombie
-        # processes on unices.
-        p.join()
+        pipe1, pipe2 = multiprocessing.Pipe(duplex=False)
+        process = get_subdirectories(pipe2, directories)
+        directories = pipe1.recv()
+        process.join()
         return directories
 
     def _create_monitor(self, directory):
         file_ = gio.File(directory)
         monitor = file_.monitor_directory(
-            flags=(gio.FILE_MONITOR_NONE |
-                   gio.FILE_MONITOR_SEND_MOVED))
+            flags=(gio.FILE_MONITOR_NONE | gio.FILE_MONITOR_SEND_MOVED))
         monitor.connect("changed", self._queue_event)
         self._monitors[directory] = monitor
 
     @blautil.thread
-    def add_directory(self, directory):
-        directories = self._get_subdirectories(directory)
-        with self._lock:
-            for directory in directories:
-                if directory in self._monitors:
-                    continue
-                self._create_monitor(directory)
-
-    @blautil.thread
-    def update_directories(self):
+    def initialize(self):
         monitored_directories = self._config.getdotliststr(
             "library", "directories")
         directories = self._get_subdirectories(monitored_directories)
@@ -223,9 +205,20 @@ class BlaLibraryMonitor(gobject.GObject):
         self.emit("initialized")
 
     @blautil.thread
-    def remove_directories(self, monitored_directory):
+    def add_directory(self, directory):
+        """Monitor `directory` and all its subdirectories."""
+        directories = self._get_subdirectories(directory)
         with self._lock:
-            for directory in sorted(self._monitors):
-                if directory.startswith(monitored_directory):
-                    monitor = self._monitors.pop(directory)
+            for directory in directories:
+                if directory in self._monitors:
+                    continue
+                self._create_monitor(directory)
+
+    @blautil.thread
+    def remove_directory(self, directory):
+        """Remove monitor for `directory` and all its subdirectories."""
+        with self._lock:
+            for d in sorted(self._monitors):
+                if d.startswith(directory):
+                    monitor = self._monitors.pop(d)
                     monitor.cancel()

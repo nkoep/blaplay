@@ -101,7 +101,7 @@ class BlaLibrary(gobject.GObject):
         self._library_monitor = BlaLibraryMonitor(app.config, self)
         self._callback_id = self._library_monitor.connect_object(
             "initialized", BlaLibrary._on_library_monitor_initialized, self)
-        self._library_monitor.update_directories()
+        self._library_monitor.initialize()
 
         def pre_shutdown_hook():
             print_i("Saving pending library changes")
@@ -554,4 +554,4 @@ class BlaLibrary(gobject.GObject):
         if not self._monitored_directories:
             map(remove_track, self._tracks.iterkeys())
         self.commit()
-        self._library_monitor.remove_directories(directory)
+        self._library_monitor.remove_directory(directory)
