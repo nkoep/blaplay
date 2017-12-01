@@ -48,7 +48,6 @@ class _GeneralSettings(_Page):
         def on_toggled(checkbutton, key):
             self._config.setboolean("general", key, checkbutton.get_active())
         options = [
-            ("Display audio spectrum", "show.visualization"),
             ("Cursor follows playback", "cursor.follows.playback"),
             ("Remove tracks from queue after manual activation",
              "queue.remove.when.activated"),

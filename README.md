@@ -13,11 +13,6 @@ Below is a list of (hard) dependencies and recommended packages. Considering
 the heterogeneity of Linux distributions and package naming conventions, the
 following dependencies correspond to their respective Debian package names.
 
-#### Build dependencies:
-* python-dev (>= 2.7)
-* Cython (>= 0.15.1)
-* libfftw3-dev (>= 3.2.2)
-
 #### Runtime dependencies:
 * python (>= 2.7)
 * python-gtk2 (>= 2.22)
@@ -26,7 +21,6 @@ following dependencies correspond to their respective Debian package names.
 * python-gobject (>= 2.21)
 * python-numpy (>= 1.3)
 * python-dbus (>= 1.2.4)
-* libfftw3-3 (>= 3.2.2)
 
 #### Recommended:
 * gstreamer0.10-plugins-good

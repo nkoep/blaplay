@@ -23,7 +23,6 @@ from blawindows import BlaBaseWindow
 from blatoolbar import BlaToolbar
 from . import browsers, blastatusbar
 from .blaguiutil import BlaViewport
-from blavisualization import BlaVisualization
 from .views.blatabview import BlaTabView
 
 
@@ -97,12 +96,6 @@ class _BlaMainWindow(BlaBaseWindow):
             else:
                 return self._config.getboolean("general", "maximized")
 
-    def _create_browser_container(self, config, player, browsers):
-        vbox = gtk.VBox(spacing=blaconst.WIDGET_SPACING)
-        vbox.pack_start(browsers)
-        vbox.pack_start(BlaVisualization(config, player), expand=False)
-        return vbox
-
     def _create_lyrics_container(self, player):
         # TODO: Rename BlaFetcher to BlaMetadataFetcher.
         from blaplay.blautil.blametadata import BlaFetcher as BlaMetadataFetcher
@@ -173,9 +166,8 @@ class _BlaMainWindow(BlaBaseWindow):
         # FIXME: The pane settings aren't ideal, i.e., the pane position won't
         #        shrink by window resizing after having grown due to a resize.
         # Pack the browser + view-widget into a paned widget.
-        browser_container = self._create_browser_container(
-            config, player, self._browser_view_slot)
-        pane_left = self._create_pane(browser_container, pane_right, "left")
+        pane_left = self._create_pane(self._browser_view_slot, pane_right,
+                                      "left")
 
         # Create a vbox for the middle pane and the statusbar. This allows for
         # using a border around those items which excludes the menubar and the
