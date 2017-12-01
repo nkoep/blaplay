@@ -42,6 +42,11 @@ def init(config, path):
     return library
 
 
+# TODO: Identify tracks through a unique integer ID instead of URIs. This will
+#       greatly reduce the effort to keep the library and components like
+#       tracklists/tag editors in sync.
+
+
 class BlaLibrary(gobject.GObject):
     __gsignals__ = {
         "progress": blautil.signal(1),
@@ -70,7 +75,9 @@ class BlaLibrary(gobject.GObject):
             #       use the restrict.to or exclude patterns. It only signals to
             #       the library browser that something changed and the model
             #       should be regenerated. Instead, let the library browser
-            #       listen for changes.
+            #       listen for changes. Then again, it's probably more
+            #       intuitive if "restrict.to" and "exclude" rules only apply
+            #       to analyzing the contents of monitored directories.
             if (section == "library" and
                 (key == "restrict.to.pattern" or key == "exclude.pattern")):
                 if self._timeout_id:
@@ -101,6 +108,10 @@ class BlaLibrary(gobject.GObject):
         self._library_monitor = BlaLibraryMonitor(app.config, self)
         self._callback_id = self._library_monitor.connect_object(
             "initialized", BlaLibrary._on_library_monitor_initialized, self)
+        # TODO: Handle file updates explicitly here (also see note in
+        #       blalibrarymonitor.py).
+        # self._library_monitor.connect_object(
+        #     "files-changed", BlaLibrary._update_library_contents, self)
         self._library_monitor.initialize()
 
         def pre_shutdown_hook():
@@ -114,23 +125,21 @@ class BlaLibrary(gobject.GObject):
     #       up-to-date all the time in case the filesystem monitor misses some
     #       events.
     def _on_library_monitor_initialized(self):
-        if self._app.config.getboolean("library", "update.on.startup"):
-            pipe1, pipe2 = multiprocessing.Pipe(duplex=False)
-            p = multiprocessing.Process(target=self._detect_changes,
-                                        args=(pipe2,))
-            p.daemon = True
-            p.start()
-            @blautil.thread
-            def join():
-                modified_tracks, missing_tracks, new_tracks = pipe1.recv()
-                p.join()
-                self._update_library_contents(modified_tracks, missing_tracks,
-                                              new_tracks)
-            join()
         self._library_monitor.disconnect(self._callback_id)
         del self._callback_id
 
-    @blautil.thread
+        @blautil.thread
+        def update_library():
+            pipe1, pipe2 = multiprocessing.Pipe(duplex=False)
+            process = blautil.daemon_process(self._detect_changes)(pipe2)
+            modified_tracks, missing_tracks, new_tracks = pipe1.recv()
+            process.join()
+            self._update_library_contents(modified_tracks, missing_tracks,
+                                          new_tracks)
+
+        if self._app.config.getboolean("library", "update.on.startup"):
+            update_library()
+
     def _update_library_contents(self, modified_tracks, missing_tracks,
                                  new_tracks):
         for track in modified_tracks:
@@ -182,19 +191,13 @@ class BlaLibrary(gobject.GObject):
         # Pickling a large dict causes quite an increase in memory use as the
         # module basically creates an exact copy of the object in memory. To
         # combat the problem we offload the serialization of the library to
-        # another process. We join the process in a separate thread to avoid
-        # that the process turns into a zombie process after it terminates.
-        # If the process itself is spawned from a thread this seems to deadlock
-        # occasionally.
-        p = multiprocessing.Process(
-            target=blautil.serialize_to_file,
-            args=(self._tracks, self._path))
-        p.start()
-
+        # another process.
         @blautil.thread_nondaemonic
-        def join():
-            p.join()
-        join()
+        def save():
+            process = blautil.process(blautil.serialize_to_file)(
+                self._tracks, self._path)
+            process.join()
+        save()
 
     def _detect_changes(self, pipe):
         monitored_directories = self._app.config.getdotliststr(
@@ -350,19 +353,16 @@ class BlaLibrary(gobject.GObject):
         # this set and the set of URIs for each playlist. The remainder will be
         # a set of URIs that weren't referenced by any playlist so we just get
         # rid of them.
-        ool_uris = set(self._tracks_ool.keys())
+        ool_uris = set(self._tracks_ool)
         for uri in ool_uris.difference(uris):
             self._tracks_ool.pop(uri)
 
-        p = multiprocessing.Process(
-            target=blautil.serialize_to_file,
-            args=(self._tracks_ool, blaconst.OOL_PATH))
-        p.start()
-
         @blautil.thread_nondaemonic
-        def join():
+        def save():
+            process = blautil.process(blautil.serialize_to_file)(
+                self._tracks_ool, blaconst.OOL_PATH)
             p.join()
-        join()
+        save()
 
     def parse_ool_uris(self, uris):
         # TODO: Test if it is faster to move this to a separate process.
@@ -520,6 +520,7 @@ class BlaLibrary(gobject.GObject):
     @blautil.thread
     def remove_directory(self, directory):
         directory = os.path.realpath(directory)
+        # XXX: This looks iffy, like it may end up deadlocking things.
         while True:
             try:
                 self._scan_queue.remove(directory)

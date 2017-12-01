@@ -29,7 +29,8 @@ EVENT_DELETED, EVENT_MOVED, EVENT_CHANGED = range(3)
 
 class BlaLibraryMonitor(gobject.GObject):
     __gsignals__ = {
-        "initialized": blautil.signal(0)
+        "initialized": blautil.signal(0),
+        "files-changed": blautil.signal(3)
     }
 
     def __init__(self, config, library):
@@ -103,7 +104,7 @@ class BlaLibraryMonitor(gobject.GObject):
         # TODO: Instead of modifying the library explicitly here, create
         #       "delta" lists much like we do in BlaLibrary's `_detect_changes`
         #       method. Then forward these updates to the library by emitting
-        #       a signal.
+        #       a files-changed signal.
 
         while True:
             event, path_from, path_to = self._queue.get()
@@ -114,6 +115,8 @@ class BlaLibraryMonitor(gobject.GObject):
                 gobject.source_remove(self._timeout_id)
                 self._timeout_id = 0
 
+            # FIXME: EVENT_CHANGED can also appear with path_to=None when a
+            #        folder was moved.
             if event == EVENT_CHANGED and os.path.isfile(path_from):
                 self._library.add_track_from_uri(path_from)
 
@@ -130,7 +133,7 @@ class BlaLibraryMonitor(gobject.GObject):
                 # TODO: Pass `moved_files` on to the library to perform the
                 #       actual moves.
                 moved_files = {}
-                if os.path.isfile(path_to):
+                if path_to is not None and os.path.isfile(path_to):
                     self._library.move_track(path_from, path_to)
                     moved_files[path_from] = path_to
                 else:
