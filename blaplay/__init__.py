@@ -117,9 +117,6 @@ class Blaplay(gobject.GObject):
     def _shutdown(self):
         print_d("Shutting down %s..." % blaconst.APPNAME)
 
-        # Stop playback. It is important to do this before destroying the main
-        # window. Otherwise, we might end up with an invalid xid that we told
-        # gstreamer to use for video rendering.
         try:
             self.player.stop()
         except AttributeError:

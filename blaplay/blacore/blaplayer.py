@@ -121,13 +121,9 @@ class BlaPlayer(gobject.GObject):
         gst.element_link_many(tee, self._volume, sink)
         gst.element_link_many(tee, queue, appsink)
 
-        video_sink = gst.element_factory_make("xvimagesink")
-        video_sink.set_property("force-aspect-ratio", True)
-
         self._playbin = gst.element_factory_make("playbin2")
         self._playbin.set_property("audio-sink", audio_sink)
         self._playbin.set_property("buffer-duration", 500 * gst.MSECOND)
-        self._playbin.set_property("video-sink", video_sink)
 
         self._playbin.set_state(gst.STATE_READY)
 
@@ -135,7 +131,6 @@ class BlaPlayer(gobject.GObject):
         bus.add_signal_watch()
         bus.enable_sync_message_emission()
         self._message_id = bus.connect("message", self._on_message)
-        bus.connect("sync-message::element", self._on_sync_message)
 
         if blacfg.getboolean("player", "muted"):
             volume = 0
@@ -155,22 +150,6 @@ class BlaPlayer(gobject.GObject):
             err, debug = message.parse_error()
             from blaplay.blagui import blaguiutil
             blaguiutil.error_dialog("Error", str(err))
-
-    def _on_sync_message(self, bus, message):
-        if message.structure.get_name() == "prepare-xwindow-id":
-            try:
-                print_d("TODO: Retrieve an xid")
-            except AttributeError:
-                print_w("No sync handler set for video playback")
-            # else:
-            #     self.set_xwindow_id(xid)
-            return False
-
-    def set_xwindow_id(self, xid):
-        try:
-            self._playbin.get_property("video-sink").set_xwindow_id(xid)
-        except AttributeError:
-            pass
 
     def set_equalizer_value(self, band, value):
         if blacfg.getboolean("player", "use.equalizer"):
@@ -333,11 +312,3 @@ class BlaPlayer(gobject.GObject):
         if self._playbin:
             self._playbin.set_state(gst.STATE_NULL)
         self.emit("get-track", blaconst.TRACK_RANDOM, True)
-
-    @property
-    def video(self):
-        try:
-            return self._playbin.get_property("n-video") > 0
-        except AttributeError:
-            pass
-        return False

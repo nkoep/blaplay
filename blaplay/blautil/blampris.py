@@ -161,8 +161,6 @@ class BlaMpris(dbus.service.Object):
         self.__properties = blautil.BlaFrozenDict({
             INTERFACE_BASE: blautil.BlaFrozenDict({
                 "CanQuit": lambda: True,
-                "Fullscreen": self.__fullscreen,
-                "CanSetFullscreen": self.__can_set_fullscreen,
                 "CanRaise": lambda: True,
                 "HasTrackList": lambda: False, # FIXME: not yet
                 "Identity": lambda: blaconst.APPNAME,
@@ -305,19 +303,6 @@ class BlaMpris(dbus.service.Object):
     @dbus.service.method(dbus_interface=INTERFACE_BASE)
     def Quit(self):
         blaplay.shutdown()
-
-    # Properties (these are handled via Get/GetAll/Set)
-    def __fullscreen(self, value=None):
-        window = self._app.window
-
-        # Read value
-        if value is None:
-            return window.is_fullscreen
-        # TODO:
-        #window.set_fullscreen()
-
-    def __can_set_fullscreen(self):
-        return self._app.player.video
 
     def __desktop_entry(self):
         import gio
@@ -485,4 +470,3 @@ class BlaMpris(dbus.service.Object):
 
     def __position(self):
         return self._app.player.get_position() / 1000
-

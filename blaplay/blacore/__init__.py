@@ -19,4 +19,3 @@
 import blaconst
 import blacfg as _blacfg
 blacfg = _blacfg.init(blaconst.CONFIG_PATH)
-

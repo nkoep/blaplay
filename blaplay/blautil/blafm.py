@@ -528,7 +528,7 @@ class BlaScrobbler(object):
         self._time_elapsed = 0
         self._iterations = 0
         track = player.get_track()
-        if not track or player.video:
+        if not track:
             return
 
         if self._passes_ignore(track):
