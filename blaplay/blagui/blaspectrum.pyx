@@ -105,6 +105,19 @@ cdef np.ndarray[f32_t, ndim=1] get_window(int n):
         window[i] = 0.54 - 0.46 * cosf(2 * np.pi * i / (n - 1))
     return window
 
+cdef np.ndarray[f32_t, ndim=1] get_window_(int n):
+    # Dolph-Chebyshev window
+    cdef int i
+    cdef np.ndarray[dtype=f32_t, ndim=1] window = np.zeros(n, dtype=f32)
+    alpha = 2
+    beta = np.cosh(np.arccosh(10 ** alpha) / n)
+    for i in range(n):
+        window[i] = np.cos(n * np.arccos(beta * np.cos(np.pi * i / n)))
+    window /= np.cosh(n * np.arccosh(beta))
+    # TODO: The above defines the window in the frequency domain so we need to
+    #       return the inverse FFT of it here.
+    return window
+
 cdef inline float cubic_interpolate(float y0, float y1, float y2, float y3,
                                     float x):
    cdef float a, b, c, d, xx, xxx
@@ -320,7 +333,7 @@ cdef class BlaSpectrum(object):
         for i in range(1, l-1):
             in_[i] = 4 * (out_[i][0] * out_[i][0] + out_[i][1] * out_[i][1])
 
-        # This is a slightly modified method from audacity to interpolate and
+        # This is a slightly modified method from Audacity to interpolate and
         # sum frequency bins which correspond to a certain frequency range.
         cdef float bin0, bin1, bin_width, binmid, value
         cdef float resolution = <float>NFFT / FS
@@ -358,6 +371,10 @@ cdef class BlaSpectrum(object):
             out_[i][0] = (value + old_[i]) / 2.0
             old_[i] = value
 
+        # TODO: Either move the drawing part to blavisualization.py again or
+        #       check if we can draw onto a canvas by wrapping the cairo C API
+        #       that we can pass back to python.
+
         # Draw the background.
         cr.set_source_color(self.__color_bg)
         cr.rectangle(0, 0, self.__width, self.height)
@@ -371,6 +388,7 @@ cdef class BlaSpectrum(object):
         # Draw the levels.
         layout = pango.Layout(pc)
         fdesc = gtk.widget_get_default_style().font_desc
+        # XXX: Where does this magic number come from again?
         fdesc.set_size(6582)
         layout.set_font_description(fdesc)
 
@@ -383,8 +401,8 @@ cdef class BlaSpectrum(object):
         for i in range(7):
             y = m + floorf(i * p) + 0.5
 
-            # Draw the label: 0 dB takes up less space than -10 dB etc., hence
-            # the distinction between i == 0 and every other case.
+            # # Draw the label: 0 dB takes up less space than -10 dB etc., hence
+            # # the distinction between i == 0 and every other case.
             # move_to(w - (21 if i == 0 else 29), y - 8)
             # layout.set_text("%d dB" % (i * (-10)))
             # cr.show_layout(layout)
@@ -404,4 +422,3 @@ cdef class BlaSpectrum(object):
             rectangle(4 + i * (bin_width + 1), m - value, bin_width,
                       x + value)
         cr.fill()
-

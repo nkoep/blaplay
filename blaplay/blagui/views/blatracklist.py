@@ -237,7 +237,7 @@ class _BlaColumn(gtk.TreeViewColumn):
             renderer.set_property("ellipsize", pango.ELLIPSIZE_END)
         self.pack_start(renderer)
         renderer.set_property("xalign", alignment)
-        self.set_cell_data_func(renderer, self._cdf)
+        self.set_cell_data_func(renderer, self._cell_data_func)
         self.set_alignment(alignment)
 
         # Add the column header.
@@ -249,7 +249,7 @@ class _BlaColumn(gtk.TreeViewColumn):
         if fixed_size:
             xpad = gtk.CellRendererText().get_property("xpad")
             width = self._get_text_width(self.TITLE)
-            padding = 14 # Arbitrary offset (see `self._get_text_with')
+            padding = 14  # Arbitrary offset (see `self._get_text_with`)
             self.set_min_width(width + padding + 2 * xpad)
         else:
             self.set_expand(True)
@@ -264,7 +264,7 @@ class _BlaColumn(gtk.TreeViewColumn):
         #        ideal.
         return gtk.Label().create_pango_layout(text).get_pixel_size()[0]
 
-    def _cdf(self, column, renderer, model, iterator):
+    def _cell_data_func(self, column, renderer, model, iterator):
         track = model[iterator][0].track
         renderer.set_property("text", self.eval_track(track))
 
@@ -283,7 +283,7 @@ class BlaColumnIndex(_BlaColumn):
         super(BlaColumnIndex, self).__init__(fixed_size=True)
         self.set_clickable(False)
 
-    def _cdf(self, column, renderer, model, iterator):
+    def _cell_data_func(self, column, renderer, model, iterator):
         renderer.set_property("text", str(model[iterator].path[0]+1))
 
 class BlaColumnPlaying(_BlaColumn):
@@ -297,7 +297,7 @@ class BlaColumnPlaying(_BlaColumn):
         self.add_attribute(renderer, "stock-id", 1)
         self.set_clickable(False)
 
-    def _cdf(self, column, renderer, model, iterator):
+    def _cell_data_func(self, column, renderer, model, iterator):
         queue_positions = model[iterator][0].queue_positions
         if queue_positions:
             text = "(%s)" % (", ".join(queue_positions))

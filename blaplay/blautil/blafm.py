@@ -429,9 +429,11 @@ class BlaScrobbler(object):
     def _query_status(self):
         state = self._app.player.get_state()
         self._iterations += 1
-        # Wait 10~ seconds in between POSTs. Before actually posting an update
+        # Wait ~10 seconds in between POSTs. Before actually posting an update
         # kill any remaining thread that still might be running.
         if self._iterations % 10 == 0:
+            # TODO: Use a "singleton queue" for nowplaying submissions instead.
+            #       That way we don't need to kill any running threads.
             if self._thread is not None:
                 self._thread.kill()
             self._thread = self._update_now_playing()

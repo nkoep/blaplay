@@ -341,4 +341,3 @@ class BlaPlayer(gobject.GObject):
         except AttributeError:
             pass
         return False
-

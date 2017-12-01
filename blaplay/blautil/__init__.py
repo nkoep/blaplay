@@ -144,11 +144,12 @@ def caches_return_value(func):
     reasons, it is only useful for pure functions that do not depend on global
     state and only accept immutable argument types.
     """
-
     if inspect.getargspec(func).keywords is not None:
         raise ValueError(
             "Decorator does not support functions with keyword arguments")
+
     cache = {}
+
     @functools.wraps(func)
     def wrapper(*args):
         key = args
@@ -363,7 +364,9 @@ class BlaLock(object):
     def __exit__(self, *args):
         self.release()
 
-class BlaThread(Thread):
+
+# TODO: Get rid of this.
+class BlaThread(threading.Thread):
     """
     A kill'able thread class. This is certainly a bit of an overkill solution
     as the class inserts a bytecode trace which checks for the kill condition

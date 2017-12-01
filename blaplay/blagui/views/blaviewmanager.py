@@ -14,14 +14,19 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-import abc
+import gobject
 
+from blaplay import blautil
 from .. import blaguiutil
 
 
-# TODO: Turn this into a GObject to we can re-use the signal model.
-class BlaViewManager(object):
-    __metaclass__ = abc.ABCMeta
+class BlaViewManager(gobject.GObject):
+    __gsignals__ = {
+        "view-added": blautil.signal(1),
+        "view-focused": blautil.signal(1),
+        "view-updated": blautil.signal(1),
+        "view-removed": blautil.signal(1)
+    }
 
     def __init__(self, config, library, player):
         self._config = config
@@ -57,11 +62,11 @@ class BlaViewManager(object):
     def register_observer(self, observer):
         self._observers.append(observer)
 
-    @abc.abstractmethod
     def create_view(self):
-        pass
+        raise NotImplementedError
 
     def request_focus_for_view(self, view):
+        assert view in self.views, "invalid view for manager"
         self._notify_focus(view)
 
     def remove_view(self, view):
@@ -70,17 +75,14 @@ class BlaViewManager(object):
         method to remove a view to guarantee that the lock state is checked
         first.
         """
+        assert view in self.views, "invalid view for manager"
+
         if view.locked():
             blaguiutil.error_dialog(
                 "This tab is locked", "Unlock it first to remove it.")
-            return False
-        try:
-            self.views.remove(view)
-        except ValueError:
-            return False
         else:
+            self.views.remove(view)
             self._notify_remove(view)
-        return True
 
     def populate_context_menu(self, menu, view):
         if view is not None:

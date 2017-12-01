@@ -17,13 +17,16 @@
 import gtk
 
 from . import blalibrarybrowser
+from . import blafsbrowser
 
 
 def create_view(config, library, view):
     library_browser = blalibrarybrowser.create_browser(config, library, view)
-    return BlaBrowserView(config, [library_browser])
+    # fs_browser = blafsbrowser.create_browser(config, view)
+    return BlaBrowserView(config, [library_browser])#, fs_browser])
 
 
+# TODO: Rename this to BlaBrowserContainer.
 class BlaBrowserView(gtk.Notebook):
     def __init__(self, config, browsers):
         super(BlaBrowserView, self).__init__()
