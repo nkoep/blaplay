@@ -28,15 +28,11 @@ try:
     from gst import *
     import gst.pbutils as pbutils
 except ImportError:
-    class gst(object):
-        class ElementNotFoundError(Exception):
-            pass
+    class ElementNotFoundError(Exception):
+        pass
 
-        @classmethod
-        def element_factory_find(cls, element):
-            return None
+    def element_factory_find(element):
+        return None
 
-        @classmethod
-        def element_factory_make(cls, element):
-            raise gst.ElementNotFoundError
-
+    def element_factory_make(element):
+        raise gst.ElementNotFoundError
