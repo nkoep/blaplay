@@ -232,4 +232,3 @@ class Mp3(BlaTrack):
             tags.save(self.uri)
             return False
         return True
-

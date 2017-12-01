@@ -45,20 +45,20 @@ def _is_py_file(s):
     return not (s.endswith("pyc") or s.startswith("_"))
 
 def _check_module_integrity(module, name):
-    try:
-        format_ = getattr(module, name)
-        extensions = format_.extensions
-        # TODO: use the iter() built-in to check iterability
-        if not hasattr(extensions, "__iter__"):
-            raise AttributeError
-        # TODO: check if these are callable
-        for attr in ["_read_tags", "_save"]:
-            if not hasattr(format_, attr):
-                raise AttributeError
-    except AttributeError as exc:
-        print_d("Failed to initialize \"%s\" visualization: %s" %
-                (identifier, exc))
+    if not hasattr(module, name):
+        print_d("Format module \"%s\" does not provide class \"%s\"" %
+                (module.__name__, name))
         return None
+    format_ = getattr(module, name)
+    if (not hasattr(format_, "extensions") or
+            not hasattr(format_.extensions, "__iter__")):
+        print_d("Format class \"%s\" does not list valid extensions" % name)
+        return None
+    for attr in ["_read_tags", "_save"]:
+        if not hasattr(format_, attr) or not callable(getattr(format_, attr)):
+            print_d("Format class \"%s\" has no method \"%s\"" %
+                    (name, attr))
+            return None
     return format_
 
 # Every module name in the formats package except those defining a format start
@@ -83,10 +83,7 @@ for module in filter(_is_py_file, os.listdir(os.path.dirname(__file__))):
         format_ = _check_module_integrity(module, name)
         if format_:
             for ext in format_.extensions:
-                # FIXME: with the addition of video support we overwrite
-                #        certain extension handlers here, e.g. mp4
                 formats[ext] = format_
 
 del _is_py_file
 del _check_module_integrity
-

@@ -47,4 +47,3 @@ class Wav(BlaTrack):
         self[ENCODING] = "lossless"
 
         audio.close()
-
