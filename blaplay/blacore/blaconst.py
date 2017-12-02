@@ -42,7 +42,6 @@ ARTISTS = os.path.join(CACHEDIR, "artists")
 
 # Files
 CONFIG_PATH = os.path.join(USERDIR, "config")
-PIDFILE = os.path.join(USERDIR, "pid")
 LIBRARY_PATH = os.path.join(USERDIR, "library")
 OOL_PATH = os.path.join(USERDIR, "ool")
 PLAYLISTS_PATH = os.path.join(USERDIR, "playlists")

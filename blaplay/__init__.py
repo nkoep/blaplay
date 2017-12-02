@@ -24,6 +24,23 @@ from blaplay.blacore import blaconst
 from blaplay import blautil
 
 
+def create_user_directories():
+    # Set up user directories if necessary.
+    directories = [blaconst.CACHEDIR, blaconst.USERDIR, blaconst.COVERS,
+                   blaconst.ARTISTS]
+
+    if not all(map(os.path.isdir, directories)):
+        print_i("Setting up user directories")
+        for directory in directories:
+            try:
+                os.makedirs(directory)
+            except OSError as (errno, strerror):
+                # inode exists, but it's a file. We can only bail in this case
+                # and just re-raise the exception.
+                if errno != 17:
+                    die("'%s' is a file, not a directory" % directory)
+
+
 class Blaplay(gobject.GObject):
     __slots__ = "_pre_shutdown_hooks config library player window".split()
 
@@ -80,7 +97,7 @@ class Blaplay(gobject.GObject):
     def run(self):
         gobject.idle_add(self.window.show)
         print_d("Starting the main loop")
-        gtk.main() # this blocks until gtk.main_quit() is called
+        gtk.main()
         self._shutdown()
 
     def _shutdown(self):

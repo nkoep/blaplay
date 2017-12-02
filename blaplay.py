@@ -15,6 +15,7 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
+import sys
 import os
 import fcntl
 
@@ -23,8 +24,8 @@ gobject.threads_init()
 
 import blaplay
 from blaplay.blacore import blaconst
-
-cli_queue = None
+# TODO: Move bladbus to core
+from blaplay.blautil import bladbus
 
 
 def init_signals():
@@ -56,7 +57,7 @@ def parse_args():
     parser.add_argument(
         "URI", nargs="*", help="Input to be sent to the current playlist "
         "unless\noption -c or -n is specified")
-    parser.add_argument("-d", "--debug", action="count", type=int, default=0,
+    parser.add_argument("-d", "--debug", action="count", default=0,
                         dest="debug_level", help="print debug messages")
     parser.add_argument("-h", "--help", action="help",
                         help="display this help and exit")
@@ -98,77 +99,28 @@ def init_logging(debug_level):
     __builtins__.__dict__["print_d"] = logging.debug
     __builtins__.__dict__["print_i"] = logging.info
     __builtins__.__dict__["print_w"] = logging.warning
+    __builtins__.__dict__["print_c"] = logging.critical
+    def _die(msg):
+        print_c(msg)
+        sys.exit(1)
+    __builtins__.__dict__["die"] = _die
 
 
-def process_args(args):
-    from blaplay.blautil import bladbus
-    # FIXME: bladbus needs to be treated differently
-    global cli_queue
-
-    # Parse URIs given on the command-line.
-    if args["URI"]:
-        if args["append"]:
-            action = "append"
-        elif args["new"]:
-            action = "new"
-        else:
-            action = "replace"
-
-        def normpath(uri):
-            return os.path.normpath(os.path.abspath(uri))
-        # TODO: make cli_queue a FIFO we write to here. then connect a handler
-        #       which monitors the FIFO in the main thread and adds tracks as
-        #       they arrive
-        isfile = os.path.isfile
-        cli_queue = (action, filter(isfile, map(normpath, args["URI"])))
+def parse_uris(args):
+    if args["append"]:
+        action = "append"
+    elif args["new"]:
+        action = "new"
     else:
-        cli_queue = ("raise_window", None)
+        action = "replace"
 
-
-def create_instance_lock():
-    # TODO: Make python2-dbus a hard-dependency and ensure singleton behavior
-    #       with owned bus names.
-
-    # Set up user directories if necessary.
-    directories = [blaconst.CACHEDIR, blaconst.USERDIR, blaconst.COVERS,
-                   blaconst.ARTISTS]
-
-    if not all(map(os.path.isdir, directories)):
-        print_i("Setting up user directories")
-        for directory in directories:
-            try:
-                os.makedirs(directory)
-            except OSError as (errno, strerror):
-                # inode exists, but it's a file. We can only bail in this case
-                # and just re-raise the exception.
-                if errno != 17:
-                    raise
-
-    lock_file = open(blaconst.PIDFILE, "w")
-    try:
-        fcntl.lockf(lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
-    except IOError:
-        print_i("%s is already running" % blaconst.APPNAME)
-        from blaplay.blautil import bladbus
-        global cli_queue
-        try:
-            bladbus.query_bus(*cli_queue)
-        except TypeError:
-            pass
-        else:
-            cli_queue = None
-        raise SystemExit
-    lock_file.write(str(os.getpid()))
-    return lock_file
-
-
-def remove_instance_lock(lock_file):
-    fcntl.lockf(lock_file, fcntl.LOCK_UN)
-    lock_file.close()
-    try:
-        os.unlink(blaconst.PIDFILE)
-    except OSError:
-        pass
+    def normalize_path(uri):
+        return os.path.normpath(os.path.abspath(uri))
+    # TODO: make cli_queue a FIFO we write to here. then connect a handler
+    #       which monitors the FIFO in the main thread and adds tracks as
+    #       they arrive
+    isfile = os.path.isfile
+    return action, filter(isfile, map(normalize_path, args["URI"]))
 
 
 def main():
@@ -178,22 +130,30 @@ def main():
     args = parse_args()
     # Initialize the logging interfaces.
     init_logging(args["debug_level"])
-    # Process and handle any remaining command-line arguments.
-    process_args(args)
+    # Parse URIs.
+    action, uris = parse_uris(args)
 
-    # If we made it this far, create a lock file that we use to guarantee only
-    # one instance is running at a time. The lock is only valid as long as the
-    # file descriptor is alive. That's why we need to keep it open (and
-    # referenced) which is why we assign and hold it here for the rest of the
-    # application lifetime.
-    lock_file = create_instance_lock()
-    # Fire up the main application.
+    # We use dbus to ensure that only one instance of blaplay is running at a
+    # time by claiming a unique bus name. That means if we manage to get an
+    # interface to the proxy object, we simply handle the command-line
+    # arguments, raise the main window and exit.
+    interface = bladbus.get_interface()
+    if interface is not None:
+        interface.raise_window()
+        interface.handle_uris(action, uris)
+        sys.exit()
+
+    # Create the required application directories.
+    blaplay.create_user_directories()
+
+    # Instantiate the main application class.
     app = blaplay.Blaplay()
+
+    # TODO: Handle command-line URIs.
+
     # This blocks until the shutdown sequence is initiated.
     app.run()
 
-    # Get rid of the lock file again.
-    remove_instance_lock(lock_file)
     print_d("Shutdown complete")
 
 

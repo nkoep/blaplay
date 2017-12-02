@@ -37,22 +37,15 @@ def init(app):
     BlaDBus(app, object_path=OBJECT_PATH, bus_name=bus_name)
 
 
-def query_bus(query, arg=None):
+def get_interface():
     # Get a proxy to the bus object of the running blaplay instance.
     try:
         proxy = dbus.SessionBus().get_object(INTERFACE, OBJECT_PATH)
     except dbus.DBusException:
-        raise SystemExit
-
-    # Get an interface to the proxy. This offers direct access to methods
-    # exposed through the interface.
-    interface = dbus.Interface(proxy, INTERFACE)
-
-    if query == "raise_window":
-        interface.raise_window()
-    elif query in ["append", "new", "replace"] and arg:
-        interface.parse_uris(query, arg)
-    raise SystemExit
+        return None
+    # Get an interface to the proxy. This offers direct access to
+    # methods exposed through the interface.
+    return dbus.Interface(proxy, INTERFACE)
 
 
 class BlaDBus(dbus.service.Object):
@@ -67,5 +60,21 @@ class BlaDBus(dbus.service.Object):
 
     @dbus.service.method(
         dbus_interface=INTERFACE, in_signature="sas", out_signature="")
-    def parse_uris(self, action, uris):
+    def handle_uris(self, action, uris):
+        if action == "append":
+            self._append_uris_to_current_playlist(uris)
+        elif action == "new":
+            self._send_uris_to_new_playlist(uris)
+        elif action == "replace":
+            self._send_uris_to_current_playlist(uris)
+        else:
+            assert False, "invalid operation"
+
+    def _append_uris_to_current_playlist(self, uris):
+        print_w("TODO")
+
+    def _send_uris_to_new_playlist(self, uris):
+        print_w("TODO")
+
+    def _send_uris_to_current_playlist(self, uris):
         print_w("TODO")
