@@ -41,6 +41,7 @@ def init_signals():
     for sig in [signal.SIGTERM, signal.SIGINT, signal.SIGHUP]:
         signal.signal(sig, lambda *x: os.write(w, "bla")) # What else?
 
+
 def parse_args():
     from argparse import ArgumentParser, RawTextHelpFormatter
 
@@ -55,19 +56,6 @@ def parse_args():
     parser.add_argument(
         "URI", nargs="*", help="Input to be sent to the current playlist "
         "unless\noption -c or -n is specified")
-    parser.add_argument("-a", "--play-pause", action="store_true",
-                        help="play or pause playback")
-    parser.add_argument("-s", "--stop", action="store_true",
-                        help="stop playback")
-    parser.add_argument("-n", "--next", action="store_true",
-                        help="play next track in current playlist")
-    parser.add_argument("-p", "--previous", action="store_true",
-                        help="play previous track in current playlist")
-    parser.add_argument(
-        "-f", "--format", nargs=1, help="print track "
-        "information and exit\n   %%a: artist\n   %%t: "
-        "title\n   %%b: album\n   %%y: year"
-        "\n   %%g: genre\n   %%c: cover", action="append")
     parser.add_argument("-d", "--debug", action="count",
                         help="print debug messages")
     parser.add_argument("-q", "--quiet", action="store_true",
@@ -80,6 +68,7 @@ def parse_args():
         version="%s %s" % (blaconst.APPNAME, blaconst.VERSION))
 
     return vars(parser.parse_args())
+
 
 def init_logging(args):
     import logging
@@ -113,14 +102,11 @@ def init_logging(args):
     __builtins__.__dict__["print_i"] = logging.info
     __builtins__.__dict__["print_w"] = logging.warning
 
+
 def process_args(args):
     from blaplay.blautil import bladbus
     # FIXME: bladbus needs to be treated differently
     global cli_queue
-
-    # Print information about the current track.
-    if args["format"]:
-        bladbus.query_bus(args["format"][0])
 
     # Parse URIs given on the command-line.
     if args["URI"]:
@@ -141,10 +127,6 @@ def process_args(args):
     else:
         cli_queue = ("raise_window", None)
 
-    # Player commands
-    for cmd in ["play_pause", "stop", "next", "previous"]:
-        if args[cmd]:
-            bladbus.query_bus(cmd)
 
 def create_instance_lock():
     # TODO: Make python2-dbus a hard-dependency and ensure singleton behavior
@@ -165,10 +147,6 @@ def create_instance_lock():
                 if errno != 17:
                     raise
 
-    # We use a lock file to ensure blaplay operates as singleton. However, the
-    # lock is only valid as long as the file descriptor is alive. That's why we
-    # need to keep it open (and referenced) which is why we assign it to a
-    # global.
     lock_file = open(blaconst.PIDFILE, "w")
     try:
         fcntl.lockf(lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
@@ -186,6 +164,7 @@ def create_instance_lock():
     lock_file.write(str(os.getpid()))
     return lock_file
 
+
 def remove_instance_lock(lock_file):
     fcntl.lockf(lock_file, fcntl.LOCK_UN)
     lock_file.close()
@@ -193,6 +172,7 @@ def remove_instance_lock(lock_file):
         os.unlink(blaconst.PIDFILE)
     except OSError:
         pass
+
 
 def main():
     # Initialize signal handling like SIGINT.
@@ -205,7 +185,10 @@ def main():
     process_args(args)
 
     # If we made it this far, create a lock file that we use to guarantee only
-    # one instance is running at a time.
+    # one instance is running at a time. The lock is only valid as long as the
+    # file descriptor is alive. That's why we need to keep it open (and
+    # referenced) which is why we assign and hold it here for the rest of the
+    # application lifetime.
     lock_file = create_instance_lock()
     # Fire up the main application.
     app = blaplay.Blaplay()
@@ -216,6 +199,6 @@ def main():
     remove_instance_lock(lock_file)
     print_d("Shutdown complete")
 
+
 if __name__ == "__main__":
     main()
-

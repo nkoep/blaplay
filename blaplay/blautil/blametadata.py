@@ -334,4 +334,3 @@ class BlaFetcher(gobject.GObject):
         if self._lyrics_thread is not None:
             self._lyrics_thread.kill()
         self._lyrics_thread = self.__fetch_lyrics(track, timestamp)
-

@@ -52,40 +52,9 @@ class Blaplay(gobject.GObject):
         from blaplay.blagui import blakeys
         blakeys.BlaKeys(config, player)
 
-        # TODO: Make python2-dbus a hard dependency so we can drop this mock
-        #       module.
         # Set up the D-Bus interface.
-        try:
-            from blaplay.blautil import bladbus
-        except ImportError:
-            # If the DBUS module isn't available we just define a class which
-            # acts on behalf of the module, issuing warnings whenever it's
-            # used.
-            class bladbus:
-                @classmethod
-                def __warning(cls, exit):
-                    print_w(
-                        "Failed to import dbus module. Install dbus-python.")
-                    if exit:
-                        raise SystemExit
-
-                @classmethod
-                def setup_bus(cls, *args):
-                    cls.__warning(False)
-
-                @classmethod
-                def query_bus(cls, *args):
-                    cls.__warning(True)
-        else:
-            bladbus.init(self)
-
-        # Initialize MPRIS2 module.
-        try:
-            from blaplay.blautil import blampris
-        except ImportError:
-            pass
-        else:
-            blampris.init(self)
+        from blaplay.blautil import bladbus
+        bladbus.init(self)
 
         # Initialize last.fm services.
         from blaplay.blautil import blafm
@@ -152,7 +121,7 @@ class Blaplay(gobject.GObject):
             print_w("Shutdown hook '{:s}' ignored as it isn't callable".format(
                 self._hook_repr(hook)))
 
+
 def shutdown():
     print_d("Stopping the main loop")
     gtk.main_quit()
-
