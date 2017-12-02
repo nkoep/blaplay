@@ -11,13 +11,6 @@ from distutils.util import change_root
 from distutils.command.build import build as d_build
 from distutils.command.build_scripts import build_scripts as d_build_scripts
 from distutils.command.install import install as d_install
-from distutils.extension import Extension
-from Cython.Distutils import build_ext
-
-try:
-    import numpy as np
-except ImportError:
-    np = None
 
 from blaplay.blacore import blaconst
 from blaplay import blautil
@@ -35,18 +28,6 @@ class clean(d_clean):
         d_clean.run(self)
 
         base = os.path.abspath(os.path.dirname(__file__))
-
-        for mod in self.distribution.ext_modules:
-            paths = [os.path.abspath("%s.c" % blautil.toss_extension(src))
-                     for src in mod.sources]
-            paths.append(
-                os.path.join(base, "%s.so" % mod.name.replace(".", "/")))
-            for f in paths:
-                try:
-                    print "removing '%s'" % f
-                    os.unlink(f)
-                except OSError:
-                    pass
 
         if not self.all:
             return
@@ -115,18 +96,6 @@ class check(Command):
         if gobject.pygobject_version < (2, 21):
             raise ImportError
 
-    def _check_cython(self):
-        import Cython
-        major, minor, patch = map(int, Cython.__version__.split("."))
-        if (major, minor, patch) < (0, 15, 1):
-            raise ImportError
-
-    def _check_numpy(self):
-        from numpy.version import version
-        major, minor, patch = map(int, version.split("."))
-        if (major, minor) < (1, 3):
-            raise ImportError
-
     def _check_dbus(self):
         import dbus
         major, minor, patch = map(int, dbus.__version__.split("."))
@@ -149,12 +118,6 @@ class check(Command):
 
         self._check_version(self._check_pygobject, "PyGObject >= 2.21",
                             "https://live.gnome.org/PyGObject")
-
-        self._check_version(self._check_cython, "Cython >= 0.15.1",
-                            "http://http://www.cython.org/")
-
-        self._check_version(self._check_numpy, "NumPy >= 1.3",
-                            "http://www.numpy.org/")
 
         self._check_version(
             self._check_dbus, "python-dbus >= 1.2.4",
@@ -265,15 +228,6 @@ class BlaDistribution(Distribution):
 if __name__ == "__main__":
     description = "Minimalist audio player for GNU/Linux written in Python"
 
-    # Spectrum visualizer
-    extra_compile_args = ["-std=gnu99", "-funroll-loops"]
-    if np is not None:
-        extra_compile_args.append("-I%s" % np.get_include())
-    path = "blaplay/blagui/blaspectrum.pyx"
-    ext_modules = [Extension(blautil.toss_extension(path.replace("/", ".")),
-                             [path], libraries=["fftw3f"],
-                             extra_compile_args=extra_compile_args)]
-
     # Icons
     base = "blaplay/images"
     images_comps = []
@@ -305,9 +259,7 @@ if __name__ == "__main__":
         "cmdclass": {
             "clean": clean,
             "check": check,
-            "build_ext": build_ext,
             "build_scripts": build_scripts
-        },
-        "ext_modules": ext_modules
+        }
     }
     setup(**kwargs)
