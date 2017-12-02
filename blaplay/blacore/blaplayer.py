@@ -18,9 +18,18 @@ import os
 from math import log10
 
 import gobject
+try:
+    import pygst
+except ImportError:
+    die("Python 2 PyGST module is missing")
+try:
+    pygst.require("0.10")
+except pygst.RequiredVersionError:
+    die("GStreamer 0.10 is missing")
+import gst
 
 import blaplay
-from blaplay.blacore import blaconst, blacfg, blagst as gst
+from blaplay.blacore import blaconst, blacfg
 from blaplay import blautil
 
 gstreamer_is_working = None

@@ -20,8 +20,7 @@ import os
 try:
     import dbus
 except ImportError:
-    print_w("Python 2 DBus module is missing")
-    sys.exit(1)
+    die("Python 2 DBus module is missing")
 import dbus.service
 import dbus.mainloop.glib
 dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
