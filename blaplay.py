@@ -56,10 +56,8 @@ def parse_args():
     parser.add_argument(
         "URI", nargs="*", help="Input to be sent to the current playlist "
         "unless\noption -c or -n is specified")
-    parser.add_argument("-d", "--debug", action="count",
-                        help="print debug messages")
-    parser.add_argument("-q", "--quiet", action="store_true",
-                        help="only print fatal messages")
+    parser.add_argument("-d", "--debug", action="count", type=int, default=0,
+                        dest="debug_level", help="print debug messages")
     parser.add_argument("-h", "--help", action="help",
                         help="display this help and exit")
     parser.add_argument(
@@ -70,23 +68,22 @@ def parse_args():
     return vars(parser.parse_args())
 
 
-def init_logging(args):
+def init_logging(debug_level):
     import logging
 
     format_ = "*** %%(levelname)s%s: %%(message)s"
+    level = logging.DEBUG
 
-    debug = args["debug"]
-    if debug:
-        if debug == 1:
-            format_ %= " (%(filename)s:%(lineno)d)"
-        elif debug == 2:
-            format_ %= " (%(asctime)s, %(filename)s:%(lineno)d)"
-        else:
-            raise SystemExit("Maximum debug level is 2")
-        level = logging.DEBUG
-    else:
+    if debug_level == 0:
         format_ %= ""
         level = logging.INFO
+    elif debug_level == 1:
+        format_ %= " (%(filename)s:%(lineno)d)"
+    elif debug_level == 2:
+        format_ %= " (%(asctime)s, %(filename)s:%(lineno)d)"
+    else:
+        raise SystemExit("Maximum debug level is 2")
+
     logging.basicConfig(format=format_, level=level,
             datefmt="%a %b %d %H:%M:%S %Y")
 
@@ -180,7 +177,7 @@ def main():
     # Parse command-line arguments.
     args = parse_args()
     # Initialize the logging interfaces.
-    init_logging(args)
+    init_logging(args["debug_level"])
     # Process and handle any remaining command-line arguments.
     process_args(args)
 
